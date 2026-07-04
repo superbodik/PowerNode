@@ -5,18 +5,24 @@ DAEMON_ENV_FILE="/etc/wingsd/wingsd.env"
 DAEMON_SERVICE="/etc/systemd/system/wingsd.service"
 DAEMON_DATA_DIR="/var/lib/wingsd/servers"
 
-install_daemon() {
-	log_step "Installing node daemon (wingsd)"
-
+build_daemon_binary() {
 	install_go
 	require_command docker || die "Docker must be installed before wingsd (this node runs containers directly)"
 
-	mkdir -p "$DAEMON_INSTALL_DIR" /etc/wingsd "$DAEMON_DATA_DIR"
+	mkdir -p "$DAEMON_INSTALL_DIR" "$DAEMON_DATA_DIR"
 
 	log_step "Building daemon"
 	(cd "${PROJECT_ROOT}/daemon" && go build -o "${DAEMON_INSTALL_DIR}/wingsd" ./cmd/wingsd) \
 		|| die "Daemon build failed"
 	log_ok "Daemon binary: ${DAEMON_INSTALL_DIR}/wingsd"
+}
+
+install_daemon() {
+	log_step "Installing node daemon (wingsd)"
+
+	mkdir -p /etc/wingsd
+
+	build_daemon_binary
 
 	write_daemon_env
 	write_daemon_service

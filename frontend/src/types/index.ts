@@ -82,3 +82,16 @@ export interface CreateNodeResponse {
   id: number;
   daemon_token: string;
 }
+
+export interface VersionInfo {
+  commit: string;
+  build_date: string;
+  source_dir: string;
+  repo_slug: string;
+}
+
+export interface UpdateCheck {
+  current_commit: string;
+  latest_commit: string;
+  update_available: boolean;
+}

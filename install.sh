@@ -26,6 +26,7 @@ source "${SCRIPT_DIR}/scripts/panel.sh"
 source "${SCRIPT_DIR}/scripts/daemon.sh"
 source "${SCRIPT_DIR}/scripts/firewall.sh"
 source "${SCRIPT_DIR}/scripts/uninstall.sh"
+source "${SCRIPT_DIR}/scripts/update.sh"
 
 preflight() {
 	log_step "Preflight checks"
@@ -76,6 +77,12 @@ main() {
 		return
 	fi
 
+	if [[ -n "${PANEL_UPDATE:-}" ]]; then
+		preflight
+		run_update
+		return
+	fi
+
 	select_language
 	preflight
 
@@ -85,7 +92,8 @@ main() {
 		2 "$(msg menu_2)" \
 		3 "$(msg menu_3)" \
 		4 "$(msg menu_4)" \
-		5 "$(msg menu_5)")
+		5 "$(msg menu_5)" \
+		6 "$(msg menu_6)")
 
 	case "$choice" in
 		1) run_master_panel ;;
@@ -93,6 +101,7 @@ main() {
 		3) run_all ;;
 		4) run_uninstall ;;
 		5) uninstall_full ;;
+		6) run_update ;;
 		*) die "No option selected, aborting" ;;
 	esac
 }

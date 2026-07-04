@@ -16,6 +16,11 @@ import (
 	"github.com/yourorg/panel/internal/ws"
 )
 
+var (
+	commit    = "unknown"
+	buildDate = "unknown"
+)
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -38,6 +43,10 @@ func main() {
 		NodeClient: func(nodeID int64) (*daemonclient.Client, error) {
 			return nil, errNodeClientNotConfigured
 		},
+		Commit:    commit,
+		BuildDate: buildDate,
+		SourceDir: cfg.SourceDir,
+		RepoSlug:  cfg.RepoSlug,
 	})
 
 	srv := &http.Server{

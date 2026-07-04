@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
+import { Settings } from './pages/Settings';
 
 interface StoredUser {
   id: number;
@@ -9,7 +10,7 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'nodes';
+type View = 'servers' | 'nodes' | 'settings';
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -56,7 +57,7 @@ export function App() {
         <div className="topbar-sep" />
         <nav className="breadcrumb">
           <span className={activeServer ? '' : 'bc-cur'} onClick={() => goTo('servers')}>
-            {view === 'nodes' ? 'Nodes' : 'Dashboard'}
+            {view === 'nodes' ? 'Nodes' : view === 'settings' ? 'Settings' : 'Dashboard'}
           </span>
           {activeServer && (
             <>
@@ -95,6 +96,12 @@ export function App() {
             <div className="nav-item">
               <span className="nav-icon">☰</span> Activity
             </div>
+            <div
+              className={`nav-item ${view === 'settings' ? 'active' : ''}`}
+              onClick={() => goTo('settings')}
+            >
+              <span className="nav-icon">⚙</span> Settings
+            </div>
           </div>
           <div className="sidebar-footer">
             <div className="nav-item logout-item" onClick={handleLogout}>
@@ -104,7 +111,13 @@ export function App() {
         </aside>
 
         <main className="main">
-          {view === 'nodes' ? <Nodes /> : <Dashboard onManage={setActiveServer} />}
+          {view === 'nodes' ? (
+            <Nodes />
+          ) : view === 'settings' ? (
+            <Settings />
+          ) : (
+            <Dashboard onManage={setActiveServer} />
+          )}
         </main>
       </div>
     </div>

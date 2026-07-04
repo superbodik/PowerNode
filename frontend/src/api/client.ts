@@ -1,4 +1,12 @@
-import type { CreateNodeRequest, CreateNodeResponse, Node, PowerAction, Server } from '../types';
+import type {
+  CreateNodeRequest,
+  CreateNodeResponse,
+  Node,
+  PowerAction,
+  Server,
+  UpdateCheck,
+  VersionInfo,
+} from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -50,6 +58,10 @@ export const api = {
 
   createNode: (payload: CreateNodeRequest) =>
     request<CreateNodeResponse>('/nodes', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getVersion: () => request<VersionInfo>('/version'),
+
+  checkUpdate: () => request<UpdateCheck>('/version/check'),
 };
 
 export function connectServerSocket(uuid: string): WebSocket {

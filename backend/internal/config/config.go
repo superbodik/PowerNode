@@ -16,6 +16,9 @@ type Config struct {
 	RefreshTokenTTL time.Duration
 
 	EncryptionKey string
+
+	SourceDir string
+	RepoSlug  string
 }
 
 func Load() Config {
@@ -28,6 +31,8 @@ func Load() Config {
 		AccessTokenTTL:  15 * time.Minute,
 		RefreshTokenTTL: 30 * 24 * time.Hour,
 		EncryptionKey:   getEnv("PANEL_ENCRYPTION_KEY", ""),
+		SourceDir:       getEnv("PANEL_SOURCE_DIR", ""),
+		RepoSlug:        getEnv("PANEL_UPDATE_REPO", "superbodik/sbPanel"),
 	}
 }
 

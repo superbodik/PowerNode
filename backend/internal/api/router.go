@@ -20,6 +20,10 @@ type Dependencies struct {
 	Token      *auth.TokenManager
 	Hub        *ws.Hub
 	NodeClient func(nodeID int64) (*daemonclient.Client, error)
+	Commit     string
+	BuildDate  string
+	SourceDir  string
+	RepoSlug   string
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -40,6 +44,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	authHandler := &handlers.AuthHandler{DB: deps.DB, Token: deps.Token}
 	nodeHandler := &handlers.NodeHandler{DB: deps.DB}
 	serverHandler := &handlers.ServerHandler{DB: deps.DB, NodeClient: deps.NodeClient}
+	versionHandler := &handlers.VersionHandler{
+		Commit:    deps.Commit,
+		BuildDate: deps.BuildDate,
+		SourceDir: deps.SourceDir,
+		RepoSlug:  deps.RepoSlug,
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -55,6 +65,9 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/servers", serverHandler.List)
 			r.Get("/servers/{uuid}", serverHandler.Get)
 			r.Post("/servers/{uuid}/power", serverHandler.Power)
+
+			r.Get("/version", versionHandler.Get)
+			r.Get("/version/check", versionHandler.CheckUpdate)
 		})
 	})
 

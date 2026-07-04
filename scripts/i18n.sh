@@ -43,6 +43,9 @@ MSG_RU[menu_4]="Удалить (база данных и файлы сервер
 MSG_EN[menu_5]="FULL removal — deletes database, Docker, all data (DANGEROUS)"
 MSG_RU[menu_5]="ПОЛНОЕ удаление — сотрёт базу данных, Docker и все данные (ОПАСНО)"
 
+MSG_EN[menu_6]="Check for updates / update this installation"
+MSG_RU[menu_6]="Проверить обновления / обновить установку"
+
 MSG_EN[domain_intro]="The panel needs a domain name to issue a free HTTPS certificate (Let's Encrypt) for. Make sure a DNS A-record for that domain/subdomain already points at this server's public IP before continuing — the certificate request will fail otherwise."
 MSG_RU[domain_intro]="Панели нужно доменное имя, чтобы автоматически выпустить бесплатный HTTPS-сертификат (Let's Encrypt). Перед тем как продолжить, убедитесь, что DNS A-запись для этого домена/поддомена уже указывает на публичный IP этого сервера — иначе выпуск сертификата не пройдёт."
 

@@ -4,20 +4,22 @@ PANEL_INSTALL_DIR="/opt/panel"
 PANEL_ENV_FILE="/etc/panel/panel.env"
 PANEL_SERVICE="/etc/systemd/system/panel.service"
 
-install_panel() {
-	log_step "Installing master panel (backend + frontend)"
-
+build_panel_binaries() {
 	install_go
 	install_nodejs
 
-	mkdir -p "$PANEL_INSTALL_DIR" /etc/panel
+	mkdir -p "$PANEL_INSTALL_DIR"
+
+	local commit build_date
+	commit=$(git -C "$PROJECT_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+	build_date=$(date -u +%FT%TZ)
 
 	log_step "Building backend"
-	(cd "${PROJECT_ROOT}/backend" && go build -o "${PANEL_INSTALL_DIR}/panel" ./cmd/panel) \
+	(cd "${PROJECT_ROOT}/backend" && go build -ldflags "-X main.commit=${commit} -X main.buildDate=${build_date}" -o "${PANEL_INSTALL_DIR}/panel" ./cmd/panel) \
 		|| die "Backend build failed"
 	(cd "${PROJECT_ROOT}/backend" && go build -o "${PANEL_INSTALL_DIR}/panel-admin" ./cmd/panel-admin) \
 		|| die "panel-admin build failed"
-	log_ok "Backend binaries: ${PANEL_INSTALL_DIR}/panel, ${PANEL_INSTALL_DIR}/panel-admin"
+	log_ok "Backend binaries: ${PANEL_INSTALL_DIR}/panel, ${PANEL_INSTALL_DIR}/panel-admin (${commit})"
 
 	log_step "Building frontend"
 	(cd "${PROJECT_ROOT}/frontend" && npm ci --silent && npm run build --silent) \
@@ -25,6 +27,14 @@ install_panel() {
 	rm -rf "${PANEL_INSTALL_DIR}/public"
 	cp -r "${PROJECT_ROOT}/frontend/dist" "${PANEL_INSTALL_DIR}/public"
 	log_ok "Frontend assets: ${PANEL_INSTALL_DIR}/public"
+}
+
+install_panel() {
+	log_step "Installing master panel (backend + frontend)"
+
+	mkdir -p "$PANEL_INSTALL_DIR" /etc/panel
+
+	build_panel_binaries
 
 	write_panel_env
 	write_panel_service
@@ -92,6 +102,7 @@ write_panel_env() {
 	PANEL_REDIS_ADDR=127.0.0.1:6379
 	PANEL_JWT_SECRET=${jwt_secret}
 	PANEL_ENCRYPTION_KEY=${encryption_key}
+	PANEL_SOURCE_DIR=${PROJECT_ROOT}
 	EOF
 	chmod 600 "$PANEL_ENV_FILE"
 	log_ok "Wrote $PANEL_ENV_FILE (mode 600)"
