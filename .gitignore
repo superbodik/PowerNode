@@ -1,0 +1,11 @@
+node_modules/
+dist/
+tsconfig.tsbuildinfo
+*.log
+
+*.env
+panel.env
+wingsd.env
+
+.vscode/
+.idea/

@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package daemon.v1;
+
+option go_package = "github.com/yourorg/panel-proto/daemon/v1;daemonv1";
+
+service NodeDaemon {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (Empty);
+
+  rpc CreateServer(CreateServerRequest) returns (ServerOperationResponse);
+  rpc StartServer(ServerActionRequest) returns (ServerOperationResponse);
+  rpc StopServer(ServerActionRequest) returns (ServerOperationResponse);
+  rpc RestartServer(ServerActionRequest) returns (ServerOperationResponse);
+  rpc KillServer(ServerActionRequest) returns (ServerOperationResponse);
+  rpc DeleteServer(ServerActionRequest) returns (Empty);
+  rpc UpdateServerLimits(UpdateLimitsRequest) returns (Empty);
+
+  rpc StreamResourceStats(ServerActionRequest) returns (stream ResourceStats);
+  rpc StreamConsole(ServerActionRequest) returns (stream ConsoleLine);
+  rpc SendConsoleCommand(ConsoleCommandRequest) returns (Empty);
+  rpc StreamInstallLog(ServerActionRequest) returns (stream ConsoleLine);
+
+  rpc ListDirectory(FileRequest) returns (FileListResponse);
+  rpc ReadFile(FileRequest) returns (stream FileChunk);
+  rpc WriteFile(stream FileChunk) returns (Empty);
+  rpc DeleteFile(FileRequest) returns (Empty);
+  rpc CreateDirectory(FileRequest) returns (Empty);
+  rpc RenameFile(RenameRequest) returns (Empty);
+  rpc CompressFiles(CompressRequest) returns (Empty);
+  rpc DecompressFile(FileRequest) returns (Empty);
+
+  rpc CreateBackup(BackupRequest) returns (BackupOperationResponse);
+  rpc RestoreBackup(BackupRequest) returns (BackupOperationResponse);
+  rpc DeleteBackup(BackupRequest) returns (Empty);
+}
+
+message Empty {}
+
+message RegisterRequest {
+  string node_uuid     = 1;
+  string daemon_token  = 2;
+  string agent_version = 3;
+}
+
+message RegisterResponse {
+  bool   accepted        = 1;
+  string tls_cert_pem    = 2;
+  int64  heartbeat_interval_seconds = 3;
+}
+
+message HeartbeatRequest {
+  string node_uuid      = 1;
+  double load_1m        = 2;
+  int64  memory_free_mb = 3;
+  int64  disk_free_mb   = 4;
+}
+
+message ServerActionRequest {
+  string server_uuid = 1;
+}
+
+message CreateServerRequest {
+  string server_uuid       = 1;
+  string docker_image      = 2;
+  string startup_command   = 3;
+  map<string, string> environment = 4;
+
+  int64 memory_mb   = 5;
+  int64 swap_mb     = 6;
+  int64 disk_mb     = 7;
+  int32 io_weight   = 8;
+  int32 cpu_percent = 9;
+  string threads_pinned = 10;
+
+  repeated PortAllocation allocations = 11;
+  string install_script = 12;
+}
+
+message PortAllocation {
+  string ip   = 1;
+  int32  port = 2;
+  bool   is_primary = 3;
+}
+
+message UpdateLimitsRequest {
+  string server_uuid = 1;
+  int64 memory_mb     = 2;
+  int64 swap_mb       = 3;
+  int64 disk_mb       = 4;
+  int32 io_weight     = 5;
+  int32 cpu_percent   = 6;
+}
+
+message ServerOperationResponse {
+  string server_uuid = 1;
+  bool   success     = 2;
+  string message     = 3;
+  string state       = 4;
+}
+
+message ResourceStats {
+  string server_uuid    = 1;
+  double cpu_percent    = 2;
+  int64  memory_bytes   = 3;
+  int64  disk_bytes     = 4;
+  int64  network_rx     = 5;
+  int64  network_tx     = 6;
+  int64  uptime_seconds = 7;
+  string state           = 8;
+}
+
+message ConsoleLine {
+  string server_uuid = 1;
+  string stream      = 2;
+  string line        = 3;
+  int64  timestamp   = 4;
+}
+
+message ConsoleCommandRequest {
+  string server_uuid = 1;
+  string line         = 2;
+}
+
+message FileRequest {
+  string server_uuid = 1;
+  string path         = 2;
+}
+
+message FileEntry {
+  string name          = 1;
+  bool   is_directory  = 2;
+  int64  size_bytes    = 3;
+  int64  modified_at   = 4;
+  string mode          = 5;
+}
+
+message FileListResponse {
+  repeated FileEntry entries = 1;
+}
+
+message FileChunk {
+  string server_uuid = 1;
+  string path         = 2;
+  bytes  data         = 3;
+  bool   is_last       = 4;
+}
+
+message RenameRequest {
+  string server_uuid = 1;
+  string from_path    = 2;
+  string to_path      = 3;
+}
+
+message CompressRequest {
+  string server_uuid   = 1;
+  repeated string paths = 2;
+  string archive_name    = 3;
+}
+
+message BackupRequest {
+  string server_uuid    = 1;
+  string backup_uuid     = 2;
+  repeated string ignored_files = 3;
+}
+
+message BackupOperationResponse {
+  string backup_uuid  = 1;
+  bool   success       = 2;
+  string message       = 3;
+  int64  bytes          = 4;
+  string checksum       = 5;
+}
