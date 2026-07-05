@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yourorg/panel/internal/api"
@@ -42,13 +43,17 @@ func main() {
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret, cfg.AccessTokenTTL)
 	resolveNodeClient := nodeClientResolver(pool, cfg.EncryptionKey)
 
-	hub := ws.NewHub()
-	hub.FetchStats = func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error) {
+	resolveServerClient := func(ctx context.Context, serverUUID uuid.UUID) (*daemonclient.Client, error) {
 		var nodeID int64
 		if err := pool.QueryRow(ctx, `SELECT node_id FROM servers WHERE uuid = $1`, serverUUID).Scan(&nodeID); err != nil {
 			return nil, err
 		}
-		client, err := resolveNodeClient(nodeID)
+		return resolveNodeClient(nodeID)
+	}
+
+	hub := ws.NewHub()
+	hub.FetchStats = func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error) {
+		client, err := resolveServerClient(ctx, serverUUID)
 		if err != nil {
 			return nil, err
 		}
@@ -66,6 +71,13 @@ func main() {
 			UptimeSeconds: stats.UptimeSeconds,
 			State:         models.ServerStatus(stats.State),
 		}, nil
+	}
+	hub.DialConsole = func(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error) {
+		client, err := resolveServerClient(ctx, serverUUID)
+		if err != nil {
+			return nil, err
+		}
+		return client.DialConsole(ctx, serverUUID)
 	}
 
 	router := api.NewRouter(api.Dependencies{

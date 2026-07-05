@@ -11,17 +11,23 @@ Pages wired into `App.tsx`'s sidebar: **Servers** (dashboard, `pages/Dashboard.t
 + `components/ServerList.tsx`), **Nodes** (`pages/Nodes.tsx`), **Settings**
 (`pages/Settings.tsx` — version + update check). Clicking "Manage" on a
 server card now goes somewhere: **`pages/ServerView.tsx`**, tab-bar with
-Overview/Console/Files/Databases/Schedules — only Overview is real (power
-buttons + live CPU/RAM/Disk meters), the other four are honest "not
-implemented yet" panels, not fake UI. **Activity** is still a static,
-unwired nav item.
+Overview/Console/Files/Databases/Schedules — Overview (power buttons +
+live CPU/RAM/Disk meters) and **Console (real, bidirectional)** are wired;
+Files/Databases/Schedules are honest "not implemented yet" panels, not
+fake UI. **Activity** is still a static, unwired nav item.
 
 Backend REST surface: auth (login/me), nodes (list/create, admin-gated),
 servers (list/get/power — power is now genuinely wired end to end, see
-below), version (get/check-update), WS gateway (`/ws/servers/{uuid}`) that
-now actually relays live stats (polls the daemon every 2s while at least
-one browser is subscribed, stops when the last one leaves) — console
-relay is not built yet, only stats.
+below), version (get/check-update). Two WS gateways, both now require
+`?token=<jwt>` on the handshake (closed a real gap — they were previously
+unauthenticated entirely, since browsers can't set an `Authorization`
+header on a WS upgrade and nothing had filled that in yet): `/ws/servers/{uuid}`
+relays live stats (polls the daemon every 2s while at least one browser is
+subscribed), `/ws/servers/{uuid}/console` relays the daemon's console
+bidirectionally (dials `wingsd`'s own `/ws/servers/{uuid}` on first
+subscriber, closes it when the last browser leaves — same lazy pattern as
+stats, see convention 10 below, now generalized to two independent
+room/session maps in the same `Hub`).
 
 **Power actions and live stats are real now, not stubbed.** The chain that
 makes this work: `NodeHandler.Create` encrypts the raw daemon token
@@ -119,26 +125,29 @@ runs `apply_migrations`), full destructive uninstall gated behind typing
    runner tracks applied files in `schema_migrations`; editing an old file
    in place means already-deployed panels never see the change (they've
    already recorded that filename as applied). Bump the number instead.
-10. **Live per-server data (stats now, console later) is relayed lazily.**
-    `ws.Hub` only starts polling/streaming a server once a browser
-    subscribes to `/ws/servers/{uuid}`, and stops the moment the last one
-    disconnects (see `pollers map[uuid.UUID]context.CancelFunc` in
-    `internal/ws/hub.go`). Don't build a global "poll every server every
-    N seconds" loop — most servers have nobody watching at any given
-    moment, and that's needless load on every node for no benefit.
+10. **Live per-server data (stats, console) is relayed lazily, per room.**
+    `ws.Hub` only starts polling/dialing for a given server once the first
+    browser subscribes to its room, and tears the upstream connection down
+    the moment the last one disconnects — `pollers`/`consoleSessions`
+    (both `map[uuid.UUID]context.CancelFunc`-shaped) in `internal/ws/hub.go`.
+    Don't build a global "poll/dial every server all the time" loop — most
+    servers have nobody watching at any given moment. When adding a third
+    kind of live relay, add a third independent room+session map rather
+    than trying to generalize the first two into one abstraction
+    prematurely — stats (HTTP poll) and console (persistent WS dial) have
+    different enough connection lifecycles that forcing one interface over
+    both cost more than the duplication would.
+11. **WS auth is a `?token=<jwt>` query param, not a header.** Browsers
+    cannot set `Authorization` on a WebSocket upgrade request, so
+    `auth.Middleware` (header-based) doesn't apply to `/ws/*` routes — they
+    validate the query param directly (`authenticateWS` in `api/router.go`)
+    instead of being wrapped in the same middleware group as the REST API.
+    Every new `/ws/*` route needs this same explicit check; it will not be
+    caught by putting the route inside `r.Group(auth.Middleware(...))`.
 
 ## Roadmap — rough priority order
 
-### Near-term (Server Detail's remaining tabs — Overview is done)
-- **Console tab** — the obvious next one; unlike when this was first written,
-  the hard part (real daemon auth) is already solved, so this is now mostly
-  plumbing: dial the daemon's `/ws/servers/{uuid}` from the panel (using the
-  same `nodeClientResolver` decrypted token, over WS instead of HTTP),
-  relay daemon->browser lines into `ws.Hub.Broadcast` and browser->daemon
-  keystrokes back, using the same lazy-subscribe/cancel-on-empty pattern
-  the stats poller already established. `console.Hub.Serve` on the daemon
-  side already does exactly the send/receive shape needed; nothing new
-  required there.
+### Near-term (Server Detail's remaining tabs — Overview + Console are done)
 - **Files tab** — needs daemon file-manager RPCs first (list/read/write/
   delete/rename over HTTP or the proto's streaming RPCs — see
   docs/PROTOCOL.md §2), then the `.files-table` UI. Bigger lift than
@@ -209,6 +218,16 @@ runs `apply_migrations`), full destructive uninstall gated behind typing
   next to it (i.e. running via `bash <(curl ...)` with nothing checked out
   locally) — don't add prompts before that check runs, they'd never be
   reached in the one-liner case since the script re-execs itself immediately.
+- Both WS endpoints were completely unauthenticated until this pass — a
+  leftover from the original scaffold, which even said so in a comment
+  that got stripped during the no-comments cleanup (the gap itself
+  outlived the comment describing it, which is exactly the risk of
+  removing "TODO"-shaped comments without also checking whether the TODO
+  ever got done). Found it while wiring Console, since sending arbitrary
+  console commands with zero auth is a much sharper problem than
+  read-only stats were. Worth periodically grepping for other
+  `r.Get`/`r.Post` calls registered directly on the base router `r`
+  instead of inside the authenticated `r.Group` — that's the tell.
 - Any "if the env/config file already exists, skip everything" guard
   (`write_panel_env`'s original shape) is a trap for anything that needs to
   run on *every* install, not just the first one — found this the hard way

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api, connectServerSocket } from '../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { api, connectConsoleSocket, connectServerSocket } from '../api/client';
 import type { PowerAction, ResourceStats, Server } from '../types';
 
 interface Props {
@@ -26,6 +26,10 @@ export function ServerView({ uuid, onBack }: Props) {
   const [live, setLive] = useState<ResourceStats | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
   const [error, setError] = useState<string | null>(null);
+  const [consoleLines, setConsoleLines] = useState<string[]>([]);
+  const [command, setCommand] = useState('');
+  const consoleWsRef = useRef<WebSocket | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api
@@ -44,12 +48,36 @@ export function ServerView({ uuid, onBack }: Props) {
     return () => ws.close();
   }, [uuid]);
 
+  useEffect(() => {
+    if (tab !== 'console') return;
+    setConsoleLines([]);
+    const ws = connectConsoleSocket(uuid);
+    consoleWsRef.current = ws;
+    ws.onmessage = (event) => {
+      setConsoleLines((prev) => [...prev.slice(-500), String(event.data)]);
+    };
+    return () => {
+      ws.close();
+      consoleWsRef.current = null;
+    };
+  }, [uuid, tab]);
+
+  useEffect(() => {
+    outputRef.current?.scrollTo({ top: outputRef.current.scrollHeight });
+  }, [consoleLines]);
+
   async function handlePower(action: PowerAction) {
     try {
       await api.power(uuid, action);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function sendCommand() {
+    if (!command.trim() || !consoleWsRef.current) return;
+    consoleWsRef.current.send(command);
+    setCommand('');
   }
 
   if (error) return <div className="login-error show">{error}</div>;
@@ -157,10 +185,41 @@ export function ServerView({ uuid, onBack }: Props) {
           </div>
 
           <div className={`tab-panel ${tab === 'console' ? 'active' : ''}`}>
-            <p className="srv-desc">
-              Console streaming isn't wired up yet — the daemon can stream container logs, but
-              the panel doesn't relay them to the browser here yet. See add.md.
-            </p>
+            <div className="console-wrap">
+              <div className="console-bar">
+                <span className="console-dot r" />
+                <span className="console-dot y" />
+                <span className="console-dot g" />
+                <span className="console-title">{server.name}</span>
+              </div>
+              <div className="console-output" ref={outputRef}>
+                {consoleLines.map((line, i) => (
+                  <div className="con-line" key={i}>
+                    <span className="con-msg">{line}</span>
+                  </div>
+                ))}
+                {consoleLines.length === 0 && (
+                  <div className="con-line">
+                    <span className="con-msg">Waiting for output…</span>
+                  </div>
+                )}
+              </div>
+              <div className="console-input-row">
+                <span className="console-prompt">$</span>
+                <input
+                  className="console-input"
+                  value={command}
+                  onChange={(e) => setCommand(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') sendCommand();
+                  }}
+                  placeholder="Type a command…"
+                />
+                <button className="console-send" onClick={sendCommand}>
+                  Send
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className={`tab-panel ${tab === 'files' ? 'active' : ''}`}>

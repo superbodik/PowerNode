@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 type Client struct {
@@ -94,6 +96,21 @@ func (c *Client) Stats(ctx context.Context, serverUUID uuid.UUID) (*ResourceStat
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *Client) DialConsole(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error) {
+	wsURL := strings.Replace(c.baseURL, "https://", "wss://", 1)
+	wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
+	url := fmt.Sprintf("%s/ws/servers/%s", wsURL, serverUUID)
+
+	header := http.Header{}
+	header.Set("Authorization", "Bearer "+c.daemonToken)
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, header)
+	if err != nil {
+		return nil, fmt.Errorf("dial daemon console: %w", err)
+	}
+	return conn, nil
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, body, out interface{}) error {

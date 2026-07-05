@@ -20,18 +20,30 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
+type consoleSession struct {
+	conn    *websocket.Conn
+	cancel  context.CancelFunc
+	writeMu sync.Mutex
+}
+
 type Hub struct {
 	mu      sync.RWMutex
 	rooms   map[uuid.UUID]map[*websocket.Conn]struct{}
 	pollers map[uuid.UUID]context.CancelFunc
 
-	FetchStats func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error)
+	consoleRooms    map[uuid.UUID]map[*websocket.Conn]struct{}
+	consoleSessions map[uuid.UUID]*consoleSession
+
+	FetchStats  func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error)
+	DialConsole func(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error)
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		rooms:   make(map[uuid.UUID]map[*websocket.Conn]struct{}),
-		pollers: make(map[uuid.UUID]context.CancelFunc),
+		rooms:           make(map[uuid.UUID]map[*websocket.Conn]struct{}),
+		pollers:         make(map[uuid.UUID]context.CancelFunc),
+		consoleRooms:    make(map[uuid.UUID]map[*websocket.Conn]struct{}),
+		consoleSessions: make(map[uuid.UUID]*consoleSession),
 	}
 }
 
@@ -53,6 +65,40 @@ func (h *Hub) ServeServerSocket(w http.ResponseWriter, r *http.Request, serverUU
 	}
 }
 
+func (h *Hub) ServeConsoleSocket(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("console ws upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	if err := h.subscribeConsole(serverUUID, conn); err != nil {
+		log.Printf("console dial failed: %v", err)
+		return
+	}
+	defer h.unsubscribeConsole(serverUUID, conn)
+
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		h.mu.RLock()
+		session := h.consoleSessions[serverUUID]
+		h.mu.RUnlock()
+		if session == nil {
+			continue
+		}
+		session.writeMu.Lock()
+		writeErr := session.conn.WriteMessage(websocket.TextMessage, msg)
+		session.writeMu.Unlock()
+		if writeErr != nil {
+			log.Printf("console write to daemon failed: %v", writeErr)
+		}
+	}
+}
+
 func (h *Hub) Broadcast(serverUUID uuid.UUID, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -65,6 +111,16 @@ func (h *Hub) Broadcast(serverUUID uuid.UUID, payload any) {
 	for conn := range h.rooms[serverUUID] {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Printf("ws write failed: %v", err)
+		}
+	}
+}
+
+func (h *Hub) broadcastConsole(serverUUID uuid.UUID, data []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for conn := range h.consoleRooms[serverUUID] {
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			log.Printf("console ws write failed: %v", err)
 		}
 	}
 }
@@ -95,6 +151,71 @@ func (h *Hub) unsubscribe(serverUUID uuid.UUID, conn *websocket.Conn) {
 			cancel()
 			delete(h.pollers, serverUUID)
 		}
+	}
+}
+
+func (h *Hub) subscribeConsole(serverUUID uuid.UUID, conn *websocket.Conn) error {
+	h.mu.Lock()
+	if h.consoleRooms[serverUUID] == nil {
+		h.consoleRooms[serverUUID] = make(map[*websocket.Conn]struct{})
+	}
+	firstSubscriber := len(h.consoleRooms[serverUUID]) == 0
+	h.consoleRooms[serverUUID][conn] = struct{}{}
+	h.mu.Unlock()
+
+	if !firstSubscriber || h.DialConsole == nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	daemonConn, err := h.DialConsole(ctx, serverUUID)
+	if err != nil {
+		cancel()
+		h.mu.Lock()
+		delete(h.consoleRooms[serverUUID], conn)
+		if len(h.consoleRooms[serverUUID]) == 0 {
+			delete(h.consoleRooms, serverUUID)
+		}
+		h.mu.Unlock()
+		return err
+	}
+
+	session := &consoleSession{conn: daemonConn, cancel: cancel}
+	h.mu.Lock()
+	h.consoleSessions[serverUUID] = session
+	h.mu.Unlock()
+
+	go h.pumpConsole(ctx, serverUUID, session)
+	return nil
+}
+
+func (h *Hub) unsubscribeConsole(serverUUID uuid.UUID, conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.consoleRooms[serverUUID], conn)
+	if len(h.consoleRooms[serverUUID]) == 0 {
+		delete(h.consoleRooms, serverUUID)
+		if session, ok := h.consoleSessions[serverUUID]; ok {
+			session.cancel()
+			session.conn.Close()
+			delete(h.consoleSessions, serverUUID)
+		}
+	}
+}
+
+func (h *Hub) pumpConsole(ctx context.Context, serverUUID uuid.UUID, session *consoleSession) {
+	defer session.conn.Close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		_, msg, err := session.conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		h.broadcastConsole(serverUUID, msg)
 	}
 }
 

@@ -64,7 +64,18 @@ export const api = {
   checkUpdate: () => request<UpdateCheck>('/version/check'),
 };
 
+function wsToken(): string {
+  return localStorage.getItem('access_token') ?? '';
+}
+
 export function connectServerSocket(uuid: string): WebSocket {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return new WebSocket(`${proto}://${window.location.host}/ws/servers/${uuid}`);
+  return new WebSocket(`${proto}://${window.location.host}/ws/servers/${uuid}?token=${wsToken()}`);
+}
+
+export function connectConsoleSocket(uuid: string): WebSocket {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return new WebSocket(
+    `${proto}://${window.location.host}/ws/servers/${uuid}/console?token=${wsToken()}`,
+  );
 }

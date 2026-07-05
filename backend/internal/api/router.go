@@ -73,6 +73,10 @@ func NewRouter(deps Dependencies) http.Handler {
 	})
 
 	r.Get("/ws/servers/{uuid}", func(w http.ResponseWriter, r *http.Request) {
+		if !authenticateWS(r, deps.Token) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		id, err := parseUUIDParam(r, "uuid")
 		if err != nil {
 			http.Error(w, "invalid server uuid", http.StatusBadRequest)
@@ -81,5 +85,27 @@ func NewRouter(deps Dependencies) http.Handler {
 		deps.Hub.ServeServerSocket(w, r, id)
 	})
 
+	r.Get("/ws/servers/{uuid}/console", func(w http.ResponseWriter, r *http.Request) {
+		if !authenticateWS(r, deps.Token) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		id, err := parseUUIDParam(r, "uuid")
+		if err != nil {
+			http.Error(w, "invalid server uuid", http.StatusBadRequest)
+			return
+		}
+		deps.Hub.ServeConsoleSocket(w, r, id)
+	})
+
 	return r
+}
+
+func authenticateWS(r *http.Request, tm *auth.TokenManager) bool {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		return false
+	}
+	_, err := tm.Parse(token)
+	return err == nil
 }
