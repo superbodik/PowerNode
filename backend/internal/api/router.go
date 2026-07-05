@@ -1,6 +1,9 @@
 package api
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -61,7 +64,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Post("/auth/refresh", authHandler.Refresh)
 
 		r.Group(func(r chi.Router) {
-			r.Use(auth.Middleware(deps.Token))
+			r.Use(auth.Middleware(deps.Token, resolveAPIKey(deps.DB)))
 
 			r.Get("/auth/me", authHandler.Me)
 
@@ -72,6 +75,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/servers", serverHandler.Create)
 			r.Get("/servers/{uuid}", serverHandler.Get)
 			r.Post("/servers/{uuid}/power", serverHandler.Power)
+			r.Delete("/servers/{uuid}", serverHandler.Delete)
 
 			r.Get("/eggs", eggHandler.List)
 
@@ -125,4 +129,27 @@ func authenticateWS(r *http.Request, tm *auth.TokenManager) bool {
 	}
 	claims, err := tm.Parse(token)
 	return err == nil && claims.Type == auth.TokenAccess
+}
+
+func resolveAPIKey(pool *pgxpool.Pool) auth.APIKeyResolver {
+	return func(ctx context.Context, rawToken string) (*auth.Claims, error) {
+		sum := sha256.Sum256([]byte(rawToken))
+		tokenHash := hex.EncodeToString(sum[:])
+
+		var userID int64
+		var email string
+		var isAdmin, isActive bool
+		err := pool.QueryRow(ctx, `
+			SELECT u.id, u.email, u.is_admin, u.is_active
+			FROM api_keys k JOIN users u ON u.id = k.user_id
+			WHERE k.token_hash = $1`, tokenHash,
+		).Scan(&userID, &email, &isAdmin, &isActive)
+		if err != nil || !isActive {
+			return nil, auth.ErrInvalidToken
+		}
+
+		_, _ = pool.Exec(ctx, `UPDATE api_keys SET last_used_at = now() WHERE token_hash = $1`, tokenHash)
+
+		return &auth.Claims{UserID: userID, Email: email, IsAdmin: isAdmin, Type: auth.TokenAccess}, nil
+	}
 }

@@ -109,11 +109,28 @@ and server creation. It intentionally swallows its own errors (logs to
 stderr, never fails the calling request) — an activity-log write failing
 is not a reason to fail the user's actual action.
 
-**API keys can be created/listed/deleted** (`Account` page,
-`api_keys` table) but **are not yet a working auth method** — nothing
-checks `api_keys.token_hash` anywhere in `auth.Middleware` or elsewhere.
-Treat this like the Files/Databases/Schedules tabs: real CRUD, honestly
-not wired to anything that uses it yet.
+**API keys are now a real auth method, not just CRUD.** `auth.Middleware`
+takes a second argument, `auth.APIKeyResolver` — if the bearer token has
+the `panel_` prefix (how raw API keys are formatted, see
+`APIKeyHandler.Create`), it's sha256-hashed and looked up in `api_keys`
+instead of being parsed as a JWT; a hit updates `last_used_at` and
+produces the same `*auth.Claims` shape a JWT would (with
+`Type: auth.TokenAccess`, so it passes the same access-only check).
+WS auth (`authenticateWS`) deliberately was **not** extended to accept
+API keys — those are for programmatic REST clients, not the browser SPA,
+and `tm.Parse` on a `panel_...` string just fails as not-a-JWT, which is
+the correct behavior there.
+
+**Server deletion is wired end to end**: `ServerHandler.Delete` checks
+owner-or-admin, calls the daemon's `DeleteServer`, then deletes the row
+(FKs cascade/null out `server_subusers`/`server_variables`/`allocations.
+server_id` automatically). Supports `?force=true` for admins to drop the
+DB record even if the node/daemon is unreachable (e.g. a decommissioned
+node) — without it, a daemon-side failure blocks the delete rather than
+silently orphaning a running container. Frontend: a `.danger-card` in
+ServerView's Overview tab, `window.confirm` before calling it (no custom
+modal system exists yet, and this is a one-off enough action that
+building one wasn't justified).
 
 ## Design conventions — follow these before inventing new patterns
 
@@ -243,25 +260,18 @@ not wired to anything that uses it yet.
   a handful of servers; won't scale past that.
 
 ### Mid-term (real functionality gaps, not just missing UI)
-- **API keys aren't a working auth method yet** — `Account` page and
-  `api_keys` table/handlers exist (create/list/delete), but nothing
-  checks `Authorization: Bearer panel_...` against `token_hash` anywhere.
-  `auth.Middleware` only understands JWTs right now. Wiring this in means
-  teaching `auth.Middleware` to try a JWT parse first, then fall back to
-  an API-key DB lookup (and updating `last_used_at` on hit).
 - RBAC is currently binary (`is_admin` or nothing) — `auth.PermissionChecker`
   interface exists in `backend/internal/auth/rbac.go` but has zero
   implementations wired into the router. `server_subusers` table exists
   for per-server sharing but nothing reads it. `ServerHandler.Create`
   in particular has no limit checks against anything resembling a quota.
+  API keys also have no scoping (`api_keys.permissions` JSONB column is
+  unused) — a key currently grants the same access the owning user has,
+  full stop.
 - gRPC migration for the daemon protocol (proto file is complete,
   `daemonclient`/`daemon/internal/api` are still the HTTP/WS stand-in) —
   low urgency, only matters once file-manager/backup streaming RPCs need
   the bidirectional-stream ergonomics gRPC gives you for free.
-- Server deletion isn't wired into any handler yet — `daemonclient.Client.
-  DeleteServer` and the daemon's `DELETE /servers/{uuid}` both already
-  exist and work, nothing in `ServerHandler` or the frontend calls them.
-  Cheap follow-up now that Create exists and the pattern is established.
 
 ### Later / polish
 - Frontend i18n (the installer got RU/EN; the SPA itself is still

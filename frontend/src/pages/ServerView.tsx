@@ -28,6 +28,7 @@ export function ServerView({ uuid, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [consoleLines, setConsoleLines] = useState<string[]>([]);
   const [command, setCommand] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const consoleWsRef = useRef<WebSocket | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +79,20 @@ export function ServerView({ uuid, onBack }: Props) {
     if (!command.trim() || !consoleWsRef.current) return;
     consoleWsRef.current.send(command);
     setCommand('');
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete "${server?.name}"? This stops and removes its container. This cannot be undone.`)) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.deleteServer(uuid);
+      onBack();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+    }
   }
 
   if (error) return <div className="login-error show">{error}</div>;
@@ -180,6 +195,18 @@ export function ServerView({ uuid, onBack }: Props) {
                   <label>Disk limit</label>
                   <input readOnly value={`${server.disk_mb} MB`} />
                 </div>
+              </div>
+            </div>
+
+            <div className="danger-card" style={{ marginTop: 20 }}>
+              <div className="danger-row">
+                <div className="danger-info">
+                  <h3>Delete server</h3>
+                  <p>Stops and permanently removes this server's container and data.</p>
+                </div>
+                <button className="btn-danger" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
               </div>
             </div>
           </div>

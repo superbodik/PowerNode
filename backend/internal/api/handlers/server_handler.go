@@ -221,6 +221,60 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s)
 }
 
+func (h *ServerHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "uuid"))
+	if err != nil {
+		http.Error(w, "invalid server uuid", http.StatusBadRequest)
+		return
+	}
+
+	var serverID, nodeID, ownerID int64
+	if err := h.DB.QueryRow(r.Context(),
+		`SELECT id, node_id, owner_id FROM servers WHERE uuid = $1`, id,
+	).Scan(&serverID, &nodeID, &ownerID); err != nil {
+		http.Error(w, "server not found", http.StatusNotFound)
+		return
+	}
+	if !claims.IsAdmin && claims.UserID != ownerID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	force := r.URL.Query().Get("force") == "true"
+
+	client, clientErr := h.NodeClient(nodeID)
+	if clientErr != nil {
+		if !force {
+			http.Error(w, "node unavailable (add ?force=true to delete the record anyway)", http.StatusBadGateway)
+			return
+		}
+	} else if delErr := client.DeleteServer(r.Context(), id); delErr != nil && !force {
+		http.Error(w, "daemon failed to delete server (add ?force=true to delete the record anyway)", http.StatusBadGateway)
+		return
+	}
+
+	if _, err := h.DB.Exec(r.Context(), `DELETE FROM servers WHERE id = $1`, serverID); err != nil {
+		http.Error(w, "failed to delete server record", http.StatusInternalServerError)
+		return
+	}
+
+	activity.Record(r.Context(), h.DB, activity.Entry{
+		ActorUserID: &claims.UserID,
+		ServerID:    &serverID,
+		NodeID:      &nodeID,
+		Event:       "server.delete",
+		IPAddress:   activity.RequestIP(r),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type powerRequest struct {
 	Action daemonclient.PowerAction `json:"action"`
 }

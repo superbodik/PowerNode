@@ -115,6 +115,8 @@ export const api = {
       body: JSON.stringify({ action }),
     }),
 
+  deleteServer: (uuid: string) => request<void>(`/servers/${uuid}`, { method: 'DELETE' }),
+
   listNodes: () => request<Node[]>('/nodes'),
 
   createNode: (payload: CreateNodeRequest) =>
