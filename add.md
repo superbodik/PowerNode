@@ -598,6 +598,75 @@ endpoint is added — this is exactly the kind of gap `go build`/`go vet`
 can never catch, since the code is entirely correct Go, just missing an
 authorization decision.
 
+**Found the same "if file exists, skip forever" trap as the migrations
+incident, this time in `scripts/daemon.sh` — and it was actively
+blocking a live user from fixing a real 401.** After the http/https
+scheme fix, the user's node started returning `node daemon returned 401`
+on every daemon call — the panel's stored token had drifted from
+whatever `wingsd` actually had configured (exactly how is unclear, but
+irrelevant once you notice there was **no way to fix it**: re-running
+the install one-liner with a new `WINGSD_DAEMON_TOKEN` hit
+`write_daemon_env`'s `if [[ -f "$DAEMON_ENV_FILE" ]]; then ... return;
+fi` guard and silently did nothing. `install_daemon` also used `systemctl
+enable --now`, which doesn't restart an already-running unit even if its
+env file *did* change. Fixed both: `write_daemon_env` now updates just
+the `WINGSD_DAEMON_TOKEN=` line via `sed` in place when the file exists
+and a token is provided (leaving `WINGSD_NODE_UUID` and everything else
+untouched), and `install_daemon` does `enable` + `restart` explicitly.
+Paired with a new `POST /nodes/{id}/regenerate-token` (admin-only, same
+`generateToken`/hash/encrypt pattern as node creation) and a
+"Regenerate token" button in the Nodes page's expanded panel — reusing
+the exact same copy-paste install-command UI node creation already
+shows, since with the installer fix that command now actually works for
+an *existing* install too, no full delete-and-recreate needed. **The
+lesson from the migrations incident generalized**: any installer step
+gated behind "if the file/record already exists, do nothing" needs a
+second look at *which specific piece* should really be one-time
+(the node UUID) versus updatable-on-demand (the token) — the guard was
+protecting the wrong granularity.
+
+**Found the real cause of a `"name, node_id, egg_id... are required"
+(400)` report**: `CreateServerForm`'s Node/Egg `<select required>`
+placeholder options used `value={0}`, which renders as the DOM string
+`"0"` — not an empty string. HTML5's native `required` validation on a
+`<select>` only blocks submission when the value is exactly `""`, so
+`"0"` satisfies it silently. A user could click Create without ever
+choosing a node or egg and the browser wouldn't stop them, sending
+`node_id: 0, egg_id: 0` straight to a backend that correctly rejected
+it — the 400 was the validation working, just one layer too late.
+Fixed with an explicit check in `handleSubmit` before the API call,
+rather than trying to coerce the placeholder into an empty-string value
+(would need parallel string/number state juggling for no real benefit) —
+matches how this codebase already prefers explicit JS validation with a
+friendly `setError` message over relying on native constraint
+validation elsewhere.
+
+**Redesigned the 2FA step during login as an actual separate screen, not
+an appended field, and added a real animation system across the app.**
+`Login.tsx` used to render the TOTP code input *below* the email/password
+fields once required — functionally fine, but not what "enter your 2FA
+code" flows anywhere else look like (GitHub, Google, etc. all swap the
+whole screen). Now `!needsTotp` renders one `<div className="login-step">`
+with credentials, `needsTotp` renders a **different** one with just the
+code field, a "Back" link, and its own heading — full replace, not
+append, with a `stepIn` slide-fade transition on the swap. Also went
+through and added a proper motion layer to `panel.css`: drifting ambient
+background blobs (`blobDrift`, previously static), staggered fade-in for
+grid/list items (server cards, table rows — `nth-child` delays capped at
+6 items so a long list doesn't take visibly long to finish appearing),
+spring-eased hover/press feedback on buttons and stat cards, a glow pulse
+on the active nav item, and a scale/rotate flourish on the user avatar on
+hover. Every new animation lives inside `@media
+(prefers-reduced-motion: no-preference)`, with a matching `reduce` query
+that collapses all animation/transition durations to near-zero — added
+both at the same time, not as a follow-up, since shipping motion without
+the accessibility opt-out from the start is the mistake to avoid, not a
+polish item to add later. Verified all of this with real Playwright
+screenshots (dev server + mocked localStorage auth to get past the login
+gate without a backend) rather than trusting a clean `vite build` — a
+CSS-only regression is invisible to any of the type-checking or build
+tooling in this project.
+
 **Once the frontend could actually display backend error text (previous
 entry), the next problem was that some backend messages were still
 deliberately vague.** `ServerHandler.Create`/`Power`'s "node unavailable"

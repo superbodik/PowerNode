@@ -96,6 +96,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/nodes", nodeHandler.List)
 			r.With(auth.RequireAdmin).Post("/nodes", nodeHandler.Create)
 			r.With(auth.RequireAdmin).Patch("/nodes/{id}", nodeHandler.Update)
+			r.With(auth.RequireAdmin).Post("/nodes/{id}/regenerate-token", nodeHandler.RegenerateToken)
 			r.With(auth.RequireAdmin).Delete("/nodes/{id}", nodeHandler.Delete)
 			r.Get("/nodes/{id}/status", nodeHandler.Status)
 

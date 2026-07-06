@@ -28,13 +28,19 @@ install_daemon() {
 	write_daemon_service
 
 	systemctl daemon-reload
-	systemctl enable --now wingsd
-	log_ok "wingsd.service started"
+	systemctl enable wingsd
+	systemctl restart wingsd
+	log_ok "wingsd.service (re)started"
 }
 
 write_daemon_env() {
 	if [[ -f "$DAEMON_ENV_FILE" ]]; then
-		log_warn "$DAEMON_ENV_FILE already exists — leaving it untouched"
+		if [[ -n "${WINGSD_DAEMON_TOKEN:-}" ]]; then
+			sed -i "s|^WINGSD_DAEMON_TOKEN=.*|WINGSD_DAEMON_TOKEN=${WINGSD_DAEMON_TOKEN}|" "$DAEMON_ENV_FILE"
+			log_ok "Updated daemon token in $DAEMON_ENV_FILE"
+		else
+			log_warn "$DAEMON_ENV_FILE already exists — leaving it untouched (no WINGSD_DAEMON_TOKEN provided to update it)"
+		fi
 		return
 	fi
 

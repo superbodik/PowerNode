@@ -82,6 +82,8 @@ export function Nodes() {
     disk_mb: 0,
   });
   const [savingNodeId, setSavingNodeId] = useState<number | null>(null);
+  const [regeneratingNodeId, setRegeneratingNodeId] = useState<number | null>(null);
+  const [regeneratedToken, setRegeneratedToken] = useState<CreateNodeResponse | null>(null);
 
   function toggleExpand(node: Node) {
     if (expandedNodeId === node.id) {
@@ -89,6 +91,7 @@ export function Nodes() {
       return;
     }
     setExpandedNodeId(node.id);
+    setRegeneratedToken(null);
     setEditForm({
       name: node.name,
       fqdn: node.fqdn,
@@ -97,6 +100,21 @@ export function Nodes() {
       memory_mb: node.memory_mb,
       disk_mb: node.disk_mb,
     });
+  }
+
+  async function handleRegenerateToken(node: Node) {
+    if (!window.confirm(`Generate a new daemon token for "${node.name}"? You'll need to run one command on the node to apply it.`)) {
+      return;
+    }
+    setRegeneratingNodeId(node.id);
+    setError(null);
+    try {
+      setRegeneratedToken(await api.regenerateNodeToken(node.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRegeneratingNodeId(null);
+    }
   }
 
   async function handleSaveNode(node: Node) {
@@ -459,7 +477,7 @@ export function Nodes() {
                         />
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <button
                         className="btn-primary"
                         style={{ width: 'auto', padding: '8px 16px' }}
@@ -467,6 +485,13 @@ export function Nodes() {
                         onClick={() => handleSaveNode(node)}
                       >
                         {savingNodeId === node.id ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        className="btn-sm"
+                        disabled={regeneratingNodeId === node.id}
+                        onClick={() => handleRegenerateToken(node)}
+                      >
+                        {regeneratingNodeId === node.id ? 'Generating…' : 'Regenerate token'}
                       </button>
                       <button
                         className="btn-danger"
@@ -477,6 +502,27 @@ export function Nodes() {
                         {deletingNodeId === node.id ? 'Deleting…' : 'Delete node'}
                       </button>
                     </div>
+
+                    {regeneratedToken && regeneratedToken.id === node.id && (
+                      <div style={{ marginTop: 14 }}>
+                        <p className="srv-desc" style={{ marginBottom: 8 }}>
+                          New token generated. Run this on the node to apply it —
+                          it updates the existing wingsd install and restarts it,
+                          nothing else changes.
+                        </p>
+                        <div className="api-item">
+                          <span className="api-key">{nodeInstallCommand(regeneratedToken.daemon_token)}</span>
+                          <button
+                            className="btn-sm"
+                            onClick={() =>
+                              navigator.clipboard?.writeText(nodeInstallCommand(regeneratedToken.daemon_token))
+                            }
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -183,6 +183,54 @@ func (h *NodeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *NodeHandler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid node id", http.StatusBadRequest)
+		return
+	}
+
+	rawToken, err := generateToken(32)
+	if err != nil {
+		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+	tokenHash, err := auth.HashPassword(rawToken)
+	if err != nil {
+		http.Error(w, "failed to hash token", http.StatusInternalServerError)
+		return
+	}
+	tokenEncrypted, err := crypto.Encrypt(h.EncryptionKey, rawToken)
+	if err != nil {
+		http.Error(w, "failed to encrypt token", http.StatusInternalServerError)
+		return
+	}
+
+	tag, err := h.DB.Exec(r.Context(),
+		`UPDATE nodes SET daemon_token_hash = $1, daemon_token_encrypted = $2 WHERE id = $3`,
+		tokenHash, tokenEncrypted, id,
+	)
+	if err != nil {
+		http.Error(w, "failed to update token", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+
+	if claims, ok := auth.FromContext(r.Context()); ok {
+		activity.Record(r.Context(), h.DB, activity.Entry{
+			ActorUserID: &claims.UserID,
+			NodeID:      &id,
+			Event:       "node.regenerate_token",
+			IPAddress:   activity.RequestIP(r),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, createNodeResponse{ID: id, DaemonToken: rawToken})
+}
+
 func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {

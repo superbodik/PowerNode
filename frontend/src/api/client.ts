@@ -211,6 +211,9 @@ export const api = {
 
   deleteNode: (id: number) => request<void>(`/nodes/${id}`, { method: 'DELETE' }),
 
+  regenerateNodeToken: (id: number) =>
+    request<CreateNodeResponse>(`/nodes/${id}/regenerate-token`, { method: 'POST' }),
+
   checkNodeStatus: (id: number) => request<NodeStatus>(`/nodes/${id}/status`),
 
   listUsers: () => request<PanelUser[]>('/users'),

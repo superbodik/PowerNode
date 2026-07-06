@@ -58,8 +58,16 @@ export function CreateServerForm({ onCreated }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (!form.node_id) {
+      setError('Select a node.');
+      return;
+    }
+    if (!form.egg_id) {
+      setError('Select an egg.');
+      return;
+    }
+    setSubmitting(true);
     try {
       await api.createServer({
         name: form.name,

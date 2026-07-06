@@ -47,57 +47,87 @@ export function Login({ onLoggedIn }: Props) {
           </div>
         </div>
 
-        <div className="login-head">
-          <h1>Sign in</h1>
-          <p>Use your Roost account to continue.</p>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {needsTotp && (
-            <div className="form-field">
-              <label htmlFor="totp-code">Authenticator code</label>
-              <input
-                id="totp-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
-                placeholder="6-digit code"
-                autoFocus
-                required
-              />
+        {!needsTotp ? (
+          <div className="login-step" key="credentials">
+            <div className="login-head">
+              <h1>Sign in</h1>
+              <p>Use your Roost account to continue.</p>
             </div>
-          )}
 
-          <button className="btn-primary" type="submit" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Sign in'}
-          </button>
+            <form onSubmit={handleSubmit}>
+              <div className="form-field">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label htmlFor="password">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
 
-          {error && <div className="login-error show">{error}</div>}
-        </form>
+              <button className="btn-primary" type="submit" disabled={submitting}>
+                {submitting ? 'Signing in…' : 'Sign in'}
+              </button>
+
+              {error && <div className="login-error show">{error}</div>}
+            </form>
+          </div>
+        ) : (
+          <div className="login-step" key="totp">
+            <div className="login-head">
+              <h1>Verification code</h1>
+              <p>Enter the 6-digit code from your authenticator app.</p>
+            </div>
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-field">
+                <label htmlFor="totp-code">Authenticator code</label>
+                <input
+                  id="totp-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value)}
+                  placeholder="123456"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <button className="btn-primary" type="submit" disabled={submitting}>
+                {submitting ? 'Verifying…' : 'Verify & sign in'}
+              </button>
+
+              {error && <div className="login-error show">{error}</div>}
+
+              <button
+                type="button"
+                className="login-back"
+                onClick={() => {
+                  setNeedsTotp(false);
+                  setTotpCode('');
+                  setError(null);
+                }}
+              >
+                ← Back
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );
