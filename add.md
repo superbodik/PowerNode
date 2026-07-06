@@ -1176,3 +1176,37 @@ actually flow into the create form.
      on the last "running" snapshot indefinitely. Fixed by checking state
      first and always reporting it; stats are only fetched (and only
      required to succeed) when the container is confirmed running.
+- **Console tab: two real bugs plus one root-cause omission, all under
+  the umbrella of "console просто не работает, no idea why"**:
+  1. Daemon (`console.Hub.Serve`) and panel (`Hub.ServeConsoleSocket`)
+     both failed completely silently on the client side whenever
+     `Docker.Attach`/`LogsFollow` errored (most commonly: the server
+     just isn't running — stopped, still installing, or its container
+     was removed) or the panel couldn't dial the node daemon at all.
+     The browser's console WS would connect fine (the panel→browser
+     upgrade always succeeds) and then just sit there forever showing
+     nothing, with the actual failure reason only ever reaching a
+     server-side `log.Printf` the user never sees. Fixed by writing an
+     explicit `[console] ...` text message over the WS before closing
+     in every one of those failure paths, so the reason is now visible
+     directly in the console output pane instead of vanishing into a
+     log file on a machine the user isn't looking at.
+  2. Frontend: `connectConsoleSocket` (a bare `WebSocket`) was stored in
+     a ref and `sendCommand` called `.send()` on it directly. A
+     `WebSocket.send()` while `readyState` is still `CONNECTING` throws
+     synchronously — and since the panel-side WS upgrade completes
+     locally before the panel has even started dialing the node daemon,
+     there's a real window where the browser socket reports "open" via
+     browser semantics before it can usefully carry a command. Typing
+     and hitting enter during that window silently ate the keystroke
+     (exception thrown before `setCommand('')`, so the input just sat
+     there looking unresponsive) with zero indication anything went
+     wrong. Fixed by wrapping the console socket the same way as the
+     stats socket: `connectConsoleSocketWithRetry` returns a small
+     `{ send, close }` handle that only actually calls `.send()` when
+     `readyState === OPEN`, exposes connection status via a callback,
+     and reconnects with capped backoff (+ a token refresh per attempt)
+     on any drop, matching the resilience already added for the stats
+     socket. The UI now shows "Connecting…" and disables the input
+     until the daemon side is actually live, instead of pretending to
+     be ready the instant the tab opens.

@@ -584,6 +584,13 @@ body::before {
 .console-dot.y { background: #f0b232; }
 .console-dot.g { background: #23a559; }
 .console-title { font-size: 11px; color: var(--muted); margin-left: 6px; font-family: var(--font-mono); }
+.console-status {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--danger, #f23f43);
+  font-family: var(--font-mono);
+}
+.console-status.online { color: #23a559; }
 
 .console-output {
   height: 380px;

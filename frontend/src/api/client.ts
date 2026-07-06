@@ -404,3 +404,51 @@ export function connectConsoleSocket(uuid: string): WebSocket {
     `${proto}://${window.location.host}/ws/servers/${uuid}/console?token=${wsToken()}`,
   );
 }
+
+export interface ConsoleHandle {
+  send: (data: string) => void;
+  close: () => void;
+}
+
+export function connectConsoleSocketWithRetry(
+  uuid: string,
+  onMessage: (line: string) => void,
+  onStatusChange: (connected: boolean) => void,
+): ConsoleHandle {
+  let closed = false;
+  let socket: WebSocket | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempt = 0;
+
+  async function open() {
+    if (closed) return;
+    if (attempt > 0) await tryRefresh();
+    if (closed) return;
+    socket = connectConsoleSocket(uuid);
+    socket.onopen = () => {
+      attempt = 0;
+      onStatusChange(true);
+    };
+    socket.onmessage = (event) => onMessage(String(event.data));
+    socket.onclose = () => {
+      onStatusChange(false);
+      if (closed) return;
+      const delay = Math.min(1000 * 2 ** attempt, 15000);
+      attempt += 1;
+      retryTimer = setTimeout(open, delay);
+    };
+  }
+
+  open();
+
+  return {
+    send: (data: string) => {
+      if (socket?.readyState === WebSocket.OPEN) socket.send(data);
+    },
+    close: () => {
+      closed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      socket?.close();
+    },
+  };
+}

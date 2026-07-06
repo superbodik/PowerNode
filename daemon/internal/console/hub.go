@@ -46,6 +46,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID
 	stdin, err := h.docker.Attach(ctx, containerID)
 	if err != nil {
 		log.Printf("attach stdin failed: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("[console] could not attach to container (is the server running?): "+err.Error()))
 		return
 	}
 	h.setWriter(serverUUID, stdin)
@@ -55,6 +56,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID
 	logs, err := h.docker.LogsFollow(ctx, containerID)
 	if err != nil {
 		log.Printf("logs follow failed: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("[console] could not read container logs: "+err.Error()))
 		return
 	}
 	defer logs.Close()
@@ -68,6 +70,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID
 		}
 		if _, err := stdin.Write(append(msg, '\n')); err != nil {
 			log.Printf("write stdin failed: %v", err)
+			conn.WriteMessage(websocket.TextMessage, []byte("[console] failed to send command: "+err.Error()))
 			return
 		}
 	}

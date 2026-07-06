@@ -77,6 +77,7 @@ func (h *Hub) ServeConsoleSocket(w http.ResponseWriter, r *http.Request, serverU
 
 	if err := h.subscribeConsole(serverUUID, conn); err != nil {
 		log.Printf("console dial failed: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("[console] could not reach the node daemon: "+err.Error()))
 		return
 	}
 	defer h.unsubscribeConsole(serverUUID, conn)

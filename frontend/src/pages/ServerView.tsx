@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, connectConsoleSocket, connectServerSocketWithRetry } from '../api/client';
+import { api, connectConsoleSocketWithRetry, connectServerSocketWithRetry } from '../api/client';
+import type { ConsoleHandle } from '../api/client';
 import { DatabaseManager } from '../components/DatabaseManager';
 import { FileManager } from '../components/FileManager';
 import { ScheduleManager } from '../components/ScheduleManager';
@@ -31,9 +32,10 @@ export function ServerView({ uuid, onBack }: Props) {
   const [tab, setTab] = useState<Tab>('overview');
   const [error, setError] = useState<string | null>(null);
   const [consoleLines, setConsoleLines] = useState<string[]>([]);
+  const [consoleConnected, setConsoleConnected] = useState(false);
   const [command, setCommand] = useState('');
   const [deleting, setDeleting] = useState(false);
-  const consoleWsRef = useRef<WebSocket | null>(null);
+  const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,14 +50,16 @@ export function ServerView({ uuid, onBack }: Props) {
   useEffect(() => {
     if (tab !== 'console') return;
     setConsoleLines([]);
-    const ws = connectConsoleSocket(uuid);
-    consoleWsRef.current = ws;
-    ws.onmessage = (event) => {
-      setConsoleLines((prev) => [...prev.slice(-500), String(event.data)]);
-    };
+    setConsoleConnected(false);
+    const handle = connectConsoleSocketWithRetry(
+      uuid,
+      (line) => setConsoleLines((prev) => [...prev.slice(-500), line]),
+      setConsoleConnected,
+    );
+    consoleRef.current = handle;
     return () => {
-      ws.close();
-      consoleWsRef.current = null;
+      handle.close();
+      consoleRef.current = null;
     };
   }, [uuid, tab]);
 
@@ -72,8 +76,8 @@ export function ServerView({ uuid, onBack }: Props) {
   }
 
   function sendCommand() {
-    if (!command.trim() || !consoleWsRef.current) return;
-    consoleWsRef.current.send(command);
+    if (!command.trim() || !consoleConnected || !consoleRef.current) return;
+    consoleRef.current.send(command);
     setCommand('');
   }
 
@@ -222,6 +226,9 @@ export function ServerView({ uuid, onBack }: Props) {
                 <span className="console-dot y" />
                 <span className="console-dot g" />
                 <span className="console-title">{server.name}</span>
+                <span className={`console-status ${consoleConnected ? 'online' : ''}`}>
+                  {consoleConnected ? 'Connected' : 'Connecting…'}
+                </span>
               </div>
               <div className="console-output" ref={outputRef}>
                 {consoleLines.map((line, i) => (
@@ -231,7 +238,9 @@ export function ServerView({ uuid, onBack }: Props) {
                 ))}
                 {consoleLines.length === 0 && (
                   <div className="con-line">
-                    <span className="con-msg">Waiting for output…</span>
+                    <span className="con-msg">
+                      {consoleConnected ? 'Waiting for output…' : 'Connecting to the node…'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -244,9 +253,10 @@ export function ServerView({ uuid, onBack }: Props) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendCommand();
                   }}
-                  placeholder="Type a command…"
+                  placeholder={consoleConnected ? 'Type a command…' : 'Connecting…'}
+                  disabled={!consoleConnected}
                 />
-                <button className="console-send" onClick={sendCommand}>
+                <button className="console-send" onClick={sendCommand} disabled={!consoleConnected}>
                   Send
                 </button>
               </div>
