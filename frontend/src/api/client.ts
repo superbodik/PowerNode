@@ -193,6 +193,8 @@ export const api = {
   createNode: (payload: CreateNodeRequest) =>
     request<CreateNodeResponse>('/nodes', { method: 'POST', body: JSON.stringify(payload) }),
 
+  deleteNode: (id: number) => request<void>(`/nodes/${id}`, { method: 'DELETE' }),
+
   checkNodeStatus: (id: number) => request<NodeStatus>(`/nodes/${id}/status`),
 
   listUsers: () => request<PanelUser[]>('/users'),

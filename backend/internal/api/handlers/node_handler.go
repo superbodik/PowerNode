@@ -130,6 +130,47 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, nodes)
 }
 
+func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid node id", http.StatusBadRequest)
+		return
+	}
+
+	var serverCount int
+	if err := h.DB.QueryRow(r.Context(),
+		`SELECT count(*) FROM servers WHERE node_id = $1`, id,
+	).Scan(&serverCount); err != nil {
+		http.Error(w, "failed to check node's servers", http.StatusInternalServerError)
+		return
+	}
+	if serverCount > 0 {
+		http.Error(w, "this node still has servers on it — delete or move them first", http.StatusConflict)
+		return
+	}
+
+	res, err := h.DB.Exec(r.Context(), `DELETE FROM nodes WHERE id = $1`, id)
+	if err != nil {
+		http.Error(w, "failed to delete node", http.StatusInternalServerError)
+		return
+	}
+	if res.RowsAffected() == 0 {
+		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+
+	if claims, ok := auth.FromContext(r.Context()); ok {
+		activity.Record(r.Context(), h.DB, activity.Entry{
+			ActorUserID: &claims.UserID,
+			NodeID:      &id,
+			Event:       "node.delete",
+			IPAddress:   activity.RequestIP(r),
+		})
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type nodeStatusResponse struct {
 	Online bool   `json:"online"`
 	Error  string `json:"error,omitempty"`

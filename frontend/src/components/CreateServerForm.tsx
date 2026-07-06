@@ -24,6 +24,7 @@ export function CreateServerForm({ onCreated }: Props) {
     disk_mb: 5120,
     allocation_id: 0,
   });
+  const [environment, setEnvironment] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +51,9 @@ export function CreateServerForm({ onCreated }: Props) {
       docker_image: egg?.docker_image ?? f.docker_image,
       startup_command: egg?.startup_command ?? f.startup_command,
     }));
+    setEnvironment(
+      Object.fromEntries((egg?.variables ?? []).map((v) => [v.env_variable, v.default_value])),
+    );
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -63,7 +67,7 @@ export function CreateServerForm({ onCreated }: Props) {
         egg_id: form.egg_id,
         docker_image: form.docker_image,
         startup_command: form.startup_command,
-        environment: {},
+        environment,
         memory_mb: form.memory_mb,
         swap_mb: 0,
         disk_mb: form.disk_mb,
@@ -71,6 +75,7 @@ export function CreateServerForm({ onCreated }: Props) {
       });
       setOpen(false);
       setForm((f) => ({ ...f, name: '', allocation_id: 0 }));
+      setEnvironment({});
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -191,6 +196,26 @@ export function CreateServerForm({ onCreated }: Props) {
             />
           </div>
         </div>
+
+        {(eggs.find((e) => e.id === form.egg_id)?.variables ?? []).length > 0 && (
+          <div className="settings-grid" style={{ marginTop: 14 }}>
+            {eggs
+              .find((e) => e.id === form.egg_id)
+              ?.variables.map((v) => (
+                <div className="sfield" key={v.env_variable}>
+                  <label htmlFor={`env-${v.env_variable}`}>{v.name}</label>
+                  <input
+                    id={`env-${v.env_variable}`}
+                    value={environment[v.env_variable] ?? ''}
+                    onChange={(e) =>
+                      setEnvironment((env) => ({ ...env, [v.env_variable]: e.target.value }))
+                    }
+                    disabled={!v.is_editable}
+                  />
+                </div>
+              ))}
+          </div>
+        )}
 
         {error && <div className="login-error show" style={{ marginTop: 12 }}>{error}</div>}
 

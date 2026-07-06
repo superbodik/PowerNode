@@ -393,6 +393,41 @@ inline (`title` attribute has the full text, the row shows a truncated
 one-liner) — this turns "why did create fail" from "read the server's
 systemd journal" into "click one button in the UI."
 
+**Nodes can be deleted now, and egg variables actually reach the
+container.** Two small gaps closed together: `DELETE /nodes/{id}`
+(admin-only) refuses if any server still references that node (checked
+explicitly for a clean 409, since `servers.node_id`'s FK has no `ON
+DELETE` clause and would otherwise surface a raw constraint-violation
+error) — `allocations.node_id` cascades on delete so those clean up
+automatically. Frontend: clicking a node's name (not a separate button)
+toggles an inline expanded panel with the delete action, since Nodes had
+no per-node detail/management surface at all before this.
+
+Separately — while adding three new Python eggs (see below) — found that
+`CreateServerForm.tsx` always sent `environment: {}` on server creation,
+no matter what. This meant even the *original* Minecraft egg's own
+description ("Set EULA=TRUE in environment") was already impossible to
+follow from the UI; there was simply no field for it. `EggHandler.List`
+now includes each egg's `egg_variables` rows (name, env var, default,
+editable, rules) in its response; `CreateServerForm.selectEgg` seeds a
+new `environment` state from those defaults, renders one input per
+variable, and actually submits it. Confirmed end to end: `Server.Environment`
+was already wired all the way through the daemon (`docker.Manager`
+turns the map into real container `Env` entries) — this was purely a
+frontend gap, nothing on the backend/daemon side needed to change.
+
+**Three new eggs**, all `python:3.12-slim` with a `pip install -r
+requirements.txt` (best-effort, errors suppressed since not every
+project has one) followed by `python3 $START_FILE` — "Python: Website",
+"Python: Telegram Bot", "Python: Discord Bot". Deliberately unopinionated
+about which web framework or bot library — this just runs whatever
+entrypoint file the user uploads via the Files tab, same
+upload-your-own-code shape as the "Custom Docker Container" egg, just
+pre-filled with a sensible Python base image and a dependency-install
+step. `START_FILE` variable defaults to `app.py` for the website egg,
+`bot.py` for both bot eggs — editable per-server now that egg variables
+actually flow into the create form.
+
 ## Design conventions — follow these before inventing new patterns
 
 1. **Never invent new CSS.** `frontend/src/styles/panel.css` is the design

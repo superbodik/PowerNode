@@ -109,6 +109,14 @@ export interface ActivityEntry {
   created_at: string;
 }
 
+export interface EggVariable {
+  name: string;
+  env_variable: string;
+  default_value: string;
+  is_editable: boolean;
+  rules: string;
+}
+
 export interface Egg {
   id: number;
   category: string;
@@ -116,6 +124,7 @@ export interface Egg {
   description: string;
   docker_image: string;
   startup_command: string;
+  variables: EggVariable[];
 }
 
 export interface Allocation {

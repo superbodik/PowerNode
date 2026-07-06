@@ -30,6 +30,25 @@ export function Nodes() {
   const [allocSubmitting, setAllocSubmitting] = useState(false);
 
   const [statuses, setStatuses] = useState<Record<number, NodeStatus | 'checking'>>({});
+  const [expandedNodeId, setExpandedNodeId] = useState<number | null>(null);
+  const [deletingNodeId, setDeletingNodeId] = useState<number | null>(null);
+
+  async function handleDeleteNode(node: Node) {
+    if (!window.confirm(`Delete node "${node.name}"? This only removes it from the panel — it does not uninstall wingsd from the machine.`)) {
+      return;
+    }
+    setDeletingNodeId(node.id);
+    setError(null);
+    try {
+      await api.deleteNode(node.id);
+      setExpandedNodeId(null);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingNodeId(null);
+    }
+  }
 
   async function handleCheckStatus(nodeId: number) {
     setStatuses((s) => ({ ...s, [nodeId]: 'checking' }));
@@ -241,40 +260,61 @@ export function Nodes() {
           </div>
           {nodes.map((node) => {
             const status = statuses[node.id];
+            const expanded = expandedNodeId === node.id;
             return (
-              <div className="db-row" key={node.id}>
-                <span className="db-name">{node.name}</span>
-                <span className="db-pw">
-                  {node.scheme}://{node.fqdn}:{node.daemon_port}
-                </span>
-                <span>{node.memory_mb} MB / {node.disk_mb} MB</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  {status === 'checking' ? (
-                    'Checking…'
-                  ) : status ? (
-                    <span
-                      title={status.error ?? ''}
-                      style={{
-                        color: status.online ? 'var(--pink-b)' : '#f23f43',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {status.online ? 'Online' : `Unreachable: ${status.error ?? 'unknown error'}`}
-                    </span>
-                  ) : (
-                    'Unknown'
-                  )}
-                  <button
-                    className="file-act-btn"
-                    title="Check connection"
-                    onClick={() => handleCheckStatus(node.id)}
-                    style={{ flexShrink: 0 }}
+              <div key={node.id}>
+                <div className="db-row">
+                  <span
+                    className="db-name"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setExpandedNodeId(expanded ? null : node.id)}
                   >
-                    ⟳
-                  </button>
-                </span>
+                    {node.name}
+                  </span>
+                  <span className="db-pw">
+                    {node.scheme}://{node.fqdn}:{node.daemon_port}
+                  </span>
+                  <span>{node.memory_mb} MB / {node.disk_mb} MB</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    {status === 'checking' ? (
+                      'Checking…'
+                    ) : status ? (
+                      <span
+                        title={status.error ?? ''}
+                        style={{
+                          color: status.online ? 'var(--pink-b)' : '#f23f43',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {status.online ? 'Online' : `Unreachable: ${status.error ?? 'unknown error'}`}
+                      </span>
+                    ) : (
+                      'Unknown'
+                    )}
+                    <button
+                      className="file-act-btn"
+                      title="Check connection"
+                      onClick={() => handleCheckStatus(node.id)}
+                      style={{ flexShrink: 0 }}
+                    >
+                      ⟳
+                    </button>
+                  </span>
+                </div>
+                {expanded && (
+                  <div style={{ padding: '10px 18px', borderBottom: '1px solid rgba(192,100,120,.06)' }}>
+                    <button
+                      className="btn-danger"
+                      style={{ width: 'auto', padding: '8px 16px' }}
+                      disabled={deletingNodeId === node.id}
+                      onClick={() => handleDeleteNode(node)}
+                    >
+                      {deletingNodeId === node.id ? 'Deleting…' : 'Delete node'}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
