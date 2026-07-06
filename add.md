@@ -25,6 +25,37 @@ import statement for zero user-facing benefit. If a full rename is ever
 wanted, do it as its own dedicated pass, not bundled with a "let's also
 add a feature" commit.
 
+**2FA is real now** — the `.twofa-card` CSS and `users.totp_secret`/
+`totp_enabled` columns had existed since the original scaffold but nothing
+ever read or wrote them. Added `github.com/pquerna/otp` (verified with a
+throwaway roundtrip test — generate a secret, compute the current code,
+confirm it validates and a wrong one doesn't — before wiring it into any
+handler, same standard as `files.SafeJoin`'s manual verification). Flow:
+`POST /account/2fa/setup` generates a secret + `otpauth://` URL and stores
+the secret **encrypted** (AES-GCM via `internal/crypto`, same treatment
+as the daemon token per convention 8 — the panel needs to read it back on
+every future login, not just verify it once) with `totp_enabled` left
+`false`; `POST /account/2fa/verify` checks a code against that pending
+secret and only then flips `totp_enabled` to `true`; `POST
+/account/2fa/disable` requires the account password (not just being
+logged in) before clearing it. `AuthHandler.Login` now takes an optional
+`totp_code`: if the user has 2FA enabled and no code was sent, it responds
+**428 Precondition Required** (not 401 — this is "give me one more thing,"
+not "wrong credentials") with no body detail; the frontend's `login()`
+special-cases exactly that status into a `TOTPRequiredError` so `Login.tsx`
+can reveal the code field and resubmit, matching the same "bypass the
+generic `request()` helper for a call with special status-code handling"
+pattern `tryRefresh()` already used. A wrong TOTP code (as opposed to a
+missing one) folds into the same generic "invalid credentials" 401
+everything else uses — deliberately not distinguished from a wrong
+password, so a failed login attempt can't be used to probe which factor
+was wrong. No QR-code image rendering (`panel.css`'s `.twofa-card` never
+had a slot for one) — the setup screen shows the `otpauth://` URL and raw
+secret as copyable rows, same `.api-item`/`.api-key`/"Copy" pattern
+already used for daemon tokens and API keys, so a user can paste the URL
+into any authenticator app that accepts manual entry or add the secret by
+hand.
+
 Pages wired into `App.tsx`'s sidebar: **Servers** (dashboard,
 `pages/Dashboard.tsx` + `components/ServerList.tsx`, now with a
 **"+ Create Server" form** — `components/CreateServerForm.tsx` — that
@@ -403,9 +434,6 @@ systemd journal" into "click one button in the UI."
   frontend simplification, not a backend limit — `schedule_tasks` already
   supports an ordered sequence with per-task offsets; a "multi-step
   schedule" UI is additive whenever it's worth building.
-- **2FA** — `.twofa-card` exists in panel.css, `users.totp_secret`/
-  `totp_enabled` columns exist, nothing reads or writes them. Account
-  page currently only has the API-keys card.
 - **Allocations need real provisioning**, not a bare IP+port text form —
   no port-range/bulk-add, no validation that the IP actually belongs to
   the node, no reservation system. Fine for one operator manually running

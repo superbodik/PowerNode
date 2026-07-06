@@ -161,6 +161,15 @@ export interface CreateApiKeyResponse {
   token: string;
 }
 
+export interface TwoFAStatus {
+  enabled: boolean;
+}
+
+export interface TwoFASetup {
+  secret: string;
+  otpauth_url: string;
+}
+
 export interface FileEntry {
   name: string;
   is_directory: boolean;

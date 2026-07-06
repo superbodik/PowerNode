@@ -15,6 +15,8 @@ import type {
   PowerAction,
   Schedule,
   Server,
+  TwoFASetup,
+  TwoFAStatus,
   UpdateCheck,
   VersionInfo,
 } from '../types';
@@ -25,6 +27,13 @@ interface AuthTokens {
   access_token: string;
   refresh_token: string;
   user: { id: number; email: string; username: string };
+}
+
+export class TOTPRequiredError extends Error {
+  constructor() {
+    super('totp code required');
+    this.name = 'TOTPRequiredError';
+  }
 }
 
 function authHeaders(): HeadersInit {
@@ -143,11 +152,20 @@ async function requestBlob(path: string, init?: RequestInit, isRetry = false): P
 }
 
 export const api = {
-  login: (email: string, password: string) =>
-    request<AuthTokens>('/auth/login', {
+  login: async (email: string, password: string, totpCode?: string) => {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, totp_code: totpCode ?? '' }),
+    });
+    if (res.status === 428) {
+      throw new TOTPRequiredError();
+    }
+    if (!res.ok) {
+      throw new Error('invalid credentials');
+    }
+    return (await res.json()) as AuthTokens;
+  },
 
   listServers: () => request<Server[]>('/servers'),
 
@@ -197,6 +215,22 @@ export const api = {
     }),
 
   deleteApiKey: (id: number) => request<void>(`/account/api-keys/${id}`, { method: 'DELETE' }),
+
+  get2FAStatus: () => request<TwoFAStatus>('/account/2fa/status'),
+
+  setup2FA: () => request<TwoFASetup>('/account/2fa/setup', { method: 'POST' }),
+
+  verify2FA: (code: string) =>
+    request<{ enabled: boolean }>('/account/2fa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  disable2FA: (password: string) =>
+    request<{ enabled: boolean }>('/account/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }),
 
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),

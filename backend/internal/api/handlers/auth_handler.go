@@ -9,16 +9,19 @@ import (
 
 	"github.com/yourorg/panel/internal/activity"
 	"github.com/yourorg/panel/internal/auth"
+	"github.com/yourorg/panel/internal/crypto"
 )
 
 type AuthHandler struct {
-	DB    *pgxpool.Pool
-	Token *auth.TokenManager
+	DB            *pgxpool.Pool
+	Token         *auth.TokenManager
+	EncryptionKey string
 }
 
 type loginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	TOTPCode string `json:"totp_code"`
 }
 
 type tokenResponse struct {
@@ -39,17 +42,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		id           int64
-		email        string
-		username     string
-		passwordHash string
-		isAdmin      bool
-		isActive     bool
+		id            int64
+		email         string
+		username      string
+		passwordHash  string
+		isAdmin       bool
+		isActive      bool
+		totpEnabled   bool
+		totpSecretEnc *string
 	)
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id, email, username, password_hash, is_admin, is_active
+		`SELECT id, email, username, password_hash, is_admin, is_active, totp_enabled, totp_secret
 		 FROM users WHERE email = $1`, req.Email,
-	).Scan(&id, &email, &username, &passwordHash, &isAdmin, &isActive)
+	).Scan(&id, &email, &username, &passwordHash, &isAdmin, &isActive, &totpEnabled, &totpSecretEnc)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
@@ -62,6 +67,18 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if !isActive || !auth.VerifyPassword(passwordHash, req.Password) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
+	}
+
+	if totpEnabled {
+		if req.TOTPCode == "" {
+			http.Error(w, "totp_required", http.StatusPreconditionRequired)
+			return
+		}
+		secret, err := crypto.Decrypt(h.EncryptionKey, *totpSecretEnc)
+		if err != nil || !auth.ValidateTOTPCode(secret, req.TOTPCode) {
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	accessToken, err := h.Token.Issue(id, email, isAdmin)

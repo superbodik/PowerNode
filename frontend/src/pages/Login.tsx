@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, storeTokens } from '../api/client';
+import { api, storeTokens, TOTPRequiredError } from '../api/client';
 
 interface Props {
   onLoggedIn: () => void;
@@ -8,6 +8,8 @@ interface Props {
 export function Login({ onLoggedIn }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [needsTotp, setNeedsTotp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -16,11 +18,15 @@ export function Login({ onLoggedIn }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      const tokens = await api.login(email, password);
+      const tokens = await api.login(email, password, needsTotp ? totpCode : undefined);
       storeTokens(tokens);
       onLoggedIn();
-    } catch {
-      setError('Invalid email or password');
+    } catch (err) {
+      if (err instanceof TOTPRequiredError) {
+        setNeedsTotp(true);
+      } else {
+        setError(needsTotp ? 'Invalid email, password, or code' : 'Invalid email or password');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -69,6 +75,22 @@ export function Login({ onLoggedIn }: Props) {
               required
             />
           </div>
+
+          {needsTotp && (
+            <div className="form-field">
+              <label htmlFor="totp-code">Authenticator code</label>
+              <input
+                id="totp-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                placeholder="6-digit code"
+                autoFocus
+                required
+              />
+            </div>
+          )}
 
           <button className="btn-primary" type="submit" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign in'}

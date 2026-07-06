@@ -45,7 +45,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		AllowCredentials: true,
 	}))
 
-	authHandler := &handlers.AuthHandler{DB: deps.DB, Token: deps.Token}
+	authHandler := &handlers.AuthHandler{DB: deps.DB, Token: deps.Token, EncryptionKey: deps.EncryptionKey}
 	nodeHandler := &handlers.NodeHandler{DB: deps.DB, EncryptionKey: deps.EncryptionKey, NodeClient: deps.NodeClient}
 	serverHandler := &handlers.ServerHandler{DB: deps.DB, NodeClient: deps.NodeClient}
 	versionHandler := &handlers.VersionHandler{
@@ -60,6 +60,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	apiKeyHandler := &handlers.APIKeyHandler{DB: deps.DB}
 	fileHandler := &handlers.FileHandler{DB: deps.DB, NodeClient: deps.NodeClient}
 	scheduleHandler := &handlers.ScheduleHandler{DB: deps.DB}
+	twofaHandler := &handlers.TwoFAHandler{DB: deps.DB, EncryptionKey: deps.EncryptionKey}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -105,6 +106,11 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/account/api-keys", apiKeyHandler.List)
 			r.Post("/account/api-keys", apiKeyHandler.Create)
 			r.Delete("/account/api-keys/{id}", apiKeyHandler.Delete)
+
+			r.Get("/account/2fa/status", twofaHandler.Status)
+			r.Post("/account/2fa/setup", twofaHandler.Setup)
+			r.Post("/account/2fa/verify", twofaHandler.Verify)
+			r.Post("/account/2fa/disable", twofaHandler.Disable)
 		})
 	})
 
