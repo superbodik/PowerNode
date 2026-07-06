@@ -1304,3 +1304,11 @@ actually flow into the create form.
   through Manage -> Domains, with the backend mocked) rather than trusting
   the build alone; both listed domains rendered with correct TLS status
   text and the add-domain form worked as expected.
+- **v0.2.0**: minor release on top of v0.1.1 — one new feature (custom
+  domains) plus the fixes that landed alongside it. Everything since
+  v0.1.1: the sbPanel -> Roost rename across every remaining reference
+  (following the actual GitHub repo rename), the full-uninstall
+  PostgreSQL-purge fix, the admin-creation JWT-secret fix that was
+  outright blocking fresh installs, the Roost marketing site + README
+  rebrand, and per-server custom domains with nginx+certbot reverse
+  proxying on the node.
