@@ -393,6 +393,27 @@ inline (`title` attribute has the full text, the row shows a truncated
 one-liner) — this turns "why did create fail" from "read the server's
 systemd journal" into "click one button in the UI."
 
+**The frontend was discarding every backend error message — this is
+almost certainly why the same "POST /servers failed: 502" kept coming
+back no matter what got fixed server-side.** `api/client.ts`'s
+`request`/`requestText`/`requestBlob` all threw a hardcoded
+`` `${method} ${path} failed: ${status}` `` on any non-OK response and
+never read the response body — so every specific message I'd carefully
+written on the backend (`"node unavailable"`, `"daemon failed to create
+server"`, the node-token-missing message, etc.) was being thrown away
+before it ever reached the screen. Every backend fix to *what* the error
+said was invisible to the user the whole time. Fixed with one shared
+`errorMessage(res, path, init)` helper — reads `res.text()` (Go's
+`http.Error` always sends plain text, never JSON, so this is safe
+without a content-type check), appends the status code, falls back to
+the old generic message only if the body is empty or unreadable. All
+three request helpers call it now. **Lesson**: when a backend keeps
+getting more specific error messages but a user keeps reporting the
+same generic-looking failure, check whether the frontend is actually
+capable of displaying anything more specific before assuming the
+backend fix didn't work or guessing at new backend causes — the wiring
+between the two is exactly as fixable as either end alone.
+
 **Nodes can be deleted now, and egg variables actually reach the
 container.** Two small gaps closed together: `DELETE /nodes/{id}`
 (admin-only) refuses if any server still references that node (checked

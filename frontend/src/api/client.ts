@@ -83,6 +83,16 @@ async function tryRefresh(): Promise<boolean> {
   return result;
 }
 
+async function errorMessage(res: Response, path: string, init?: RequestInit): Promise<string> {
+  const fallback = `${init?.method ?? 'GET'} ${path} failed: ${res.status}`;
+  try {
+    const body = (await res.text()).trim();
+    return body ? `${body} (${res.status})` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit, isRetry = false): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -102,7 +112,7 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     throw new Error('session expired');
   }
   if (!res.ok) {
-    throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status}`);
+    throw new Error(await errorMessage(res, path, init));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -126,7 +136,7 @@ async function requestText(path: string, init?: RequestInit, isRetry = false): P
     throw new Error('session expired');
   }
   if (!res.ok) {
-    throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status}`);
+    throw new Error(await errorMessage(res, path, init));
   }
   return res.text();
 }
@@ -149,7 +159,7 @@ async function requestBlob(path: string, init?: RequestInit, isRetry = false): P
     throw new Error('session expired');
   }
   if (!res.ok) {
-    throw new Error(`${init?.method ?? 'GET'} ${path} failed: ${res.status}`);
+    throw new Error(await errorMessage(res, path, init));
   }
   return res.blob();
 }
