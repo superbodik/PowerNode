@@ -76,12 +76,11 @@ create_admin_interactive() {
 		log_warn "$(msg admin_password_mismatch)"
 	done
 
-	local db_url
-	db_url=$(grep '^PANEL_DATABASE_URL=' "$PANEL_ENV_FILE" | cut -d= -f2-)
-
-	printf '%s\n' "$password" \
-		| PANEL_DATABASE_URL="$db_url" "${PANEL_INSTALL_DIR}/panel-admin" -email "$email" -username "$username" \
-		|| die "Failed to create admin user"
+	(
+		set -a
+		source "$PANEL_ENV_FILE"
+		printf '%s\n' "$password" | "${PANEL_INSTALL_DIR}/panel-admin" -email "$email" -username "$username"
+	) || die "Failed to create admin user"
 }
 
 write_panel_env() {

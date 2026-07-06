@@ -1264,3 +1264,16 @@ actually flow into the create form.
   README badges/links, and the marketing site) to match the GitHub repo
   rename — the version-check and node-install-command features would
   otherwise have kept pointing at the old, redirected URL indefinitely.
+- **Fresh installs broke at "Failed to create admin user" with `PANEL_JWT_SECRET
+  is not set to a real secret`** — confirmed live. `create_admin_interactive`
+  invoked `panel-admin` with only `PANEL_DATABASE_URL` set in its environment
+  (extracted from `panel.env` with a one-off `grep`), but `panel-admin` calls
+  the exact same `config.Load()` as the main `panel` binary, which refuses to
+  start unless `PANEL_JWT_SECRET` is also a real, non-default secret — and
+  that variable was simply never passed through. `panel.service` gets the
+  full file via `EnvironmentFile=`; the interactive admin-creation step
+  didn't have an equivalent and only cherry-picked one variable. Fixed by
+  running `panel-admin` inside a `( set -a; source "$PANEL_ENV_FILE"; ... )`
+  subshell instead, so it gets every variable panel.env actually defines,
+  matching what the systemd unit already does. Verified the exact shell
+  logic in isolation with a stand-in panel-admin script before shipping.
