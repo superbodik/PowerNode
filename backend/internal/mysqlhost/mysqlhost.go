@@ -3,11 +3,13 @@ package mysqlhost
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 )
 
 type Host struct {
@@ -45,6 +47,18 @@ func Ping(ctx context.Context, h Host) error {
 		return err
 	}
 	return db.Close()
+}
+
+func DescribeConnectError(err error) string {
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		return fmt.Sprintf("could not reach that host at all (%v) — check that MySQL/MariaDB is running, listening on the given port, and reachable from the panel server (firewall rules, bind-address); credentials were never checked", err)
+	}
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1045 {
+		return fmt.Sprintf("reached the host, but the given admin username/password were rejected: %v", err)
+	}
+	return fmt.Sprintf("could not connect to that MySQL/MariaDB host: %v", err)
 }
 
 func Provision(ctx context.Context, h Host, dbName, username, password string) error {

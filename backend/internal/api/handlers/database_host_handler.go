@@ -77,7 +77,7 @@ func (h *DatabaseHostHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Hostname: req.Host, Port: req.Port,
 		AdminUsername: req.AdminUsername, AdminPassword: req.AdminPassword,
 	}); err != nil {
-		http.Error(w, "could not connect to that MySQL/MariaDB host with the given credentials: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, mysqlhost.DescribeConnectError(err), http.StatusBadGateway)
 		return
 	}
 

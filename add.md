@@ -1136,3 +1136,16 @@ actually flow into the create form.
   scanned into a non-pointer Go field is a time bomb that only detonates
   once a real NULL row exists to scan, which can be long after the code
   was written and reviewed.
+- **`could not connect to that MySQL/MariaDB host with the given
+  credentials` was reported for a plain `connection refused`** — a pure
+  TCP-level dial failure (nothing listening on that host/port at all,
+  before any credentials are even sent) was being worded identically to
+  an actual auth rejection, which misleads the user into suspecting
+  their username/password when the real problem is the remote MySQL/
+  MariaDB isn't reachable (down, bound to `127.0.0.1` only, wrong port,
+  firewalled). Not a panel bug — the dial genuinely was refused, that
+  part is infra on the DB host's side — but the wording was. Added
+  `mysqlhost.DescribeConnectError`, which uses `errors.As` to tell a
+  `*net.OpError` (never reached the host, credentials irrelevant) apart
+  from a MySQL `Error 1045` (reached the host, credentials specifically
+  rejected) apart from anything else, and phrases each case accordingly.
