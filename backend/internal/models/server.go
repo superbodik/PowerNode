@@ -46,6 +46,9 @@ type Server struct {
 	ContainerID string       `json:"container_id,omitempty"`
 	IsSuspended bool         `json:"is_suspended"`
 
+	NodeName       string  `json:"node_name,omitempty"`
+	PrimaryAddress *string `json:"primary_address,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

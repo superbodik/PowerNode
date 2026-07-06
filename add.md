@@ -414,6 +414,27 @@ capable of displaying anything more specific before assuming the
 backend fix didn't work or guessing at new backend causes — the wiring
 between the two is exactly as fixable as either end alone.
 
+**`models.Server` never actually had `node_name`/`primary_address` —
+the frontend has been ready for them since `ServerCard.tsx`/`ServerView.tsx`
+were first written, they just silently never rendered.** Found this
+doing a review pass, not chasing a specific report: `types/index.ts`'s
+`Server` interface already had `node_name?`/`primary_address?` and
+`ServerCard.tsx` already had `{server.node_name && ...}` conditionals
+and `panel.css` already had `.srv-node`/`.srv-addr` styling for them —
+but `ServerHandler.List`/`Get`'s SQL never selected anything to fill
+those fields, and the Go `models.Server` struct didn't even have them.
+The dashboard has apparently never shown which node a server lives on or
+its connection IP:port, since the very first version of this page.
+Fixed by joining `nodes` (for the name) and a per-server correlated
+subquery against `allocations` (first one by id, ordered — there's no
+"primary allocation" flag in the schema, and in practice a server has at
+most one allocation today since `ServerHandler.Create` only ever binds
+the single `allocation_id` sent at creation time, so "first by id" and
+"the only one" are the same thing right now). Also surfaced the same two
+fields in `ServerView.tsx`'s Overview tab, which hadn't shown them
+either. If multi-allocation-per-server ever becomes a real feature,
+revisit this "first by id = primary" shortcut with an actual flag.
+
 **Nodes can be deleted now, and egg variables actually reach the
 container.** Two small gaps closed together: `DELETE /nodes/{id}`
 (admin-only) refuses if any server still references that node (checked

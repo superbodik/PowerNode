@@ -39,8 +39,12 @@ func (h *ServerHandler) List(w http.ResponseWriter, r *http.Request) {
 		       s.node_id, s.egg_id, s.docker_image, s.startup_command,
 		       s.memory_mb, s.swap_mb, s.disk_mb, s.io_weight, s.cpu_percent,
 		       s.allocation_limit, s.database_limit, s.backup_limit,
-		       s.status, s.container_id, s.is_suspended, s.created_at, s.updated_at
+		       s.status, s.container_id, s.is_suspended, s.created_at, s.updated_at,
+		       n.name,
+		       (SELECT HOST(a.ip) || ':' || a.port FROM allocations a
+		        WHERE a.server_id = s.id ORDER BY a.id LIMIT 1)
 		FROM servers s
+		JOIN nodes n ON n.id = s.node_id
 		LEFT JOIN server_subusers su ON su.server_id = s.id AND su.user_id = $1
 		WHERE s.owner_id = $1 OR $2 = true OR su.user_id IS NOT NULL
 		ORDER BY s.created_at DESC`, claims.UserID, claims.IsAdmin)
@@ -59,6 +63,7 @@ func (h *ServerHandler) List(w http.ResponseWriter, r *http.Request) {
 			&s.MemoryMB, &s.SwapMB, &s.DiskMB, &s.IOWeight, &s.CPUPercent,
 			&s.AllocationLimit, &s.DatabaseLimit, &s.BackupLimit,
 			&s.Status, &s.ContainerID, &s.IsSuspended, &s.CreatedAt, &s.UpdatedAt,
+			&s.NodeName, &s.PrimaryAddress,
 		); err != nil {
 			http.Error(w, "failed to read servers", http.StatusInternalServerError)
 			return
@@ -247,18 +252,22 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var s models.Server
 	err = h.DB.QueryRow(r.Context(), `
-		SELECT id, uuid, uuid_short, name, description, owner_id, node_id,
-		       egg_id, docker_image, startup_command, memory_mb, swap_mb,
-		       disk_mb, io_weight, cpu_percent, allocation_limit,
-		       database_limit, backup_limit, status, container_id,
-		       is_suspended, created_at, updated_at
-		FROM servers WHERE uuid = $1`, id,
+		SELECT s.id, s.uuid, s.uuid_short, s.name, s.description, s.owner_id, s.node_id,
+		       s.egg_id, s.docker_image, s.startup_command, s.memory_mb, s.swap_mb,
+		       s.disk_mb, s.io_weight, s.cpu_percent, s.allocation_limit,
+		       s.database_limit, s.backup_limit, s.status, s.container_id,
+		       s.is_suspended, s.created_at, s.updated_at, n.name,
+		       (SELECT HOST(a.ip) || ':' || a.port FROM allocations a
+		        WHERE a.server_id = s.id ORDER BY a.id LIMIT 1)
+		FROM servers s JOIN nodes n ON n.id = s.node_id
+		WHERE s.uuid = $1`, id,
 	).Scan(
 		&s.ID, &s.UUID, &s.UUIDShort, &s.Name, &s.Description, &s.OwnerID,
 		&s.NodeID, &s.EggID, &s.DockerImage, &s.StartupCommand,
 		&s.MemoryMB, &s.SwapMB, &s.DiskMB, &s.IOWeight, &s.CPUPercent,
 		&s.AllocationLimit, &s.DatabaseLimit, &s.BackupLimit,
 		&s.Status, &s.ContainerID, &s.IsSuspended, &s.CreatedAt, &s.UpdatedAt,
+		&s.NodeName, &s.PrimaryAddress,
 	)
 	if err == pgx.ErrNoRows {
 		http.Error(w, "server not found", http.StatusNotFound)

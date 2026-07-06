@@ -187,6 +187,14 @@ export function ServerView({ uuid, onBack }: Props) {
                   <input readOnly value={live?.state ?? server.status} />
                 </div>
                 <div className="sfield">
+                  <label>Node</label>
+                  <input readOnly value={server.node_name ?? '—'} />
+                </div>
+                <div className="sfield">
+                  <label>Address</label>
+                  <input readOnly value={server.primary_address ?? 'no allocation assigned'} />
+                </div>
+                <div className="sfield">
                   <label>Startup command</label>
                   <input readOnly value={server.startup_command} />
                 </div>
