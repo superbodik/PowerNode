@@ -9,6 +9,7 @@ import (
 
 	"github.com/yourorg/panel-daemon/internal/console"
 	"github.com/yourorg/panel-daemon/internal/docker"
+	"github.com/yourorg/panel-daemon/internal/proxy"
 )
 
 type Handlers struct {
@@ -223,6 +224,37 @@ func (h *Handlers) SendCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+type addDomainRequest struct {
+	Domain string `json:"domain"`
+	Port   int    `json:"port"`
+	Email  string `json:"email"`
+}
+
+func (h *Handlers) AddDomain(w http.ResponseWriter, r *http.Request) {
+	var req addDomainRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	tlsStatus, err := proxy.AddDomain(req.Domain, req.Port, req.Email)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"domain": req.Domain, "tls_status": tlsStatus})
+}
+
+func (h *Handlers) RemoveDomain(w http.ResponseWriter, r *http.Request) {
+	domain := chi.URLParam(r, "domain")
+	if err := proxy.RemoveDomain(domain); err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

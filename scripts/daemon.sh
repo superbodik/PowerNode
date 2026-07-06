@@ -23,6 +23,7 @@ install_daemon() {
 	mkdir -p /etc/wingsd
 
 	build_daemon_binary
+	install_daemon_proxy
 
 	write_daemon_env
 	write_daemon_service
@@ -31,6 +32,18 @@ install_daemon() {
 	systemctl enable wingsd
 	systemctl restart wingsd
 	log_ok "wingsd.service (re)started"
+}
+
+install_daemon_proxy() {
+	if ! require_command nginx; then
+		apt-get install -y -qq nginx || die "nginx installation failed (required for the custom-domains feature)"
+	fi
+	systemctl enable --now nginx 2>/dev/null
+	if ! require_command certbot; then
+		apt-get install -y -qq certbot python3-certbot-nginx \
+			|| log_warn "certbot installation failed — custom domains will stay on plain HTTP until it's installed manually"
+	fi
+	log_ok "nginx + certbot ready (used for per-server custom domains)"
 }
 
 write_daemon_env() {

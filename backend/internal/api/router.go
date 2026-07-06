@@ -85,6 +85,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	userHandler := &handlers.UserHandler{DB: deps.DB}
 	databaseHostHandler := &handlers.DatabaseHostHandler{DB: deps.DB, EncryptionKey: deps.EncryptionKey}
 	serverDatabaseHandler := &handlers.ServerDatabaseHandler{DB: deps.DB, Subusers: subusers, Encrypt: deps.EncryptionKey}
+	serverDomainHandler := &handlers.ServerDomainHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -130,6 +131,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/servers/{uuid}/databases", serverDatabaseHandler.List)
 			r.Post("/servers/{uuid}/databases", serverDatabaseHandler.Create)
 			r.Delete("/servers/{uuid}/databases/{id}", serverDatabaseHandler.Delete)
+
+			r.Get("/servers/{uuid}/domains", serverDomainHandler.List)
+			r.Post("/servers/{uuid}/domains", serverDomainHandler.Create)
+			r.Delete("/servers/{uuid}/domains/{id}", serverDomainHandler.Delete)
 
 			r.Get("/servers/{uuid}/subusers", subuserHandler.List)
 			r.Post("/servers/{uuid}/subusers", subuserHandler.Create)

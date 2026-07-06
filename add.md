@@ -1277,3 +1277,30 @@ actually flow into the create form.
   subshell instead, so it gets every variable panel.env actually defines,
   matching what the systemd unit already does. Verified the exact shell
   logic in isolation with a stand-in panel-admin script before shipping.
+- Added custom-domain support for servers ("Domains" tab in server
+  settings): `server_domains` table (0007 migration), `ServerDomainHandler`
+  (list/create/delete, gated by new `domains.read`/`domains.write`
+  permissions, same owner-or-subuser pattern as every other per-server
+  resource), and a `DomainManager.tsx` component modeled directly on
+  `DatabaseManager.tsx`. The actual proxying happens on the node: a new
+  `daemon/internal/proxy` package writes an nginx vhost
+  (`/etc/nginx/sites-available/roost-<domain>.conf`, symlinked into
+  `sites-enabled`) that reverse-proxies the domain to the server's primary
+  allocation port on `127.0.0.1`, reloads nginx (`nginx -t` first, so a bad
+  config can't take the node's nginx down), and then runs
+  `certbot --nginx -d <domain> --non-interactive --redirect` — the same
+  certbot invocation pattern `scripts/domain.sh` already uses for the
+  panel's own domain, just triggered at runtime instead of install time.
+  If certbot fails (DNS not pointed there yet, rate-limited, whatever) the
+  domain is recorded as `tls_status: http_only` rather than failing the
+  whole request — plain HTTP still works, and the user can just delete and
+  re-add once DNS is fixed. Domain names are validated with the same strict
+  hostname regex on both the panel and the daemon (defense in depth, since
+  the string ends up in a shell arg to certbot and a filename on the node).
+  `scripts/daemon.sh` now installs nginx + certbot on node install, since
+  neither was there before — the panel's installer already had both, but
+  only for the panel's own reverse proxy, not per-node. Verified the new
+  tab end-to-end in a real browser (Playwright driving the actual SPA
+  through Manage -> Domains, with the backend mocked) rather than trusting
+  the build alone; both listed domains rendered with correct TLS status
+  text and the add-domain form worked as expected.

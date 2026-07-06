@@ -53,6 +53,9 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 			r.Delete("/servers/{uuid}/files", h.DeleteFile)
 			r.Post("/servers/{uuid}/files/directory", h.CreateDirectory)
 			r.Post("/servers/{uuid}/files/rename", h.RenameFile)
+
+			r.Post("/servers/{uuid}/domains", h.AddDomain)
+			r.Delete("/servers/{uuid}/domains/{domain}", h.RemoveDomain)
 		})
 		r.Get("/ws/servers/{uuid}", h.ConsoleSocket)
 	})

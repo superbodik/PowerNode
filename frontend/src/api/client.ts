@@ -19,6 +19,7 @@ import type {
   Schedule,
   Server,
   ServerDatabase,
+  ServerDomain,
   Subuser,
   TwoFASetup,
   TwoFAStatus,
@@ -238,6 +239,17 @@ export const api = {
 
   deleteServerDatabase: (uuid: string, id: number) =>
     request<void>(`/servers/${uuid}/databases/${id}`, { method: 'DELETE' }),
+
+  listServerDomains: (uuid: string) => request<ServerDomain[]>(`/servers/${uuid}/domains`),
+
+  createServerDomain: (uuid: string, domain: string, email: string) =>
+    request<ServerDomain>(`/servers/${uuid}/domains`, {
+      method: 'POST',
+      body: JSON.stringify({ domain, email }),
+    }),
+
+  deleteServerDomain: (uuid: string, id: number) =>
+    request<void>(`/servers/${uuid}/domains/${id}`, { method: 'DELETE' }),
 
   getVersion: () => request<VersionInfo>('/version'),
 

@@ -210,6 +210,31 @@ func (c *Client) DialConsole(ctx context.Context, serverUUID uuid.UUID) (*websoc
 	return conn, nil
 }
 
+type AddDomainRequest struct {
+	Domain string `json:"domain"`
+	Port   int    `json:"port"`
+	Email  string `json:"email"`
+}
+
+type AddDomainResponse struct {
+	Domain    string `json:"domain"`
+	TLSStatus string `json:"tls_status"`
+}
+
+func (c *Client) AddDomain(ctx context.Context, serverUUID uuid.UUID, req AddDomainRequest) (*AddDomainResponse, error) {
+	var resp AddDomainResponse
+	path := fmt.Sprintf("/api/v1/servers/%s/domains", serverUUID)
+	if err := c.doJSON(ctx, http.MethodPost, path, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *Client) RemoveDomain(ctx context.Context, serverUUID uuid.UUID, domain string) error {
+	path := fmt.Sprintf("/api/v1/servers/%s/domains/%s", serverUUID, url.QueryEscape(domain))
+	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
+}
+
 func (c *Client) doJSON(ctx context.Context, method, path string, body, out interface{}) error {
 	var reader *bytes.Reader
 	if body != nil {
