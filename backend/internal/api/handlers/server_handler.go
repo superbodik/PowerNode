@@ -135,7 +135,7 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	client, err := h.NodeClient(req.NodeID)
 	if err != nil {
 		log.Printf("servers.create: node %d client unavailable: %v", req.NodeID, err)
-		http.Error(w, "node unavailable", http.StatusBadGateway)
+		http.Error(w, "node unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -204,10 +204,11 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil || !daemonResp.Success {
 		if err != nil {
 			log.Printf("servers.create: daemon call failed for node %d: %v", req.NodeID, err)
+			http.Error(w, "daemon call failed: "+err.Error(), http.StatusBadGateway)
 		} else {
 			log.Printf("servers.create: daemon rejected create for node %d: %s", req.NodeID, daemonResp.Message)
+			http.Error(w, "daemon rejected server creation: "+daemonResp.Message, http.StatusBadGateway)
 		}
-		http.Error(w, "daemon failed to create server", http.StatusBadGateway)
 		return
 	}
 
@@ -395,13 +396,13 @@ func (h *ServerHandler) Power(w http.ResponseWriter, r *http.Request) {
 
 	client, err := h.NodeClient(nodeID)
 	if err != nil {
-		http.Error(w, "node unavailable", http.StatusBadGateway)
+		http.Error(w, "node unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
 	resp, err := client.Power(r.Context(), id, req.Action)
 	if err != nil {
-		http.Error(w, "daemon rejected power action", http.StatusBadGateway)
+		http.Error(w, "daemon rejected power action: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 

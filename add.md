@@ -414,6 +414,23 @@ capable of displaying anything more specific before assuming the
 backend fix didn't work or guessing at new backend causes — the wiring
 between the two is exactly as fixable as either end alone.
 
+**Once the frontend could actually display backend error text (previous
+entry), the next problem was that some backend messages were still
+deliberately vague.** `ServerHandler.Create`/`Power`'s "node unavailable"
+and "daemon failed to create server" / "daemon rejected power action"
+used to swallow the real underlying error into `log.Printf` only,
+returning a fixed string to the client — a leftover from before the
+frontend could show anything useful, when there was no point sending
+detail nobody could see. Now that it can, these four sites append
+`err.Error()` (or `daemonResp.Message` for a daemon-side rejection) to
+the HTTP response body too. This is consistent with what
+`NodeHandler.Status`'s "⟳" check already exposes (raw daemon-connectivity
+errors) to the same audience — anyone who can create/power a server can
+already see the same class of infrastructure detail via the Nodes page,
+so this isn't a new exposure, just the same information reaching the
+place a user actually hits the problem instead of requiring a detour
+through the Nodes page or `journalctl`.
+
 **`models.Server` never actually had `node_name`/`primary_address` —
 the frontend has been ready for them since `ServerCard.tsx`/`ServerView.tsx`
 were first written, they just silently never rendered.** Found this
