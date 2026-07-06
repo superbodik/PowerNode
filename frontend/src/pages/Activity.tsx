@@ -15,7 +15,7 @@ export function Activity() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (error) return <div className="login-error show">{error}</div>;
+  if (error) return <p className="srv-desc">Only admins can view the activity log.</p>;
 
   return (
     <div className="view active">

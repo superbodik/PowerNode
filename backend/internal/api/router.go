@@ -142,7 +142,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/version", versionHandler.Get)
 			r.Get("/version/check", versionHandler.CheckUpdate)
 
-			r.Get("/activity", activityHandler.List)
+			r.With(auth.RequireAdmin).Get("/activity", activityHandler.List)
 
 			r.Get("/account/api-keys", apiKeyHandler.List)
 			r.Post("/account/api-keys", apiKeyHandler.Create)

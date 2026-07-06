@@ -571,6 +571,33 @@ not a report of "it's broken."**
   (installing Playwright, finding the proxy config, etc.) from scratch
   again.
 
+**Doing a route-by-route pass over `router.go` (every path, checked
+against what it actually returns and who's allowed to call it) found
+one real, serious information-disclosure bug**: `GET /activity` had no
+authorization gate at all — every other admin-management route
+(`/nodes` writes, `/users`, `/database-hosts` writes, `/allocations`
+writes) uses `auth.RequireAdmin`, but this one was plain
+`r.Get("/activity", ...)`. `ActivityHandler.List` itself has no
+per-user filtering either — it returns the last 100 `activity_logs`
+rows *panel-wide*, including `ip_address` and `username` for every
+actor. Any authenticated non-admin user — a regular account that owns
+zero servers — could see every other user's login IP addresses and
+every action anyone had taken anywhere in the panel. The frontend's own
+copy ("Recent actions across the panel") already signals this was
+designed as an admin audit view, not a personal feed, so the fix is the
+missing gate, not new filtering logic: added
+`r.With(auth.RequireAdmin)`. `Activity.tsx` now shows "Only admins can
+view the activity log" on a fetch failure instead of the raw error
+text, matching the same blanket-treat-any-error-as-403 pattern
+`SubuserManager.tsx`/`Users.tsx` already use for their own admin-gated
+resources. **Worth re-running this specific check** (grep `router.go`
+for every route lacking `auth.RequireAdmin`, then ask "should a
+brand-new non-admin account be able to call this, and does the handler
+filter results to that account if not") whenever a new list-style
+endpoint is added — this is exactly the kind of gap `go build`/`go vet`
+can never catch, since the code is entirely correct Go, just missing an
+authorization decision.
+
 **Once the frontend could actually display backend error text (previous
 entry), the next problem was that some backend messages were still
 deliberately vague.** `ServerHandler.Create`/`Power`'s "node unavailable"
