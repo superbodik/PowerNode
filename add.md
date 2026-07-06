@@ -7,6 +7,24 @@ plan changes; treat it as append/edit, not write-once.
 
 ## Current state (as of this writing)
 
+**The product has a name now: Roost.** Picked to fit the bird/flight
+vocabulary the codebase already committed to (`wingsd` the daemon, "eggs"
+for server templates) without directly copying Pterodactyl's own naming —
+servers "roost" on nodes, eggs hatch there. Applied everywhere a human
+actually sees it: the browser tab title, the topbar/login logo (`name`
+"Roost" + `tag`/`sub` "Panel" — same two-part logo shape panel.css already
+had, just new words in the same slots), the installer's menu title and a
+one-line `print_banner` shown before language selection, and the README's
+H1. **Deliberately not renamed**: the Go module path
+(`github.com/yourorg/panel`), systemd unit names (`panel.service`,
+`wingsd.service`), env var prefixes (`PANEL_*`, `WINGSD_*`), the npm
+package name, and `PANEL_REPO_URL`/`CLONE_DIR` in `install.sh` — those are
+internal plumbing nobody but a developer reads, and renaming them is a
+mechanical, error-prone, all-or-nothing refactor across every script and
+import statement for zero user-facing benefit. If a full rename is ever
+wanted, do it as its own dedicated pass, not bundled with a "let's also
+add a feature" commit.
+
 Pages wired into `App.tsx`'s sidebar: **Servers** (dashboard,
 `pages/Dashboard.tsx` + `components/ServerList.tsx`, now with a
 **"+ Create Server" form** — `components/CreateServerForm.tsx` — that

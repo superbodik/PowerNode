@@ -54,8 +54,8 @@ export function App() {
 
       <header className="topbar">
         <div className="topbar-logo">
-          <span className="name">Panel</span>
-          <span className="tag">Control</span>
+          <span className="name">Roost</span>
+          <span className="tag">Panel</span>
         </div>
         <div className="topbar-sep" />
         <nav className="breadcrumb">

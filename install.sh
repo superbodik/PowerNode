@@ -84,6 +84,7 @@ main() {
 		return
 	fi
 
+	print_banner
 	select_language
 	preflight
 

@@ -36,14 +36,14 @@ export function Login({ onLoggedIn }: Props) {
       <div className="login-box">
         <div className="login-logo">
           <div className="login-logo-text">
-            <div className="title">Panel</div>
-            <div className="sub">Control</div>
+            <div className="title">Roost</div>
+            <div className="sub">Panel</div>
           </div>
         </div>
 
         <div className="login-head">
           <h1>Sign in</h1>
-          <p>Use your panel account to continue.</p>
+          <p>Use your Roost account to continue.</p>
         </div>
 
         <form onSubmit={handleSubmit}>
