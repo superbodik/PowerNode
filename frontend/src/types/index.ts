@@ -233,3 +233,23 @@ export interface CreateScheduleRequest {
   only_when_online: boolean;
   tasks: ScheduleTask[];
 }
+
+export interface PanelUser {
+  id: number;
+  uuid: string;
+  email: string;
+  username: string;
+  is_admin: boolean;
+  totp_enabled: boolean;
+  is_active: boolean;
+  server_limit: number | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateUserRequest {
+  is_admin: boolean;
+  is_active: boolean;
+  server_limit: number | null;
+}

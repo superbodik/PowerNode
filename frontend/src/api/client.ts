@@ -12,6 +12,7 @@ import type {
   FileEntry,
   Node,
   NodeStatus,
+  PanelUser,
   PowerAction,
   Schedule,
   Server,
@@ -19,6 +20,7 @@ import type {
   TwoFASetup,
   TwoFAStatus,
   UpdateCheck,
+  UpdateUserRequest,
   VersionInfo,
 } from '../types';
 
@@ -192,6 +194,11 @@ export const api = {
     request<CreateNodeResponse>('/nodes', { method: 'POST', body: JSON.stringify(payload) }),
 
   checkNodeStatus: (id: number) => request<NodeStatus>(`/nodes/${id}/status`),
+
+  listUsers: () => request<PanelUser[]>('/users'),
+
+  updateUser: (id: number, payload: UpdateUserRequest) =>
+    request<void>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
 
   getVersion: () => request<VersionInfo>('/version'),
 

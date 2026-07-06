@@ -15,6 +15,7 @@ type User struct {
 	IsAdmin      bool       `json:"is_admin"`
 	TOTPEnabled  bool       `json:"totp_enabled"`
 	IsActive     bool       `json:"is_active"`
+	ServerLimit  *int       `json:"server_limit"`
 	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`

@@ -66,6 +66,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	scheduleHandler := &handlers.ScheduleHandler{DB: deps.DB, Subusers: subusers}
 	twofaHandler := &handlers.TwoFAHandler{DB: deps.DB, EncryptionKey: deps.EncryptionKey}
 	subuserHandler := &handlers.SubuserHandler{DB: deps.DB}
+	userHandler := &handlers.UserHandler{DB: deps.DB}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -79,6 +80,9 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/nodes", nodeHandler.List)
 			r.With(auth.RequireAdmin).Post("/nodes", nodeHandler.Create)
 			r.Get("/nodes/{id}/status", nodeHandler.Status)
+
+			r.With(auth.RequireAdmin).Get("/users", userHandler.List)
+			r.With(auth.RequireAdmin).Patch("/users/{id}", userHandler.Update)
 
 			r.Get("/servers", serverHandler.List)
 			r.Post("/servers", serverHandler.Create)

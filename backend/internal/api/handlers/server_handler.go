@@ -104,6 +104,29 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !claims.IsAdmin {
+		var serverLimit *int
+		if err := h.DB.QueryRow(r.Context(),
+			`SELECT server_limit FROM users WHERE id = $1`, claims.UserID,
+		).Scan(&serverLimit); err != nil {
+			http.Error(w, "failed to check server limit", http.StatusInternalServerError)
+			return
+		}
+		if serverLimit != nil {
+			var count int
+			if err := h.DB.QueryRow(r.Context(),
+				`SELECT count(*) FROM servers WHERE owner_id = $1`, claims.UserID,
+			).Scan(&count); err != nil {
+				http.Error(w, "failed to check server limit", http.StatusInternalServerError)
+				return
+			}
+			if count >= *serverLimit {
+				http.Error(w, "server limit reached for your account", http.StatusForbidden)
+				return
+			}
+		}
+	}
+
 	client, err := h.NodeClient(req.NodeID)
 	if err != nil {
 		log.Printf("servers.create: node %d client unavailable: %v", req.NodeID, err)

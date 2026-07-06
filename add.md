@@ -343,6 +343,36 @@ everything unchecked for full access" as the explicit default explained
 in the UI (matches the empty-array-means-unrestricted backend
 convention, so it doesn't need its own migration for existing keys).
 
+**There's a Users admin page now — there wasn't one at all before, for
+anyone.** Went looking for where to add a per-user server-creation quota
+and found there was no way for an admin to list users, deactivate one, or
+change anyone's admin status short of hand-editing the database — the
+only user-management moment in the entire product was the one-time admin
+bootstrap during install. New `UserHandler` (`GET /users`, `PATCH
+/users/{id}`, both `auth.RequireAdmin`-gated) and a `Users` sidebar page
+(`.db-table`, matching Nodes/Allocations) with a toggle for admin status,
+a toggle for active/deactivated, and a `server_limit` field (new nullable
+`users.server_limit INT` column, migration `0004`; `NULL` = unlimited,
+matches how `nodes.last_seen_at`/other nullable columns already read as
+"nothing set yet = no restriction" elsewhere in this schema).
+`ServerHandler.Create` now checks it (skipped for admins) — count the
+user's existing servers, compare to `server_limit`, 403 if at or over.
+**Update semantics are full-replace, not partial-patch, on purpose**:
+`PATCH /users/{id}` always requires `is_admin`/`is_active` and always
+takes whatever `server_limit` value is sent (including explicit `null`)
+as the new value — no "send only the field you're changing" merge logic.
+This sidesteps a real ambiguity: Go's `encoding/json` can't distinguish
+"key omitted" from "key explicitly null" when decoding into `*int`, so a
+partial-update design would have had no way to tell "leave server_limit
+alone" from "clear it back to unlimited." Full-replace works because the
+frontend's per-row form always holds and submits the complete current
+state of all three fields together — there's no scenario where only one
+field is known and the others need to be preserved from the server.
+Guard rail: an admin can't remove their own admin status or deactivate
+themselves through this endpoint (`id == claims.UserID` check) — the
+only way that risk existed already (unwitting self-lockout via a raw SQL
+edit) shouldn't become a one-click UI mistake now that this is exposed.
+
 **Nodes now have a real connectivity check, not just a `last_seen_at`
 column that nothing ever writes to** — the Status column used to show
 "Online"/"Never seen" based on `nodes.last_seen_at`, but no code path
@@ -581,8 +611,6 @@ systemd journal" into "click one button in the UI."
   low priority since it's an admin-only, low-frequency operation.
 
 ### Mid-term (real functionality gaps, not just missing UI)
-- `ServerHandler.Create` still has no limit checks against anything
-  resembling a quota (a user can create unlimited servers).
 - gRPC migration for the daemon protocol (proto file is complete,
   `daemonclient`/`daemon/internal/api` are still the HTTP/WS stand-in) —
   low urgency, only matters once file-manager/backup streaming RPCs need

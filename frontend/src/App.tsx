@@ -7,6 +7,7 @@ import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
 import { ServerView } from './pages/ServerView';
 import { Settings } from './pages/Settings';
+import { Users } from './pages/Users';
 
 interface StoredUser {
   id: number;
@@ -14,7 +15,7 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'nodes' | 'settings' | 'activity' | 'account';
+type View = 'servers' | 'nodes' | 'settings' | 'activity' | 'account' | 'users';
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -68,7 +69,9 @@ export function App() {
                   ? 'Activity'
                   : view === 'account'
                     ? 'Account'
-                    : 'Dashboard'}
+                    : view === 'users'
+                      ? 'Users'
+                      : 'Dashboard'}
           </span>
           {activeServer && (
             <>
@@ -105,6 +108,12 @@ export function App() {
               <span className="nav-icon">◆</span> Nodes
             </div>
             <div
+              className={`nav-item ${view === 'users' ? 'active' : ''}`}
+              onClick={() => goTo('users')}
+            >
+              <span className="nav-icon">☺</span> Users
+            </div>
+            <div
               className={`nav-item ${view === 'activity' ? 'active' : ''}`}
               onClick={() => goTo('activity')}
             >
@@ -135,6 +144,8 @@ export function App() {
             <ServerView uuid={activeServer} onBack={() => setActiveServer(null)} />
           ) : view === 'nodes' ? (
             <Nodes />
+          ) : view === 'users' ? (
+            <Users />
           ) : view === 'settings' ? (
             <Settings />
           ) : view === 'activity' ? (
