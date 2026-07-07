@@ -1530,3 +1530,6 @@ actually flow into the create form.
     "Maintenance" badges inline so this state is visible without expanding
     every row. Verified in a real browser that toggling and saving sends
     the full updated payload to the API.
+- **v0.3.1**: patch release — node capacity/visibility/maintenance-mode
+  enforcement (is_public, maintenance_mode, memory_overallocate,
+  disk_overallocate were all real schema columns doing nothing until now).
