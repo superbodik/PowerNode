@@ -1616,3 +1616,16 @@ actually flow into the create form.
   no way to onboard non-admin users or change a password after account
   creation, anywhere, until now) — the headline feature, plus egg-variable
   validation enforcement and two TOCTOU race fixes from the same batch.
+- Added admin password reset for locked-out users — a direct follow-on
+  gap from the user-creation fix: self-service password change requires
+  knowing the *current* password, so a user who genuinely forgot theirs
+  had no way back in. `UserHandler.Update` only ever touched
+  `is_admin`/`is_active`/`server_limit`, and `panel-admin` only resets
+  *admin* accounts over SSH — there was no path at all for an admin to
+  reset a regular user's password through the panel. Added
+  `POST /users/{id}/reset-password` (admin-only, logged to the activity
+  feed) and a click-to-expand row on the Users page (reusing the same
+  expand pattern Nodes.tsx already established, rather than window.prompt
+  — no interest in reintroducing the exact bug class the Files "+ Folder"
+  fix addressed earlier this session). Verified end-to-end in a real
+  browser.

@@ -111,6 +111,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.With(auth.RequireAdmin).Get("/users", userHandler.List)
 			r.With(auth.RequireAdmin).Post("/users", userHandler.Create)
 			r.With(auth.RequireAdmin).Patch("/users/{id}", userHandler.Update)
+			r.With(auth.RequireAdmin).Post("/users/{id}/reset-password", userHandler.ResetPassword)
 
 			r.Get("/database-hosts", databaseHostHandler.List)
 			r.With(auth.RequireAdmin).Post("/database-hosts", databaseHostHandler.Create)

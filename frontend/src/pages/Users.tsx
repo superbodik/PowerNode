@@ -19,6 +19,11 @@ export function Users() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
+
   function refresh() {
     api
       .listUsers()
@@ -89,6 +94,28 @@ export function Users() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(null);
+    }
+  }
+
+  function toggleExpand(userId: number) {
+    setExpandedUserId((current) => (current === userId ? null : userId));
+    setResetPasswordValue('');
+    setResetSuccess(false);
+  }
+
+  async function handleResetPassword(e: React.FormEvent, userId: number) {
+    e.preventDefault();
+    setResetSubmitting(true);
+    setResetSuccess(false);
+    setError(null);
+    try {
+      await api.resetUserPassword(userId, resetPasswordValue);
+      setResetPasswordValue('');
+      setResetSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setResetSubmitting(false);
     }
   }
 
@@ -201,8 +228,13 @@ export function Users() {
             <span>Server limit</span>
           </div>
           {users.map((u) => (
-            <div className="db-row" key={u.id}>
-              <span className="db-name">
+            <div key={u.id}>
+            <div className="db-row">
+              <span
+                className="db-name"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleExpand(u.id)}
+              >
                 {u.username}
                 <span className="db-pw" style={{ display: 'block' }}>
                   {u.email}
@@ -248,6 +280,36 @@ export function Users() {
                   Save
                 </button>
               </span>
+            </div>
+            {expandedUserId === u.id && (
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(192,100,120,.06)' }}>
+                <form
+                  onSubmit={(e) => handleResetPassword(e, u.id)}
+                  style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
+                >
+                  <div className="sfield" style={{ margin: 0 }}>
+                    <label htmlFor={`reset-pw-${u.id}`}>Reset password for {u.username}</label>
+                    <input
+                      id={`reset-pw-${u.id}`}
+                      type="password"
+                      autoComplete="new-password"
+                      value={resetPasswordValue}
+                      onChange={(e) => setResetPasswordValue(e.target.value)}
+                      placeholder="at least 8 characters"
+                      required
+                    />
+                  </div>
+                  <button className="btn-primary" type="submit" disabled={resetSubmitting} style={{ width: 'auto', padding: '10px 20px' }}>
+                    {resetSubmitting ? 'Resetting…' : 'Reset password'}
+                  </button>
+                  {resetSuccess && (
+                    <span className="srv-desc" style={{ color: 'var(--green)' }}>
+                      Password reset.
+                    </span>
+                  )}
+                </form>
+              </div>
+            )}
             </div>
           ))}
           {users.length === 0 && <p className="srv-desc" style={{ padding: 16 }}>No users yet.</p>}

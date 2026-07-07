@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yourorg/panel/internal/activity"
 	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/models"
 )
@@ -125,6 +126,61 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type resetUserPasswordRequest struct {
+	Password string `json:"password"`
+}
+
+func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	var req resetUserPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.Password) < 8 {
+		http.Error(w, "password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		http.Error(w, "failed to hash password", http.StatusInternalServerError)
+		return
+	}
+
+	tag, err := h.DB.Exec(r.Context(),
+		`UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, hash, id,
+	)
+	if err != nil {
+		http.Error(w, "failed to reset password", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	activity.Record(r.Context(), h.DB, activity.Entry{
+		ActorUserID: &claims.UserID,
+		Event:       "user.reset_password",
+		IPAddress:   activity.RequestIP(r),
+		Metadata:    map[string]any{"target_user_id": id},
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
