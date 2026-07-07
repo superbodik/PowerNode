@@ -303,3 +303,35 @@ JWT в `backend/internal/auth/jwt.go` полностью stateless — `Parse`
 аккаунт, потому что лимит есть только на источник, а не на цель.
 Стоит добавить второй, менее строгий, но per-email лимит
 (`ratelimit:login:email:<email>`) в дополнение к per-IP.
+
+### 4.13. Удаление сервера НИКОГДА не чистит его файлы и бэкапы на диске ноды — утечка места навсегда
+Самая крупная находка этого захода. `daemon/internal/api/handlers.go:
+Delete` (вызывается из `ServerHandler.Delete` на панели) делает только
+`h.Docker.RemoveContainer(...)` — а это `ContainerRemove(..., Force:
+true, RemoveVolumes: true)`. `RemoveVolumes` тут ничего не даёт,
+потому что папка сервера примонтирована как **bind mount**
+(`docker/manager.go: CreateContainer` → `mount.Mount{Type:
+mount.TypeBind, Source: m.serverVolumePath(...), Target:
+"/home/container"}`), а не как named docker volume — bind-mounts
+`RemoveVolumes` не трогает вообще. Проверил через `grep` по всему
+демону: `os.RemoveAll` для `ServerVolumePath` не вызывается НИГДЕ,
+кроме как внутри `files.Delete`/`files.Rename` (это по запросу юзера
+на конкретный путь, не на весь каталог сервера).
+
+Итог: при удалении сервера (обычное удаление, `?force=true`, через
+UI — не важно) на диске ноды остаётся:
+1. Вся папка `dataDir/<server-uuid>/` со всеми файлами игрового
+   сервера — навсегда;
+2. Весь каталог `backupDir/<server-uuid>/` со всеми `.tar.gz`
+   бэкапами этого сервера — тоже навсегда (бэкапы, в отличие от
+   удаления одного бэкапа через `ServerBackupHandler.Delete`, при
+   удалении самого сервера никак не подчищаются).
+
+На панели, которая теперь активно занимается capacity/overallocation
+нод (в этой же сессии), это довольно серьёзно: диск ноды будет
+физически заканчиваться от "удалённых" серверов, о существовании
+которых панель полностью забыла, и админ не увидит причину в UI —
+только зайдя на ноду руками и посмотрев `du -sh` по датадиру. Нужно
+добавить `os.RemoveAll(m.ServerVolumePath(serverUUID))` (и то же для
+папки бэкапов) в `Handlers.Delete` после успешного
+`RemoveContainer`.
