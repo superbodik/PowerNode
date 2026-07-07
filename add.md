@@ -1490,3 +1490,9 @@ actually flow into the create form.
   suspended, matching the backend enforcement instead of just letting the
   click 403 with no context. Verified in a real browser: clicking Suspend
   actually disables Start/Restart and flips the button to "Unsuspend".
+- **v0.3.0**: three real features that had been sitting in the schema as
+  dead columns/tables since day one, all now actually built and shipped —
+  SFTP (ssh_keys + port 2022), server backups (server_backups + backup_limit),
+  and server suspension (is_suspended + the 'suspended' status). Plus two
+  real bug fixes since v0.2.0: the domains-creation timeout chain, and
+  "+ Folder" silently doing nothing on mobile/webview browsers.
