@@ -18,10 +18,11 @@ const (
 )
 
 type Claims struct {
-	UserID  int64     `json:"uid"`
-	Email   string    `json:"email"`
-	IsAdmin bool      `json:"is_admin"`
-	Type    TokenType `json:"type"`
+	UserID       int64     `json:"uid"`
+	Email        string    `json:"email"`
+	IsAdmin      bool      `json:"is_admin"`
+	Type         TokenType `json:"type"`
+	TokenVersion int       `json:"tv"`
 	jwt.RegisteredClaims
 
 	KeyPermissions *[]string `json:"-"`
@@ -49,13 +50,14 @@ func NewTokenManager(secret string, accessTTL, refreshTTL time.Duration) *TokenM
 	return &TokenManager{secret: []byte(secret), accessTTL: accessTTL, refreshTTL: refreshTTL}
 }
 
-func (m *TokenManager) issue(userID int64, email string, isAdmin bool, typ TokenType, ttl time.Duration) (string, error) {
+func (m *TokenManager) issue(userID int64, email string, isAdmin bool, tokenVersion int, typ TokenType, ttl time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID:  userID,
-		Email:   email,
-		IsAdmin: isAdmin,
-		Type:    typ,
+		UserID:       userID,
+		Email:        email,
+		IsAdmin:      isAdmin,
+		Type:         typ,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid.NewString(),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -66,12 +68,12 @@ func (m *TokenManager) issue(userID int64, email string, isAdmin bool, typ Token
 	return token.SignedString(m.secret)
 }
 
-func (m *TokenManager) Issue(userID int64, email string, isAdmin bool) (string, error) {
-	return m.issue(userID, email, isAdmin, TokenAccess, m.accessTTL)
+func (m *TokenManager) Issue(userID int64, email string, isAdmin bool, tokenVersion int) (string, error) {
+	return m.issue(userID, email, isAdmin, tokenVersion, TokenAccess, m.accessTTL)
 }
 
-func (m *TokenManager) IssueRefresh(userID int64, email string, isAdmin bool) (string, error) {
-	return m.issue(userID, email, isAdmin, TokenRefresh, m.refreshTTL)
+func (m *TokenManager) IssueRefresh(userID int64, email string, isAdmin bool, tokenVersion int) (string, error) {
+	return m.issue(userID, email, isAdmin, tokenVersion, TokenRefresh, m.refreshTTL)
 }
 
 func (m *TokenManager) Parse(raw string) (*Claims, error) {

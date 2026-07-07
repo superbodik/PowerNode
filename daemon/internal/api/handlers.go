@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -124,6 +126,15 @@ func (h *Handlers) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+
+	if err := os.RemoveAll(h.Docker.ServerVolumePath(serverUUID)); err != nil {
+		http.Error(w, "container removed but failed to delete server files: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if h.BackupDir != "" {
+		os.RemoveAll(filepath.Join(h.BackupDir, serverUUID.String()))
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

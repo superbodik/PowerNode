@@ -130,23 +130,31 @@ func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
-	defer cancel()
-	resp, err := client.AddDomain(ctx, serverUUID, daemonclient.AddDomainRequest{Domain: domain, Port: port, Email: req.Email})
-	if err != nil {
-		http.Error(w, "daemon call failed: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-
 	var id int64
 	var createdAt time.Time
 	if err := h.DB.QueryRow(r.Context(), `
 		INSERT INTO server_domains (server_id, domain, tls_status)
-		VALUES ($1, $2, $3)
+		VALUES ($1, $2, 'pending')
 		RETURNING id, created_at`,
-		serverID, domain, resp.TLSStatus,
+		serverID, domain,
 	).Scan(&id, &createdAt); err != nil {
 		http.Error(w, "domain already in use", http.StatusConflict)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
+	defer cancel()
+	resp, err := client.AddDomain(ctx, serverUUID, daemonclient.AddDomainRequest{Domain: domain, Port: port, Email: req.Email})
+	if err != nil {
+		h.DB.Exec(r.Context(), `DELETE FROM server_domains WHERE id = $1`, id)
+		http.Error(w, "daemon call failed: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	if _, err := h.DB.Exec(r.Context(),
+		`UPDATE server_domains SET tls_status = $1 WHERE id = $2`, resp.TLSStatus, id,
+	); err != nil {
+		http.Error(w, "domain configured but failed to record status", http.StatusInternalServerError)
 		return
 	}
 

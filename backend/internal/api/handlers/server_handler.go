@@ -369,7 +369,7 @@ func (h *ServerHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	force := r.URL.Query().Get("force") == "true"
+	force := claims.IsAdmin && r.URL.Query().Get("force") == "true"
 
 	client, clientErr := h.NodeClient(nodeID)
 	if clientErr != nil {

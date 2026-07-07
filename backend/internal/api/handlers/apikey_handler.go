@@ -79,6 +79,12 @@ func (h *APIKeyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Permissions == nil {
 		req.Permissions = []string{}
 	}
+	for _, p := range req.Permissions {
+		if !auth.IsValidPermission(p) {
+			http.Error(w, "unknown permission: "+p, http.StatusBadRequest)
+			return
+		}
+	}
 	permissionsJSON, err := json.Marshal(req.Permissions)
 	if err != nil {
 		http.Error(w, "invalid permissions", http.StatusBadRequest)

@@ -148,16 +148,6 @@ func (h *ServerDatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-	if err := mysqlhost.Provision(ctx, mysqlhost.Host{
-		Hostname: hostname, Port: port,
-		AdminUsername: adminUsername, AdminPassword: adminPassword,
-	}, databaseName, username, rawPassword); err != nil {
-		http.Error(w, "failed to provision database: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-
 	passwordEncrypted, err := crypto.Encrypt(h.Encrypt, rawPassword)
 	if err != nil {
 		http.Error(w, "failed to encrypt database password", http.StatusInternalServerError)
@@ -172,6 +162,17 @@ func (h *ServerDatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		serverID, req.DatabaseHostID, databaseName, username, passwordEncrypted,
 	).Scan(&id); err != nil {
 		http.Error(w, "failed to save database record", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	if err := mysqlhost.Provision(ctx, mysqlhost.Host{
+		Hostname: hostname, Port: port,
+		AdminUsername: adminUsername, AdminPassword: adminPassword,
+	}, databaseName, username, rawPassword); err != nil {
+		h.DB.Exec(r.Context(), `DELETE FROM server_databases WHERE id = $1`, id)
+		http.Error(w, "failed to provision database: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 

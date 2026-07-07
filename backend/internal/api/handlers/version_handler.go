@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var versionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$`)
 
 type VersionHandler struct {
 	Version   string
@@ -66,5 +69,9 @@ func latestReleasedVersion(ctx context.Context, repoSlug string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(string(body)), nil
+	version := strings.TrimSpace(string(body))
+	if !versionPattern.MatchString(version) {
+		return "", fmt.Errorf("unexpected VERSION file contents from GitHub")
+	}
+	return version, nil
 }

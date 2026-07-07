@@ -29,6 +29,31 @@ const (
 	PermServersWrite = "servers.write"
 )
 
+var validPermissions = map[string]struct{}{
+	PermControlStart:   {},
+	PermControlStop:    {},
+	PermControlRestart: {},
+	PermControlKill:    {},
+	PermConsole:        {},
+	PermFilesRead:      {},
+	PermFilesWrite:     {},
+	PermSchedulesRead:  {},
+	PermSchedulesWrite: {},
+	PermDatabasesRead:  {},
+	PermDatabasesWrite: {},
+	PermDomainsRead:    {},
+	PermDomainsWrite:   {},
+	PermBackupsRead:    {},
+	PermBackupsWrite:   {},
+	PermServersRead:    {},
+	PermServersWrite:   {},
+}
+
+func IsValidPermission(code string) bool {
+	_, ok := validPermissions[code]
+	return ok
+}
+
 type PermissionChecker interface {
 	HasPermission(ctx context.Context, userID int64, code string) (bool, error)
 	HasServerPermission(ctx context.Context, userID, serverID int64, code string) (bool, error)

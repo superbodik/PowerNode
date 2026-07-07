@@ -97,6 +97,12 @@ func (h *SubuserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Permissions == nil {
 		req.Permissions = []string{}
 	}
+	for _, p := range req.Permissions {
+		if !auth.IsValidPermission(p) {
+			http.Error(w, "unknown permission: "+p, http.StatusBadRequest)
+			return
+		}
+	}
 
 	var userID int64
 	if err := h.DB.QueryRow(r.Context(),
@@ -153,6 +159,12 @@ func (h *SubuserHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Permissions == nil {
 		req.Permissions = []string{}
+	}
+	for _, p := range req.Permissions {
+		if !auth.IsValidPermission(p) {
+			http.Error(w, "unknown permission: "+p, http.StatusBadRequest)
+			return
+		}
 	}
 
 	permissionsJSON, err := json.Marshal(req.Permissions)

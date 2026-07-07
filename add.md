@@ -1629,3 +1629,63 @@ actually flow into the create form.
   — no interest in reintroducing the exact bug class the Files "+ Folder"
   fix addressed earlier this session). Verified end-to-end in a real
   browser.
+- **Fixed 12 of 13 findings from the `arbeit.md` bug-hunting audit in one
+  pass** (per explicit instruction to stop documenting and fix
+  everything quickly). In rough order of severity:
+  - Server deletion never cleaned up disk: `daemon` `Handlers.Delete`
+    only removed the Docker container — the bind-mounted server data
+    directory and its backup archives were never `os.RemoveAll`'d
+    anywhere, so every deleted server permanently leaked disk usage on
+    the node with zero visibility from the panel. Now removes both after
+    a successful container removal.
+  - Stolen refresh tokens survived a password change indefinitely: JWTs
+    were fully stateless (only signature + `exp` checked), and the
+    refresh token's 30-day TTL meant changing your password, disabling
+    2FA, or being deactivated by an admin did nothing to kill an
+    already-issued refresh token. Added `users.token_version`
+    (migration `0008_user_token_version.sql`), embedded it in claims,
+    and check it on `/auth/refresh` — bumped on `ChangePassword`,
+    `TwoFAHandler.Disable`, admin `ResetPassword`, and `UserHandler.Update`
+    when admin/active is revoked. Deliberately left `auth.Middleware`
+    alone (no DB hit per request) — the access token's existing 15-minute
+    TTL is an accepted, much cheaper bound for that side.
+  - `GET /database-hosts` and `GET /allocations` had no permission check
+    at all (not even non-admin scoping), leaking MySQL host credentials'
+    metadata and private-node IP:port layouts to any logged-in user.
+    Since both are legitimately used by regular users (database host
+    picker, allocation picker on server creation), didn't just gate them
+    admin-only — scoped the *fields*/*rows* returned instead: database
+    hosts hide `host`/`port`/`admin_username` from non-admins, allocations
+    404 for a non-public node the caller doesn't own.
+  - `GET /nodes/{id}/status` had the same missing-gate bug but is only
+    ever called from the admin-only Nodes page, so this one really was
+    just a forgotten `RequireAdmin`.
+  - `TwoFAHandler.Setup` could silently disable an already-enabled 2FA
+    (no password check, unlike `Disable`) — now requires the current
+    password when 2FA is already on.
+  - Domain/database creation ran the external side effect (certbot+nginx
+    on the node, real MySQL provisioning) *before* the panel's own DB
+    insert, so a failed insert left a live orphaned resource nothing
+    could ever find or delete. Reordered both to reserve the DB row
+    first and compensate with a delete if the external call then fails.
+  - `UserHandler.Update` only blocked self-demotion, not demoting/
+    deactivating the last other remaining admin. Added a remaining-admin
+    count check before allowing it.
+  - Subuser/API-key `permissions` arrays were stored with zero validation
+    against the real permission set — added `auth.IsValidPermission`.
+  - `?force=true` on server delete was usable by the owner, not just an
+    admin, and let a failed daemon deletion desync the node's
+    memory/disk capacity accounting from what's actually still running.
+    Now force only takes effect for admins.
+  - Login rate limiting was IP-only, so a distributed attacker had no
+    per-account throttle; added a looser secondary per-email limit
+    alongside the existing per-IP one.
+  - `VersionHandler.CheckUpdate` compared the fetched `VERSION` file as a
+    raw string with no format check; now validated against a semver-ish
+    regex first.
+  - Left one finding (WS auth token passed as a URL query param, which
+    ends up in nginx/proxy access logs) explicitly unfixed — the real fix
+    needs a `Sec-WebSocket-Protocol`-based handshake on both backend and
+    frontend, which is a separate, riskier change than the rest of this
+    batch and deserves its own verification pass in a browser rather than
+    being rushed alongside twelve other changes.

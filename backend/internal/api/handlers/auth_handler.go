@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,16 +26,30 @@ type AuthHandler struct {
 const (
 	loginRateLimit  = 10
 	loginRateWindow = 15 * time.Minute
+
+	loginEmailRateLimit  = 20
+	loginEmailRateWindow = 15 * time.Minute
 )
 
-func (h *AuthHandler) checkLoginRateLimit(w http.ResponseWriter, r *http.Request) bool {
+func (h *AuthHandler) checkLoginRateLimit(w http.ResponseWriter, r *http.Request, email string) bool {
 	allowed, err := h.Limiter.Allow(r.Context(), "ratelimit:login:"+activity.RequestIP(r), loginRateLimit, loginRateWindow)
 	if err != nil {
 		log.Printf("ratelimit: login check failed, allowing request: %v", err)
+	} else if !allowed {
+		http.Error(w, "too many login attempts — try again later", http.StatusTooManyRequests)
+		return false
+	}
+
+	if email == "" {
+		return true
+	}
+	allowed, err = h.Limiter.Allow(r.Context(), "ratelimit:login:email:"+strings.ToLower(email), loginEmailRateLimit, loginEmailRateWindow)
+	if err != nil {
+		log.Printf("ratelimit: login email check failed, allowing request: %v", err)
 		return true
 	}
 	if !allowed {
-		http.Error(w, "too many login attempts — try again later", http.StatusTooManyRequests)
+		http.Error(w, "too many login attempts for this account — try again later", http.StatusTooManyRequests)
 		return false
 	}
 	return true
@@ -57,13 +72,13 @@ type tokenResponse struct {
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	if !h.checkLoginRateLimit(w, r) {
-		return
-	}
-
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if !h.checkLoginRateLimit(w, r, req.Email) {
 		return
 	}
 
@@ -76,11 +91,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		isActive      bool
 		totpEnabled   bool
 		totpSecretEnc *string
+		tokenVersion  int
 	)
 	err := h.DB.QueryRow(r.Context(),
-		`SELECT id, email, username, password_hash, is_admin, is_active, totp_enabled, totp_secret
+		`SELECT id, email, username, password_hash, is_admin, is_active, totp_enabled, totp_secret, token_version
 		 FROM users WHERE email = $1`, req.Email,
-	).Scan(&id, &email, &username, &passwordHash, &isAdmin, &isActive, &totpEnabled, &totpSecretEnc)
+	).Scan(&id, &email, &username, &passwordHash, &isAdmin, &isActive, &totpEnabled, &totpSecretEnc, &tokenVersion)
 
 	if err == pgx.ErrNoRows {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
@@ -107,12 +123,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	accessToken, err := h.Token.Issue(id, email, isAdmin)
+	accessToken, err := h.Token.Issue(id, email, isAdmin, tokenVersion)
 	if err != nil {
 		http.Error(w, "failed to issue token", http.StatusInternalServerError)
 		return
 	}
-	refreshToken, err := h.Token.IssueRefresh(id, email, isAdmin)
+	refreshToken, err := h.Token.IssueRefresh(id, email, isAdmin, tokenVersion)
 	if err != nil {
 		http.Error(w, "failed to issue token", http.StatusInternalServerError)
 		return
@@ -150,25 +166,30 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var (
-		email    string
-		username string
-		isAdmin  bool
-		isActive bool
+		email        string
+		username     string
+		isAdmin      bool
+		isActive     bool
+		tokenVersion int
 	)
 	err = h.DB.QueryRow(r.Context(),
-		`SELECT email, username, is_admin, is_active FROM users WHERE id = $1`, claims.UserID,
-	).Scan(&email, &username, &isAdmin, &isActive)
+		`SELECT email, username, is_admin, is_active, token_version FROM users WHERE id = $1`, claims.UserID,
+	).Scan(&email, &username, &isAdmin, &isActive, &tokenVersion)
 	if err != nil || !isActive {
 		http.Error(w, "account no longer active", http.StatusUnauthorized)
 		return
 	}
+	if claims.TokenVersion != tokenVersion {
+		http.Error(w, "session revoked — please log in again", http.StatusUnauthorized)
+		return
+	}
 
-	accessToken, err := h.Token.Issue(claims.UserID, email, isAdmin)
+	accessToken, err := h.Token.Issue(claims.UserID, email, isAdmin, tokenVersion)
 	if err != nil {
 		http.Error(w, "failed to issue token", http.StatusInternalServerError)
 		return
 	}
-	refreshToken, err := h.Token.IssueRefresh(claims.UserID, email, isAdmin)
+	refreshToken, err := h.Token.IssueRefresh(claims.UserID, email, isAdmin, tokenVersion)
 	if err != nil {
 		http.Error(w, "failed to issue token", http.StatusInternalServerError)
 		return
@@ -235,7 +256,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.DB.Exec(r.Context(),
-		`UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, newHash, claims.UserID,
+		`UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = now() WHERE id = $2`, newHash, claims.UserID,
 	); err != nil {
 		http.Error(w, "failed to update password", http.StatusInternalServerError)
 		return

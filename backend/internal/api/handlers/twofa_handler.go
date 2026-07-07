@@ -44,11 +44,33 @@ func (h *TwoFAHandler) Status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"enabled": enabled})
 }
 
+type twofaSetupRequest struct {
+	Password string `json:"password"`
+}
+
 func (h *TwoFAHandler) Setup(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	var passwordHash string
+	var alreadyEnabled bool
+	if err := h.DB.QueryRow(r.Context(),
+		`SELECT password_hash, totp_enabled FROM users WHERE id = $1`, claims.UserID,
+	).Scan(&passwordHash, &alreadyEnabled); err != nil {
+		http.Error(w, "user not found", http.StatusInternalServerError)
+		return
+	}
+
+	if alreadyEnabled {
+		var req twofaSetupRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if !auth.VerifyPassword(passwordHash, req.Password) {
+			http.Error(w, "current password is required to regenerate 2FA", http.StatusForbidden)
+			return
+		}
 	}
 
 	secret, otpauthURL, err := auth.GenerateTOTPSecret("Roost", claims.Email)
@@ -160,7 +182,7 @@ func (h *TwoFAHandler) Disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := h.DB.Exec(r.Context(),
-		`UPDATE users SET totp_enabled = false, totp_secret = NULL WHERE id = $1`, claims.UserID,
+		`UPDATE users SET totp_enabled = false, totp_secret = NULL, token_version = token_version + 1 WHERE id = $1`, claims.UserID,
 	); err != nil {
 		http.Error(w, "failed to disable 2FA", http.StatusInternalServerError)
 		return

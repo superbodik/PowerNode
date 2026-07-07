@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/crypto"
 	"github.com/yourorg/panel/internal/mysqlhost"
 )
@@ -22,12 +23,18 @@ type DatabaseHostHandler struct {
 type databaseHostSummary struct {
 	ID            int64  `json:"id"`
 	Name          string `json:"name"`
-	Host          string `json:"host"`
-	Port          int    `json:"port"`
-	AdminUsername string `json:"admin_username"`
+	Host          string `json:"host,omitempty"`
+	Port          int    `json:"port,omitempty"`
+	AdminUsername string `json:"admin_username,omitempty"`
 }
 
 func (h *DatabaseHostHandler) List(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	rows, err := h.DB.Query(r.Context(),
 		`SELECT id, name, host, port, admin_username FROM database_hosts ORDER BY name`)
 	if err != nil {
@@ -42,6 +49,9 @@ func (h *DatabaseHostHandler) List(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&host.ID, &host.Name, &host.Host, &host.Port, &host.AdminUsername); err != nil {
 			http.Error(w, "failed to read database hosts", http.StatusInternalServerError)
 			return
+		}
+		if !claims.IsAdmin {
+			host.Host, host.Port, host.AdminUsername = "", 0, ""
 		}
 		hosts = append(hosts, host)
 	}

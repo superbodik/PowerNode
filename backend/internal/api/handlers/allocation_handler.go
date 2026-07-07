@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/yourorg/panel/internal/auth"
 )
 
 type AllocationHandler struct {
@@ -23,12 +25,29 @@ type allocationSummary struct {
 }
 
 func (h *AllocationHandler) List(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	nodeIDStr := r.URL.Query().Get("node_id")
 	nodeID, err := strconv.ParseInt(nodeIDStr, 10, 64)
 	if err != nil {
 		http.Error(w, "node_id query param is required", http.StatusBadRequest)
 		return
 	}
+
+	if !claims.IsAdmin {
+		var isPublic bool
+		if err := h.DB.QueryRow(r.Context(),
+			`SELECT is_public FROM nodes WHERE id = $1`, nodeID,
+		).Scan(&isPublic); err != nil || !isPublic {
+			http.Error(w, "node not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	freeOnly := r.URL.Query().Get("free") == "true"
 
 	query := `SELECT id, node_id, HOST(ip), port, alias, server_id FROM allocations WHERE node_id = $1`

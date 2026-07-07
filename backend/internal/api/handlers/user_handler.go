@@ -114,8 +114,33 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.DB.Exec(r.Context(),
-		`UPDATE users SET is_admin = $1, is_active = $2, server_limit = $3, updated_at = now() WHERE id = $4`,
+	if !req.IsAdmin || !req.IsActive {
+		var wasAdmin, wasActive bool
+		if err := h.DB.QueryRow(r.Context(),
+			`SELECT is_admin, is_active FROM users WHERE id = $1`, id,
+		).Scan(&wasAdmin, &wasActive); err != nil {
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		}
+		if wasAdmin && wasActive {
+			var remaining int
+			if err := h.DB.QueryRow(r.Context(),
+				`SELECT count(*) FROM users WHERE is_admin = true AND is_active = true AND id != $1`, id,
+			).Scan(&remaining); err != nil {
+				http.Error(w, "failed to check remaining admins", http.StatusInternalServerError)
+				return
+			}
+			if remaining == 0 {
+				http.Error(w, "cannot remove the last remaining admin", http.StatusConflict)
+				return
+			}
+		}
+	}
+
+	tag, err := h.DB.Exec(r.Context(), `
+		UPDATE users SET is_admin = $1, is_active = $2, server_limit = $3, updated_at = now(),
+		                 token_version = CASE WHEN NOT $1 OR NOT $2 THEN token_version + 1 ELSE token_version END
+		WHERE id = $4`,
 		req.IsAdmin, req.IsActive, req.ServerLimit, id,
 	)
 	if err != nil {
@@ -164,7 +189,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.DB.Exec(r.Context(),
-		`UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2`, hash, id,
+		`UPDATE users SET password_hash = $1, token_version = token_version + 1, updated_at = now() WHERE id = $2`, hash, id,
 	)
 	if err != nil {
 		http.Error(w, "failed to reset password", http.StatusInternalServerError)
