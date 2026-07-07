@@ -1466,3 +1466,27 @@ actually flow into the create form.
     mocked API): created a backup through the actual form, confirmed the
     right payload reached the API, and confirmed a failed backup renders
     with disabled actions instead of a broken-looking enabled button.
+- Implemented real server suspension — `servers.is_suspended` and the
+  `'suspended'` status enum value existed since the first migration
+  (`StatusSuspended` in the Go model, `'Suspended'` label already wired up
+  in the frontend's `StatusBadge`), but nothing anywhere ever set
+  `is_suspended` to true, and `Power` never checked it — a server that was
+  somehow marked suspended could still be started normally. Added
+  admin-only `POST /servers/{uuid}/suspend` / `.../unsuspend`: suspending
+  sets `is_suspended = true` and `status = 'suspended'`, and best-effort
+  stops the container immediately via the daemon (logged, not fatal, if
+  the node is unreachable — the DB flag is the actual source of truth for
+  blocking future starts, not whether the stop call happened to land).
+  `Power` now rejects `start`/`restart` with 403 while suspended; `stop`/
+  `kill` stay allowed. Also discovered along the way that `servers.status`
+  in the DB is otherwise *never* updated after creation — the "running"/
+  "stopping" the UI shows day-to-day is a purely client-side illusion
+  from the live-stats WebSocket that reverts to whatever's in the DB on
+  reload. Didn't fix that separate, pre-existing gap here (syncing live
+  daemon state back into the DB is its own project), just made sure my
+  own suspend/unsuspend writes land in the one column that's supposed to
+  reflect it. Frontend: a Suspend/Unsuspend row in the server's danger
+  zone, Start/Restart disabled with an explanatory tooltip while
+  suspended, matching the backend enforcement instead of just letting the
+  click 403 with no context. Verified in a real browser: clicking Suspend
+  actually disables Start/Restart and flips the button to "Unsuspend".

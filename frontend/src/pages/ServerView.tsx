@@ -37,15 +37,18 @@ export function ServerView({ uuid, onBack }: Props) {
   const [consoleConnected, setConsoleConnected] = useState(false);
   const [command, setCommand] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [suspending, setSuspending] = useState(false);
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  function refreshServer() {
     api
       .getServer(uuid)
       .then(setServer)
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
-  }, [uuid]);
+  }
+
+  useEffect(refreshServer, [uuid]);
 
   useEffect(() => connectServerSocketWithRetry<ResourceStats>(uuid, setLive), [uuid]);
 
@@ -97,6 +100,27 @@ export function ServerView({ uuid, onBack }: Props) {
     }
   }
 
+  async function handleSuspendToggle() {
+    if (!server) return;
+    const willSuspend = !server.is_suspended;
+    if (willSuspend && !window.confirm(`Suspend "${server.name}"? This stops it and blocks starting it again until unsuspended.`)) {
+      return;
+    }
+    setSuspending(true);
+    try {
+      if (willSuspend) {
+        await api.suspendServer(uuid);
+      } else {
+        await api.unsuspendServer(uuid);
+      }
+      refreshServer();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSuspending(false);
+    }
+  }
+
   if (error) return <div className="login-error show">{error}</div>;
   if (!server) return <p className="srv-desc">Loading…</p>;
 
@@ -119,19 +143,34 @@ export function ServerView({ uuid, onBack }: Props) {
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
         <div style={{ width: 220, flexShrink: 0 }}>
           <div className="power-grid">
-            <button className="power-btn start" onClick={() => handlePower('start')}>
+            <button
+              className="power-btn start"
+              onClick={() => handlePower('start')}
+              disabled={server.is_suspended}
+              title={server.is_suspended ? 'This server is suspended' : undefined}
+            >
               Start
             </button>
             <button className="power-btn stop" onClick={() => handlePower('stop')}>
               Stop
             </button>
-            <button className="power-btn" onClick={() => handlePower('restart')}>
+            <button
+              className="power-btn"
+              onClick={() => handlePower('restart')}
+              disabled={server.is_suspended}
+              title={server.is_suspended ? 'This server is suspended' : undefined}
+            >
               Restart
             </button>
             <button className="power-btn kill" onClick={() => handlePower('kill')}>
               Kill
             </button>
           </div>
+          {server.is_suspended && (
+            <p className="srv-desc" style={{ marginTop: 8, marginBottom: 0 }}>
+              This server is suspended.
+            </p>
+          )}
 
           <div className="res-list">
             <div className="res-item">
@@ -205,6 +244,22 @@ export function ServerView({ uuid, onBack }: Props) {
                   <label>Disk limit</label>
                   <input readOnly value={`${server.disk_mb} MB`} />
                 </div>
+              </div>
+            </div>
+
+            <div className="danger-card" style={{ marginTop: 20 }}>
+              <div className="danger-row">
+                <div className="danger-info">
+                  <h3>{server.is_suspended ? 'Unsuspend server' : 'Suspend server'}</h3>
+                  <p>
+                    {server.is_suspended
+                      ? 'Allow this server to be started again.'
+                      : "Stops the server and blocks starting it again until it's unsuspended."}
+                  </p>
+                </div>
+                <button className="btn-sm" onClick={handleSuspendToggle} disabled={suspending}>
+                  {suspending ? 'Working…' : server.is_suspended ? 'Unsuspend' : 'Suspend'}
+                </button>
               </div>
             </div>
 

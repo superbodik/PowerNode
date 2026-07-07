@@ -204,6 +204,10 @@ export const api = {
 
   deleteServer: (uuid: string) => request<void>(`/servers/${uuid}`, { method: 'DELETE' }),
 
+  suspendServer: (uuid: string) => request<void>(`/servers/${uuid}/suspend`, { method: 'POST' }),
+
+  unsuspendServer: (uuid: string) => request<void>(`/servers/${uuid}/unsuspend`, { method: 'POST' }),
+
   listNodes: () => request<Node[]>('/nodes'),
 
   createNode: (payload: CreateNodeRequest) =>

@@ -383,14 +383,19 @@ func (h *ServerHandler) Power(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var serverID, nodeID, ownerID int64
+	var isSuspended bool
 	if err := h.DB.QueryRow(r.Context(),
-		`SELECT id, node_id, owner_id FROM servers WHERE uuid = $1`, id,
-	).Scan(&serverID, &nodeID, &ownerID); err != nil {
+		`SELECT id, node_id, owner_id, is_suspended FROM servers WHERE uuid = $1`, id,
+	).Scan(&serverID, &nodeID, &ownerID, &isSuspended); err != nil {
 		http.Error(w, "server not found", http.StatusNotFound)
 		return
 	}
 	if !claims.HasKeyPermission(permission) || !h.Subusers.CanAccessServer(r.Context(), claims, ownerID, serverID, permission) {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if isSuspended && (req.Action == daemonclient.PowerStart || req.Action == daemonclient.PowerRestart) {
+		http.Error(w, "this server is suspended and cannot be started", http.StatusForbidden)
 		return
 	}
 
@@ -415,4 +420,58 @@ func (h *ServerHandler) Power(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *ServerHandler) Suspend(w http.ResponseWriter, r *http.Request) {
+	h.setSuspended(w, r, true, "server.suspend")
+}
+
+func (h *ServerHandler) Unsuspend(w http.ResponseWriter, r *http.Request) {
+	h.setSuspended(w, r, false, "server.unsuspend")
+}
+
+func (h *ServerHandler) setSuspended(w http.ResponseWriter, r *http.Request, suspended bool, event string) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "uuid"))
+	if err != nil {
+		http.Error(w, "invalid server uuid", http.StatusBadRequest)
+		return
+	}
+
+	newStatus := models.StatusOffline
+	if suspended {
+		newStatus = models.StatusSuspended
+	}
+
+	var serverID, nodeID int64
+	if err := h.DB.QueryRow(r.Context(),
+		`UPDATE servers SET is_suspended = $1, status = $2 WHERE uuid = $3 RETURNING id, node_id`,
+		suspended, newStatus, id,
+	).Scan(&serverID, &nodeID); err != nil {
+		http.Error(w, "server not found", http.StatusNotFound)
+		return
+	}
+
+	if suspended {
+		if client, err := h.NodeClient(nodeID); err == nil {
+			if _, err := client.Power(r.Context(), id, daemonclient.PowerStop); err != nil {
+				log.Printf("servers.suspend: failed to stop server %s on suspend: %v", id, err)
+			}
+		}
+	}
+
+	activity.Record(r.Context(), h.DB, activity.Entry{
+		ActorUserID: &claims.UserID,
+		ServerID:    &serverID,
+		NodeID:      &nodeID,
+		Event:       event,
+		IPAddress:   activity.RequestIP(r),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
 }

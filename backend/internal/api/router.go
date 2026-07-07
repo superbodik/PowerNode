@@ -118,6 +118,8 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/servers", serverHandler.Create)
 			r.Get("/servers/{uuid}", serverHandler.Get)
 			r.Post("/servers/{uuid}/power", serverHandler.Power)
+			r.With(auth.RequireAdmin).Post("/servers/{uuid}/suspend", serverHandler.Suspend)
+			r.With(auth.RequireAdmin).Post("/servers/{uuid}/unsuspend", serverHandler.Unsuspend)
 			r.Delete("/servers/{uuid}", serverHandler.Delete)
 
 			r.Get("/servers/{uuid}/files", fileHandler.List)
