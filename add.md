@@ -1689,3 +1689,26 @@ actually flow into the create form.
     frontend, which is a separate, riskier change than the rest of this
     batch and deserves its own verification pass in a browser rather than
     being rushed alongside twelve other changes.
+- Picked up three more items from `arbeit.md` section 1 (the original,
+  lower-severity "недоделки" list, as opposed to the fresh-audit section 4
+  above) since they were cheap and safe to close alongside the bug batch:
+  - `servers.status` staleness: `ws.Hub` gained a `PersistStatus` callback
+    that `pollStats` now calls on every tick alongside `Broadcast`, so the
+    DB row gets updated with the daemon's real state (guarded against
+    overwriting `suspended`) for as long as at least one browser has the
+    server's WS open. Left as a known partial fix — full background
+    reconciliation for servers nobody's currently watching would mean
+    polling every node on a timer regardless of viewers, which is a
+    heavier, separate change to the daemon-load profile than this pass
+    should make unilaterally.
+  - CORS origins were hardcoded to `http://localhost:5173`; added
+    `PANEL_ALLOWED_ORIGINS` (comma-separated) to `config.Load()`, wired
+    through `Dependencies.AllowedOrigins` — unset behaves identically to
+    before, so purely additive.
+  - `docs/PROTOCOL.md` confidently documented a gRPC+mTLS control-plane
+    that was never implemented (`google.golang.org/grpc` isn't a
+    dependency anywhere, no generated `.pb.go` files exist). Rewrote it to
+    lead with the real HTTP/JSON+WS contract (exact routes pulled from
+    `daemon/internal/api/router.go`) and moved gRPC to an explicit
+    "not implemented, roadmap" section explaining why the `.proto` file is
+    still there.

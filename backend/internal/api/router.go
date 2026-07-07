@@ -22,17 +22,18 @@ import (
 )
 
 type Dependencies struct {
-	DB            *pgxpool.Pool
-	Token         *auth.TokenManager
-	Hub           *ws.Hub
-	NodeClient    func(nodeID int64) (*daemonclient.Client, error)
-	EncryptionKey string
-	Limiter       *ratelimit.Limiter
-	Version       string
-	Commit        string
-	BuildDate     string
-	SourceDir     string
-	RepoSlug      string
+	DB             *pgxpool.Pool
+	Token          *auth.TokenManager
+	Hub            *ws.Hub
+	NodeClient     func(nodeID int64) (*daemonclient.Client, error)
+	EncryptionKey  string
+	Limiter        *ratelimit.Limiter
+	Version        string
+	Commit         string
+	BuildDate      string
+	SourceDir      string
+	RepoSlug       string
+	AllowedOrigins []string
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -54,8 +55,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(maxBodySize(maxRequestBodyBytes))
+	allowedOrigins := deps.AllowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"http://localhost:5173"}
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,

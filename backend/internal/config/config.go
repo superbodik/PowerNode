@@ -3,14 +3,16 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
 type Config struct {
-	HTTPAddr      string
-	DatabaseURL   string
-	RedisAddr     string
-	RedisPassword string
+	HTTPAddr       string
+	DatabaseURL    string
+	RedisAddr      string
+	RedisPassword  string
+	AllowedOrigins []string
 
 	JWTSecret       string
 	AccessTokenTTL  time.Duration
@@ -28,6 +30,7 @@ func Load() Config {
 		DatabaseURL:     getEnv("PANEL_DATABASE_URL", "postgres://panel:panel@localhost:5432/panel?sslmode=disable"),
 		RedisAddr:       getEnv("PANEL_REDIS_ADDR", "localhost:6379"),
 		RedisPassword:   getEnv("PANEL_REDIS_PASSWORD", ""),
+		AllowedOrigins:  splitCSV(getEnv("PANEL_ALLOWED_ORIGINS", "http://localhost:5173")),
 		JWTSecret:       os.Getenv("PANEL_JWT_SECRET"),
 		AccessTokenTTL:  15 * time.Minute,
 		RefreshTokenTTL: 30 * 24 * time.Hour,
@@ -51,4 +54,15 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func splitCSV(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

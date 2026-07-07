@@ -83,21 +83,30 @@ func main() {
 		}
 		return client.DialConsole(ctx, serverUUID)
 	}
+	hub.PersistStatus = func(ctx context.Context, serverUUID uuid.UUID, state models.ServerStatus) {
+		if _, err := pool.Exec(ctx,
+			`UPDATE servers SET status = $1 WHERE uuid = $2 AND status != 'suspended'`,
+			string(state), serverUUID,
+		); err != nil {
+			log.Printf("hub: failed to persist status for server %s: %v", serverUUID, err)
+		}
+	}
 
 	go scheduler.Run(pool, resolveNodeClient)
 
 	router := api.NewRouter(api.Dependencies{
-		DB:            pool,
-		Token:         tokenManager,
-		Hub:           hub,
-		NodeClient:    resolveNodeClient,
-		EncryptionKey: cfg.EncryptionKey,
-		Limiter:       limiter,
-		Version:       version,
-		Commit:        commit,
-		BuildDate:     buildDate,
-		SourceDir:     cfg.SourceDir,
-		RepoSlug:      cfg.RepoSlug,
+		DB:             pool,
+		Token:          tokenManager,
+		Hub:            hub,
+		NodeClient:     resolveNodeClient,
+		EncryptionKey:  cfg.EncryptionKey,
+		Limiter:        limiter,
+		Version:        version,
+		Commit:         commit,
+		BuildDate:      buildDate,
+		SourceDir:      cfg.SourceDir,
+		RepoSlug:       cfg.RepoSlug,
+		AllowedOrigins: cfg.AllowedOrigins,
 	})
 
 	srv := &http.Server{

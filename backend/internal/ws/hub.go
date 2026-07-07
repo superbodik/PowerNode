@@ -34,8 +34,9 @@ type Hub struct {
 	consoleRooms    map[uuid.UUID]map[*websocket.Conn]struct{}
 	consoleSessions map[uuid.UUID]*consoleSession
 
-	FetchStats  func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error)
-	DialConsole func(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error)
+	FetchStats    func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error)
+	DialConsole   func(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error)
+	PersistStatus func(ctx context.Context, serverUUID uuid.UUID, state models.ServerStatus)
 }
 
 func NewHub() *Hub {
@@ -236,6 +237,9 @@ func (h *Hub) pollStats(ctx context.Context, serverUUID uuid.UUID) {
 				continue
 			}
 			h.Broadcast(serverUUID, stats)
+			if h.PersistStatus != nil {
+				h.PersistStatus(ctx, serverUUID, stats.State)
+			}
 		}
 	}
 }
