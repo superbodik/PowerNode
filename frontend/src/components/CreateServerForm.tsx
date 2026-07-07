@@ -219,7 +219,13 @@ export function CreateServerForm({ onCreated }: Props) {
                       setEnvironment((env) => ({ ...env, [v.env_variable]: e.target.value }))
                     }
                     disabled={!v.is_editable}
+                    required={v.rules.split('|').includes('required')}
                   />
+                  {v.rules && (
+                    <span className="srv-desc" style={{ fontSize: 10 }}>
+                      {v.rules}
+                    </span>
+                  )}
                 </div>
               ))}
           </div>

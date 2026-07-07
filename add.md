@@ -1533,3 +1533,30 @@ actually flow into the create form.
 - **v0.3.1**: patch release — node capacity/visibility/maintenance-mode
   enforcement (is_public, maintenance_mode, memory_overallocate,
   disk_overallocate were all real schema columns doing nothing until now).
+- Implemented egg-variable validation — `egg_variables.rules` (the
+  Laravel-style DSL, e.g. `required|string|max:20`, `in:TRUE,FALSE` for
+  the Minecraft EULA flag) was read from the DB and returned to the
+  frontend since day one, but literally nothing ever validated a
+  submitted value against it, client or server. A user (or a scoped API
+  key calling the endpoint directly) could submit an empty value for a
+  `required` field, garbage text for an `integer` field, or an arbitrary
+  string where `in:TRUE,FALSE` demanded one of two exact values, and the
+  panel would pass it straight through to the container as an environment
+  variable with zero pushback — the egg's startup script would just have
+  to cope. Separately, `is_editable` was only enforced by disabling the
+  input in the React form, which is meaningless against a direct API call;
+  nothing stopped overriding a non-editable variable server-side.
+  - New `internal/eggvars` package: a small rule parser/validator
+    (`required`, `string`, `integer`, `numeric`, `boolean`, `min:N`,
+    `max:N`, `in:a,b,c`, with `nullable`/`sometimes` as accepted no-ops),
+    with a real table-driven test for every rule type plus the
+    empty-and-optional short-circuit case.
+  - `ServerHandler.Create` now loads the egg's variables, forces
+    non-editable ones back to their `default_value` regardless of what
+    was submitted, and validates every editable one's value against its
+    rules before ever dialing the daemon — a bad value now fails fast
+    with a specific 400 instead of silently becoming a broken container.
+  - Frontend: the create-server form now shows each variable's rule
+    string as a hint and sets the native `required` attribute when the
+    rules include it, so most mistakes get caught before the request
+    even goes out, not just after.

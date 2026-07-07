@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 	"github.com/yourorg/panel/internal/activity"
 	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/daemonclient"
+	"github.com/yourorg/panel/internal/eggvars"
 	"github.com/yourorg/panel/internal/models"
 )
 
@@ -171,20 +173,30 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := h.NodeClient(req.NodeID)
-	if err != nil {
-		log.Printf("servers.create: node %d client unavailable: %v", req.NodeID, err)
-		http.Error(w, "node unavailable: "+err.Error(), http.StatusBadGateway)
-		return
-	}
-
 	environment := req.Environment
 	if environment == nil {
 		environment = map[string]string{}
 	}
+
+	if err := h.applyAndValidateEggVariables(r.Context(), req.EggID, environment); err != nil {
+		status := http.StatusBadRequest
+		if _, ok := err.(*eggVariablesLoadError); ok {
+			status = http.StatusInternalServerError
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+
 	environmentJSON, err := json.Marshal(environment)
 	if err != nil {
 		http.Error(w, "invalid environment", http.StatusBadRequest)
+		return
+	}
+
+	client, err := h.NodeClient(req.NodeID)
+	if err != nil {
+		log.Printf("servers.create: node %d client unavailable: %v", req.NodeID, err)
+		http.Error(w, "node unavailable: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
@@ -517,4 +529,39 @@ func (h *ServerHandler) setSuspended(w http.ResponseWriter, r *http.Request, sus
 
 func effectiveCapacity(totalMB int64, overallocatePercent int) int64 {
 	return totalMB * int64(100+overallocatePercent) / 100
+}
+
+type eggVariablesLoadError struct{ err error }
+
+func (e *eggVariablesLoadError) Error() string {
+	return "failed to load egg variables: " + e.err.Error()
+}
+
+func (h *ServerHandler) applyAndValidateEggVariables(ctx context.Context, eggID int, environment map[string]string) error {
+	rows, err := h.DB.Query(ctx,
+		`SELECT name, env_variable, default_value, is_editable, rules FROM egg_variables WHERE egg_id = $1`, eggID)
+	if err != nil {
+		return &eggVariablesLoadError{err}
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, envVar, defaultValue, rules string
+		var isEditable bool
+		if err := rows.Scan(&name, &envVar, &defaultValue, &isEditable, &rules); err != nil {
+			return &eggVariablesLoadError{err}
+		}
+		if !isEditable {
+			environment[envVar] = defaultValue
+			continue
+		}
+		value, submitted := environment[envVar]
+		if !submitted {
+			value = defaultValue
+		}
+		if err := eggvars.Validate(name, value, rules); err != nil {
+			return err
+		}
+	}
+	return nil
 }
