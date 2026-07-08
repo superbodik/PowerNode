@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { api } from '../api/client';
 import type { ApiKey, CreateApiKeyResponse, SSHKey, TwoFASetup, TwoFAStatus } from '../types';
 import { API_KEY_PERMISSIONS } from '../types';
+import { canGenerateKeyPair, downloadPrivateKey, generateEd25519KeyPair } from '../sshKeygen';
 
 function loadUsername(): string {
   try {
@@ -27,6 +28,8 @@ export function Account() {
   const [sshPublicKey, setSSHPublicKey] = useState('');
   const [sshError, setSSHError] = useState<string | null>(null);
   const [sshSubmitting, setSSHSubmitting] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [justGenerated, setJustGenerated] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -95,7 +98,7 @@ export function Account() {
     setSSHSubmitting(true);
     setSSHError(null);
     try {
-      await api.createSSHKey(sshKeyName, sshPublicKey);
+      await api.createSSHKey(sshKeyName.trim() || 'Uploaded key', sshPublicKey);
       setSSHKeyName('');
       setSSHPublicKey('');
       refreshSSHKeys();
@@ -103,6 +106,25 @@ export function Account() {
       setSSHError(err instanceof Error ? err.message : String(err));
     } finally {
       setSSHSubmitting(false);
+    }
+  }
+
+  async function handleGenerateKeyPair() {
+    setSSHError(null);
+    setJustGenerated(false);
+    setGeneratingKey(true);
+    try {
+      const name = sshKeyName.trim() || 'Generated key';
+      const { publicKeyLine, privateKeyPem } = await generateEd25519KeyPair(`${loadUsername()}@powernode`);
+      await api.createSSHKey(name, publicKeyLine);
+      downloadPrivateKey(privateKeyPem, `${name.replace(/[^a-z0-9_-]+/gi, '_')}.pem`);
+      setSSHKeyName('');
+      setJustGenerated(true);
+      refreshSSHKeys();
+    } catch (err) {
+      setSSHError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGeneratingKey(false);
     }
   }
 
@@ -298,17 +320,42 @@ export function Account() {
             {sshKeys.length === 0 && <p className="srv-desc">No SSH keys yet.</p>}
           </div>
 
-          <form onSubmit={handleCreateSSHKey} style={{ marginTop: 16 }}>
-            <div className="sfield" style={{ marginBottom: 14 }}>
-              <label htmlFor="ssh-key-name">Key name</label>
-              <input
-                id="ssh-key-name"
-                value={sshKeyName}
-                onChange={(e) => setSSHKeyName(e.target.value)}
-                placeholder="e.g. laptop"
-                required
-              />
+          {justGenerated && (
+            <div className="login-error show" style={{ marginTop: 16, borderColor: 'var(--green)', color: 'var(--green)' }}>
+              Key pair generated and downloaded — that file is the only copy of your private key,
+              the panel never stores it. Keep it safe; if you lose it you'll need to generate a new one.
             </div>
+          )}
+
+          <div className="sfield" style={{ marginTop: 16, marginBottom: 0 }}>
+            <label htmlFor="ssh-key-name">Key name</label>
+            <input
+              id="ssh-key-name"
+              value={sshKeyName}
+              onChange={(e) => setSSHKeyName(e.target.value)}
+              placeholder="e.g. laptop"
+            />
+          </div>
+
+          {canGenerateKeyPair() && (
+            <div className="settings-foot" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleGenerateKeyPair}
+                disabled={generatingKey}
+                style={{ width: 'auto', padding: '10px 20px' }}
+              >
+                {generatingKey ? 'Generating…' : 'Generate a new key pair'}
+              </button>
+            </div>
+          )}
+
+          <p className="srv-desc" style={{ marginTop: canGenerateKeyPair() ? 16 : 0, marginBottom: 8 }}>
+            {canGenerateKeyPair() ? 'Or paste an existing public key:' : 'Paste an existing public key:'}
+          </p>
+
+          <form onSubmit={handleCreateSSHKey}>
             <div className="sfield" style={{ marginBottom: 14 }}>
               <label htmlFor="ssh-key-value">Public key</label>
               <textarea
