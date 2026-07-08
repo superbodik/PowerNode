@@ -21,6 +21,9 @@ run_update() {
 		build_panel_binaries
 		systemctl restart panel
 		log_ok "panel.service restarted on ${new_commit}"
+		if [[ ! -f /etc/systemd/system/panel-backup.timer ]]; then
+			install_panel_backup_timer
+		fi
 	fi
 
 	if [[ -x "${DAEMON_INSTALL_DIR:-/opt/wingsd}/wingsd" ]]; then

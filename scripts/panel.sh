@@ -48,6 +48,8 @@ install_panel() {
 	systemctl enable --now panel
 	log_ok "panel.service started"
 
+	install_panel_backup_timer
+
 	create_admin_interactive
 
 	echo
@@ -131,6 +133,35 @@ write_panel_service() {
 	WantedBy=multi-user.target
 	EOF
 	log_ok "Wrote $PANEL_SERVICE"
+}
+
+install_panel_backup_timer() {
+	chmod +x "${PROJECT_ROOT}/scripts/panel-backup.sh"
+
+	cat >/etc/systemd/system/panel-backup.service <<-EOF
+	[Unit]
+	Description=PowerNode panel database + secrets backup
+
+	[Service]
+	Type=oneshot
+	ExecStart=${PROJECT_ROOT}/scripts/panel-backup.sh
+	EOF
+
+	cat >/etc/systemd/system/panel-backup.timer <<-'EOF'
+	[Unit]
+	Description=Daily PowerNode panel backup
+
+	[Timer]
+	OnCalendar=daily
+	Persistent=true
+
+	[Install]
+	WantedBy=timers.target
+	EOF
+
+	systemctl daemon-reload
+	systemctl enable --now panel-backup.timer
+	log_ok "panel-backup.timer installed — daily DB + secrets backup to /var/backups/panel (kept 14 days). Disable with: systemctl disable --now panel-backup.timer"
 }
 
 install_nginx_site() {

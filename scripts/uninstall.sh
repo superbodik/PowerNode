@@ -4,11 +4,13 @@ uninstall_panel() {
 	log_step "Removing master panel"
 	systemctl disable --now panel 2>/dev/null
 	rm -f /etc/systemd/system/panel.service
+	systemctl disable --now panel-backup.timer 2>/dev/null
+	rm -f /etc/systemd/system/panel-backup.timer /etc/systemd/system/panel-backup.service
 	rm -rf /opt/panel
 	rm -f /etc/nginx/sites-enabled/panel /etc/nginx/sites-available/panel
 	systemctl reload nginx 2>/dev/null || true
 	systemctl daemon-reload
-	log_ok "Panel removed (database and /etc/panel/panel.env kept — delete manually if truly unwanted)"
+	log_ok "Panel removed (database, /etc/panel/panel.env, and /var/backups/panel kept — delete manually if truly unwanted)"
 }
 
 uninstall_daemon() {
@@ -56,7 +58,7 @@ uninstall_full() {
 	apt-get autoremove -y -qq 2>/dev/null
 	rm -rf /var/lib/docker /var/lib/containerd /var/lib/postgresql /var/lib/redis \
 		/var/lib/wingsd /etc/panel /etc/wingsd /etc/nginx/sites-available/panel \
-		/etc/postgresql /etc/postgresql-common /var/log/postgresql
+		/etc/postgresql /etc/postgresql-common /var/log/postgresql /var/backups/panel
 
 	log_step "Resetting firewall"
 	require_command ufw && ufw --force reset >/dev/null 2>&1

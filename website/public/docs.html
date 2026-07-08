@@ -183,8 +183,15 @@ rm -rf /etc/postgresql /etc/postgresql-common /var/log/postgresql</code></pre>
             <tr><td>Restart node daemon</td><td><code>systemctl restart wingsd</code></td></tr>
             <tr><td>Panel env file</td><td><code>/etc/panel/panel.env</code></td></tr>
             <tr><td>Node env file</td><td><code>/etc/wingsd/wingsd.env</code></td></tr>
+            <tr><td>Run a panel backup now</td><td><code>/usr/local/src/panel/scripts/panel-backup.sh</code></td></tr>
+            <tr><td>Panel backups (DB + secrets)</td><td><code>/var/backups/panel</code></td></tr>
           </tbody>
         </table>
+        <p>Installing the panel sets up a daily <code>panel-backup.timer</code> automatically —
+        a <code>pg_dump</code> of the database plus a copy of <code>/etc/panel</code>, gzipped into
+        <code>/var/backups/panel</code>, keeping the last 14 days. Disable it with
+        <code>systemctl disable --now panel-backup.timer</code> if you'd rather handle backups
+        yourself.</p>
       </section>
 
       <section class="docs-section" id="help">
