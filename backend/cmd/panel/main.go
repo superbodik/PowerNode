@@ -95,18 +95,19 @@ func main() {
 	go scheduler.Run(pool, resolveNodeClient)
 
 	router := api.NewRouter(api.Dependencies{
-		DB:             pool,
-		Token:          tokenManager,
-		Hub:            hub,
-		NodeClient:     resolveNodeClient,
-		EncryptionKey:  cfg.EncryptionKey,
-		Limiter:        limiter,
-		Version:        version,
-		Commit:         commit,
-		BuildDate:      buildDate,
-		SourceDir:      cfg.SourceDir,
-		RepoSlug:       cfg.RepoSlug,
-		AllowedOrigins: cfg.AllowedOrigins,
+		DB:              pool,
+		Token:           tokenManager,
+		Hub:             hub,
+		NodeClient:      resolveNodeClient,
+		EncryptionKey:   cfg.EncryptionKey,
+		Limiter:         limiter,
+		Version:         version,
+		Commit:          commit,
+		BuildDate:       buildDate,
+		SourceDir:       cfg.SourceDir,
+		RepoSlug:        cfg.RepoSlug,
+		AllowedOrigins:  cfg.AllowedOrigins,
+		RequireAdmin2FA: cfg.RequireAdmin2FA,
 	})
 
 	srv := &http.Server{

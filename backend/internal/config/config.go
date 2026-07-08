@@ -22,6 +22,8 @@ type Config struct {
 
 	SourceDir string
 	RepoSlug  string
+
+	RequireAdmin2FA bool
 }
 
 func Load() Config {
@@ -37,6 +39,7 @@ func Load() Config {
 		EncryptionKey:   os.Getenv("PANEL_ENCRYPTION_KEY"),
 		SourceDir:       getEnv("PANEL_SOURCE_DIR", ""),
 		RepoSlug:        getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
+		RequireAdmin2FA: getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

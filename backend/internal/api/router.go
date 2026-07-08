@@ -22,18 +22,19 @@ import (
 )
 
 type Dependencies struct {
-	DB             *pgxpool.Pool
-	Token          *auth.TokenManager
-	Hub            *ws.Hub
-	NodeClient     func(nodeID int64) (*daemonclient.Client, error)
-	EncryptionKey  string
-	Limiter        *ratelimit.Limiter
-	Version        string
-	Commit         string
-	BuildDate      string
-	SourceDir      string
-	RepoSlug       string
-	AllowedOrigins []string
+	DB              *pgxpool.Pool
+	Token           *auth.TokenManager
+	Hub             *ws.Hub
+	NodeClient      func(nodeID int64) (*daemonclient.Client, error)
+	EncryptionKey   string
+	Limiter         *ratelimit.Limiter
+	Version         string
+	Commit          string
+	BuildDate       string
+	SourceDir       string
+	RepoSlug        string
+	AllowedOrigins  []string
+	RequireAdmin2FA bool
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -69,7 +70,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	subusers := auth.NewSubuserChecker(deps.DB)
 
-	authHandler := &handlers.AuthHandler{DB: deps.DB, Token: deps.Token, EncryptionKey: deps.EncryptionKey, Limiter: deps.Limiter}
+	authHandler := &handlers.AuthHandler{DB: deps.DB, Token: deps.Token, EncryptionKey: deps.EncryptionKey, Limiter: deps.Limiter, RequireAdmin2FA: deps.RequireAdmin2FA}
 	nodeHandler := &handlers.NodeHandler{DB: deps.DB, EncryptionKey: deps.EncryptionKey, NodeClient: deps.NodeClient}
 	serverHandler := &handlers.ServerHandler{DB: deps.DB, NodeClient: deps.NodeClient, Subusers: subusers}
 	versionHandler := &handlers.VersionHandler{

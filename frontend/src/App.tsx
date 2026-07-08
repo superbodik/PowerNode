@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { clearTokens } from './api/client';
+import { useEffect, useState } from 'react';
+import { api, clearTokens } from './api/client';
 import { Account } from './pages/Account';
 import { Activity } from './pages/Activity';
 import { Dashboard } from './pages/Dashboard';
@@ -8,6 +8,7 @@ import { Nodes } from './pages/Nodes';
 import { ServerView } from './pages/ServerView';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
+import { TwoFactorGate } from './components/TwoFactorGate';
 
 interface StoredUser {
   id: number;
@@ -32,10 +33,17 @@ export function App() {
   const [view, setView] = useState<View>('servers');
   const [activeServer, setActiveServer] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mustSetup2FA, setMustSetup2FA] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    api.me().then((me) => setMustSetup2FA(me.must_setup_2fa)).catch(() => {});
+  }, [user]);
 
   function handleLogout() {
     clearTokens();
     setUser(null);
+    setMustSetup2FA(false);
   }
 
   function goTo(next: View) {
@@ -46,6 +54,10 @@ export function App() {
 
   if (!user) {
     return <Login onLoggedIn={() => setUser(loadUser())} />;
+  }
+
+  if (mustSetup2FA) {
+    return <TwoFactorGate onVerified={() => setMustSetup2FA(false)} onLogout={handleLogout} />;
   }
 
   return (

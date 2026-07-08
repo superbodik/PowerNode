@@ -17,10 +17,11 @@ import (
 )
 
 type AuthHandler struct {
-	DB            *pgxpool.Pool
-	Token         *auth.TokenManager
-	EncryptionKey string
-	Limiter       *ratelimit.Limiter
+	DB              *pgxpool.Pool
+	Token           *auth.TokenManager
+	EncryptionKey   string
+	Limiter         *ratelimit.Limiter
+	RequireAdmin2FA bool
 }
 
 const (
@@ -209,10 +210,20 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+
+	var totpEnabled bool
+	if err := h.DB.QueryRow(r.Context(),
+		`SELECT totp_enabled FROM users WHERE id = $1`, claims.UserID,
+	).Scan(&totpEnabled); err != nil {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"id":       claims.UserID,
-		"email":    claims.Email,
-		"is_admin": claims.IsAdmin,
+		"id":             claims.UserID,
+		"email":          claims.Email,
+		"is_admin":       claims.IsAdmin,
+		"must_setup_2fa": claims.IsAdmin && h.RequireAdmin2FA && !totpEnabled,
 	})
 }
 

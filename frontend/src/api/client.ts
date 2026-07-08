@@ -13,6 +13,7 @@ import type {
   DatabaseHost,
   Egg,
   FileEntry,
+  MeInfo,
   Node,
   NodeStatus,
   PanelUser,
@@ -225,6 +226,8 @@ export const api = {
     }
     return (await res.json()) as AuthTokens;
   },
+
+  me: () => request<MeInfo>('/auth/me'),
 
   listServers: () => request<Server[]>('/servers'),
 

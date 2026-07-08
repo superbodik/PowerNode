@@ -78,6 +78,13 @@ export interface NodeStatus {
   agent_version?: string;
 }
 
+export interface MeInfo {
+  id: number;
+  email: string;
+  is_admin: boolean;
+  must_setup_2fa: boolean;
+}
+
 export interface CreateNodeRequest {
   name: string;
   location_id: number;
