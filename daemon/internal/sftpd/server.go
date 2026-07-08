@@ -137,6 +137,7 @@ func (s *Server) handleConn(nConn net.Conn) {
 
 	sshConn, chans, reqs, err := ssh.NewServerConn(nConn, s.config)
 	if err != nil {
+		log.Printf("sftp: auth failed for %s: %v", nConn.RemoteAddr(), err)
 		return
 	}
 	defer sshConn.Close()
