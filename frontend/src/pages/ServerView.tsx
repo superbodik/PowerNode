@@ -28,6 +28,16 @@ function formatBytes(bytes: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
 }
 
+function loadUsername(): string {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return 'yourusername';
+    return (JSON.parse(raw) as { username: string }).username;
+  } catch {
+    return 'yourusername';
+  }
+}
+
 export function ServerView({ uuid, onBack }: Props) {
   const [server, setServer] = useState<Server | null>(null);
   const [live, setLive] = useState<ResourceStats | null>(null);
@@ -243,6 +253,28 @@ export function ServerView({ uuid, onBack }: Props) {
                 <div className="sfield">
                   <label>Disk limit</label>
                   <input readOnly value={`${server.disk_mb} MB`} />
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-card" style={{ marginTop: 20 }}>
+              <div className="settings-card-title">SFTP access</div>
+              <p className="srv-desc" style={{ marginBottom: 12 }}>
+                Connect with any SFTP client — add your public key on the{' '}
+                <strong>Account</strong> page first if you haven't already.
+              </p>
+              <div className="settings-grid">
+                <div className="sfield">
+                  <label>Host</label>
+                  <input readOnly value={server.primary_address?.split(':')[0] ?? 'no allocation assigned'} />
+                </div>
+                <div className="sfield">
+                  <label>Port</label>
+                  <input readOnly value="2022" />
+                </div>
+                <div className="sfield">
+                  <label>Username</label>
+                  <input readOnly value={`${loadUsername()}.${server.uuid_short}`} />
                 </div>
               </div>
             </div>

@@ -32,6 +32,7 @@ install_daemon() {
 	systemctl enable wingsd
 	systemctl restart wingsd
 	log_ok "wingsd.service (re)started"
+	log_ok "SFTP ready on port 2022 — users connect with <username>.<server-id>, using an SSH key added on the Account page"
 }
 
 install_daemon_proxy() {
