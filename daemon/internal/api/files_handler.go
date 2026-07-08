@@ -2,8 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -41,6 +43,9 @@ func (h *Handlers) ReadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
+	if info, statErr := f.Stat(); statErr == nil {
+		w.Header().Set("X-File-Mtime", strconv.FormatInt(info.ModTime().Unix(), 10))
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = io.Copy(w, f)
 }
@@ -52,7 +57,17 @@ func (h *Handlers) WriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := files.Write(h.Docker.ServerVolumePath(serverUUID), r.URL.Query().Get("path"), r.Body); err != nil {
+	var expectedMtime int64
+	if raw := r.Header.Get("X-Expected-Mtime"); raw != "" {
+		expectedMtime, _ = strconv.ParseInt(raw, 10, 64)
+	}
+
+	err = files.Write(h.Docker.ServerVolumePath(serverUUID), r.URL.Query().Get("path"), r.Body, expectedMtime)
+	if errors.Is(err, files.ErrConflict) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

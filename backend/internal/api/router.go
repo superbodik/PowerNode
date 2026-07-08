@@ -62,7 +62,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type", "X-Expected-Mtime"},
+		ExposedHeaders:   []string{"X-File-Mtime"},
 		AllowCredentials: true,
 	}))
 

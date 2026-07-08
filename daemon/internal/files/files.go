@@ -1,12 +1,15 @@
 package files
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+var ErrConflict = errors.New("file changed on disk since it was last read")
 
 type Entry struct {
 	Name        string `json:"name"`
@@ -61,13 +64,18 @@ func Read(baseDir, requestedPath string) (*os.File, error) {
 	return os.Open(full)
 }
 
-func Write(baseDir, requestedPath string, r io.Reader) error {
+func Write(baseDir, requestedPath string, r io.Reader, expectedMtime int64) error {
 	full, err := SafeJoin(baseDir, requestedPath)
 	if err != nil {
 		return err
 	}
 	if full == filepath.Clean(baseDir) {
 		return fmt.Errorf("cannot write to the server root directory itself")
+	}
+	if expectedMtime > 0 {
+		if info, statErr := os.Stat(full); statErr == nil && info.ModTime().Unix() != expectedMtime {
+			return ErrConflict
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
 		return err

@@ -47,6 +47,13 @@ export class TOTPRequiredError extends Error {
   }
 }
 
+export class FileConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FileConflictError';
+  }
+}
+
 function authHeaders(): HeadersInit {
   const token = localStorage.getItem('access_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -143,10 +150,41 @@ async function requestText(path: string, init?: RequestInit, isRetry = false): P
     window.location.reload();
     throw new Error('session expired');
   }
+  if (res.status === 409) {
+    throw new FileConflictError(await errorMessage(res, path, init));
+  }
   if (!res.ok) {
     throw new Error(await errorMessage(res, path, init));
   }
   return res.text();
+}
+
+async function requestTextWithMtime(
+  path: string,
+  init?: RequestInit,
+  isRetry = false,
+): Promise<{ text: string; mtime: number }> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...init?.headers,
+    },
+  });
+
+  if (res.status === 401) {
+    if (!isRetry && (await tryRefresh())) {
+      return requestTextWithMtime(path, init, true);
+    }
+    clearTokens();
+    window.location.reload();
+    throw new Error('session expired');
+  }
+  if (!res.ok) {
+    throw new Error(await errorMessage(res, path, init));
+  }
+  const mtime = Number(res.headers.get('X-File-Mtime') ?? 0);
+  return { text: await res.text(), mtime };
 }
 
 async function requestBlob(path: string, init?: RequestInit, isRetry = false): Promise<Blob> {
@@ -345,12 +383,15 @@ export const api = {
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),
 
   readFile: (uuid: string, path: string) =>
-    requestText(`/servers/${uuid}/files/contents?path=${encodeURIComponent(path)}`),
+    requestTextWithMtime(`/servers/${uuid}/files/contents?path=${encodeURIComponent(path)}`),
 
-  writeFile: (uuid: string, path: string, content: string) =>
+  writeFile: (uuid: string, path: string, content: string, expectedMtime?: number) =>
     requestText(`/servers/${uuid}/files/contents?path=${encodeURIComponent(path)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'text/plain' },
+      headers: {
+        'Content-Type': 'text/plain',
+        ...(expectedMtime ? { 'X-Expected-Mtime': String(expectedMtime) } : {}),
+      },
       body: content,
     }),
 

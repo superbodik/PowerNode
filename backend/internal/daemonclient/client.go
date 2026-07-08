@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -148,27 +150,31 @@ func (c *Client) ListFiles(ctx context.Context, serverUUID uuid.UUID, path strin
 	return entries, nil
 }
 
-func (c *Client) ReadFile(ctx context.Context, serverUUID uuid.UUID, path string) ([]byte, error) {
+var ErrFileConflict = errors.New("file changed on disk since it was last read")
+
+func (c *Client) ReadFile(ctx context.Context, serverUUID uuid.UUID, path string) ([]byte, int64, error) {
 	p := fmt.Sprintf("/api/v1/servers/%s/files/contents?path=%s", serverUUID, url.QueryEscape(path))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+p, nil)
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		return nil, 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.daemonToken)
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("call node daemon: %w", err)
+		return nil, 0, fmt.Errorf("call node daemon: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("node daemon returned %d", resp.StatusCode)
+		return nil, 0, fmt.Errorf("node daemon returned %d", resp.StatusCode)
 	}
-	return io.ReadAll(resp.Body)
+	mtime, _ := strconv.ParseInt(resp.Header.Get("X-File-Mtime"), 10, 64)
+	content, err := io.ReadAll(resp.Body)
+	return content, mtime, err
 }
 
-func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path string, content []byte) error {
+func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path string, content []byte, expectedMtime int64) error {
 	p := fmt.Sprintf("/api/v1/servers/%s/files/contents?path=%s", serverUUID, url.QueryEscape(path))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+p, bytes.NewReader(content))
 	if err != nil {
@@ -176,6 +182,9 @@ func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path strin
 	}
 	req.Header.Set("Authorization", "Bearer "+c.daemonToken)
 	req.Header.Set("Content-Type", "application/octet-stream")
+	if expectedMtime > 0 {
+		req.Header.Set("X-Expected-Mtime", strconv.FormatInt(expectedMtime, 10))
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -183,6 +192,9 @@ func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path strin
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusConflict {
+		return ErrFileConflict
+	}
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("node daemon returned %d", resp.StatusCode)
 	}

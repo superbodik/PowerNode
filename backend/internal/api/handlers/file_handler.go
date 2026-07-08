@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -74,12 +76,15 @@ func (h *FileHandler) Read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := client.ReadFile(r.Context(), serverUUID, r.URL.Query().Get("path"))
+	content, mtime, err := client.ReadFile(r.Context(), serverUUID, r.URL.Query().Get("path"))
 	if err != nil {
 		http.Error(w, "failed to read file: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 
+	if mtime > 0 {
+		w.Header().Set("X-File-Mtime", strconv.FormatInt(mtime, 10))
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write(content)
 }
@@ -96,7 +101,17 @@ func (h *FileHandler) Write(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := client.WriteFile(r.Context(), serverUUID, r.URL.Query().Get("path"), content); err != nil {
+	var expectedMtime int64
+	if raw := r.Header.Get("X-Expected-Mtime"); raw != "" {
+		expectedMtime, _ = strconv.ParseInt(raw, 10, 64)
+	}
+
+	err = client.WriteFile(r.Context(), serverUUID, r.URL.Query().Get("path"), content, expectedMtime)
+	if errors.Is(err, daemonclient.ErrFileConflict) {
+		http.Error(w, "this file was changed on disk since you opened it — reload it and re-apply your edits", http.StatusConflict)
+		return
+	}
+	if err != nil {
 		http.Error(w, "failed to write file: "+err.Error(), http.StatusBadGateway)
 		return
 	}

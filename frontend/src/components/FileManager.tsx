@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { api, FileConflictError } from '../api/client';
 import type { FileEntry } from '../types';
 
 interface Props {
@@ -35,6 +35,7 @@ export function FileManager({ uuid }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [editingFile, setEditingFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState('');
+  const [editingMtime, setEditingMtime] = useState(0);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -68,13 +69,14 @@ export function FileManager({ uuid }: Props) {
     }
     const target = joinPath(path, entry.name);
     try {
-      const content = await api.readFile(uuid, target);
-      if (looksBinary(content)) {
+      const { text, mtime } = await api.readFile(uuid, target);
+      if (looksBinary(text)) {
         setError(`"${entry.name}" looks like a binary file — use Download instead of editing it as text.`);
         return;
       }
       setEditingFile(target);
-      setFileContent(content);
+      setFileContent(text);
+      setEditingMtime(mtime);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -84,11 +86,15 @@ export function FileManager({ uuid }: Props) {
     if (!editingFile) return;
     setSaving(true);
     try {
-      await api.writeFile(uuid, editingFile, fileContent);
+      await api.writeFile(uuid, editingFile, fileContent, editingMtime);
       setEditingFile(null);
       refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      if (err instanceof FileConflictError) {
+        setError(`"${editingFile.split('/').pop()}" was changed on disk since you opened it — reopen it to see the latest version before saving again.`);
+      } else {
+        setError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setSaving(false);
     }
