@@ -20,6 +20,7 @@ import (
 	"github.com/yourorg/panel/internal/daemonclient"
 	"github.com/yourorg/panel/internal/db"
 	"github.com/yourorg/panel/internal/domainretry"
+	"github.com/yourorg/panel/internal/mail"
 	"github.com/yourorg/panel/internal/models"
 	"github.com/yourorg/panel/internal/ratelimit"
 	"github.com/yourorg/panel/internal/scheduler"
@@ -93,7 +94,18 @@ func main() {
 		}
 	}
 
-	go scheduler.Run(pool, resolveNodeClient)
+	mailer := &mail.Mailer{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		Username: cfg.SMTPUsername,
+		Password: cfg.SMTPPassword,
+		From:     cfg.SMTPFrom,
+	}
+	if mailer.Enabled() {
+		log.Printf("email notifications enabled via %s:%s", cfg.SMTPHost, cfg.SMTPPort)
+	}
+
+	go scheduler.Run(pool, resolveNodeClient, mailer)
 	go domainretry.Run(pool, resolveNodeClient)
 
 	router := api.NewRouter(api.Dependencies{

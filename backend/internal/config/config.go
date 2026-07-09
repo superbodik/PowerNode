@@ -24,6 +24,12 @@ type Config struct {
 	RepoSlug  string
 
 	RequireAdmin2FA bool
+
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
 }
 
 func Load() Config {
@@ -40,6 +46,11 @@ func Load() Config {
 		SourceDir:       getEnv("PANEL_SOURCE_DIR", ""),
 		RepoSlug:        getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
 		RequireAdmin2FA: getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
+		SMTPHost:        getEnv("PANEL_SMTP_HOST", ""),
+		SMTPPort:        getEnv("PANEL_SMTP_PORT", "587"),
+		SMTPUsername:    getEnv("PANEL_SMTP_USERNAME", ""),
+		SMTPPassword:    getEnv("PANEL_SMTP_PASSWORD", ""),
+		SMTPFrom:        getEnv("PANEL_SMTP_FROM", ""),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

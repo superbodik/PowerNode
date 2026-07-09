@@ -49,6 +49,7 @@
       <a href="#install">Install &amp; update</a>
       <a href="#sftp">SFTP</a>
       <a href="#domains">Custom domains</a>
+      <a href="#email">Email notifications</a>
       <a href="#install-errors">Install errors</a>
       <a href="#commands">Useful commands</a>
       <a href="#help">Getting help</a>
@@ -150,6 +151,24 @@ systemctl restart wingsd</code></pre>
           <li>Both the panel install and the per-server domains feature use the same certbot/nginx
           setup on the node, so the fix is the same either way.</li>
         </ul>
+      </section>
+
+      <section class="docs-section" id="email">
+        <h2>Email notifications</h2>
+        <p class="docs-lede">Fully optional — off by default, nothing to configure unless you want it.</p>
+        <p>The panel can send email for two things: a scheduled power action or backup that failed,
+        and a node that stopped responding to health checks. Set these in <code>/etc/panel/panel.env</code>
+        and restart the panel:</p>
+        <pre><code>PANEL_SMTP_HOST=smtp.example.com
+PANEL_SMTP_PORT=587
+PANEL_SMTP_USERNAME=you@example.com
+PANEL_SMTP_PASSWORD=your-smtp-password
+PANEL_SMTP_FROM=panel@example.com</code></pre>
+        <p>Works with any standard SMTP provider — your own mail server, a transactional email
+        service, or a plain Gmail/Workspace relay. Port <code>587</code> (STARTTLS) and
+        <code>465</code> (implicit TLS) are both supported. Leave <code>PANEL_SMTP_HOST</code>
+        unset and nothing changes — no emails are ever sent.</p>
+        <pre><code>systemctl restart panel</code></pre>
       </section>
 
       <section class="docs-section" id="install-errors">
