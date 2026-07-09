@@ -19,6 +19,7 @@ import (
 	"github.com/yourorg/panel/internal/crypto"
 	"github.com/yourorg/panel/internal/daemonclient"
 	"github.com/yourorg/panel/internal/db"
+	"github.com/yourorg/panel/internal/domainretry"
 	"github.com/yourorg/panel/internal/models"
 	"github.com/yourorg/panel/internal/ratelimit"
 	"github.com/yourorg/panel/internal/scheduler"
@@ -93,6 +94,7 @@ func main() {
 	}
 
 	go scheduler.Run(pool, resolveNodeClient)
+	go domainretry.Run(pool, resolveNodeClient)
 
 	router := api.NewRouter(api.Dependencies{
 		DB:              pool,

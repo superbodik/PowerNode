@@ -133,10 +133,10 @@ func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var createdAt time.Time
 	if err := h.DB.QueryRow(r.Context(), `
-		INSERT INTO server_domains (server_id, domain, tls_status)
-		VALUES ($1, $2, 'pending')
+		INSERT INTO server_domains (server_id, domain, tls_status, admin_email)
+		VALUES ($1, $2, 'pending', $3)
 		RETURNING id, created_at`,
-		serverID, domain,
+		serverID, domain, req.Email,
 	).Scan(&id, &createdAt); err != nil {
 		http.Error(w, "domain already in use", http.StatusConflict)
 		return
