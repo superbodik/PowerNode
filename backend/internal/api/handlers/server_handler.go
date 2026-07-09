@@ -25,6 +25,8 @@ type ServerHandler struct {
 	Subusers   *auth.SubuserChecker
 }
 
+const maxServerListSize = 1000
+
 func (h *ServerHandler) List(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if !ok {
@@ -49,7 +51,8 @@ func (h *ServerHandler) List(w http.ResponseWriter, r *http.Request) {
 		JOIN nodes n ON n.id = s.node_id
 		LEFT JOIN server_subusers su ON su.server_id = s.id AND su.user_id = $1
 		WHERE s.owner_id = $1 OR $2 = true OR su.user_id IS NOT NULL
-		ORDER BY s.created_at DESC`, claims.UserID, claims.IsAdmin)
+		ORDER BY s.created_at DESC
+		LIMIT $3`, claims.UserID, claims.IsAdmin, maxServerListSize)
 	if err != nil {
 		http.Error(w, "failed to list servers", http.StatusInternalServerError)
 		return
