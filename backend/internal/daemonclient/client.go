@@ -71,6 +71,18 @@ func (c *Client) CreateServer(ctx context.Context, req CreateServerRequest) (*Op
 	return &resp, nil
 }
 
+// RebuildServer recreates the server's container from req, keeping its files.
+// Needed whenever published ports change, since Docker can't rebind them on a
+// live container.
+func (c *Client) RebuildServer(ctx context.Context, serverUUID uuid.UUID, req CreateServerRequest) (*OperationResponse, error) {
+	var resp OperationResponse
+	path := fmt.Sprintf("/api/v1/servers/%s/rebuild", serverUUID)
+	if err := c.doJSONWith(c.longHTTP, ctx, http.MethodPost, path, req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 func (c *Client) Power(ctx context.Context, serverUUID uuid.UUID, action PowerAction) (*OperationResponse, error) {
 	var resp OperationResponse
 	path := fmt.Sprintf("/api/v1/servers/%s/power", serverUUID)

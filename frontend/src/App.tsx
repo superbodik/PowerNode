@@ -18,6 +18,8 @@ interface StoredUser {
 
 type View = 'servers' | 'nodes' | 'settings' | 'activity' | 'account' | 'users';
 
+const VIEWS: View[] = ['servers', 'nodes', 'settings', 'activity', 'account', 'users'];
+
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
   if (!raw) return null;
@@ -28,10 +30,33 @@ function loadUser(): StoredUser | null {
   }
 }
 
+interface Location {
+  view: View;
+  activeServer: string | null;
+}
+
+// The URL is the source of truth for which screen is showing, so a reload (or
+// a bookmark, or the browser back button) lands back where the user was
+// instead of always bouncing to the servers dashboard.
+function parseLocation(): Location {
+  const path = window.location.pathname;
+  const serverMatch = path.match(/^\/servers\/([^/]+)\/?$/);
+  if (serverMatch) return { view: 'servers', activeServer: decodeURIComponent(serverMatch[1]) };
+
+  const segment = path.replace(/^\/+/, '').split('/')[0];
+  if ((VIEWS as string[]).includes(segment)) return { view: segment as View, activeServer: null };
+
+  return { view: 'servers', activeServer: null };
+}
+
+function pathFor(loc: Location): string {
+  if (loc.activeServer) return `/servers/${encodeURIComponent(loc.activeServer)}`;
+  return loc.view === 'servers' ? '/' : `/${loc.view}`;
+}
+
 export function App() {
   const [user, setUser] = useState<StoredUser | null>(() => loadUser());
-  const [view, setView] = useState<View>('servers');
-  const [activeServer, setActiveServer] = useState<string | null>(null);
+  const [{ view, activeServer }, setLocation] = useState<Location>(() => parseLocation());
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mustSetup2FA, setMustSetup2FA] = useState(false);
 
@@ -40,16 +65,38 @@ export function App() {
     api.me().then((me) => setMustSetup2FA(me.must_setup_2fa)).catch(() => {});
   }, [user]);
 
+  useEffect(() => {
+    const onPopState = () => setLocation(parseLocation());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  function navigate(next: Location) {
+    const path = pathFor(next);
+    if (path !== window.location.pathname) {
+      window.history.pushState(null, '', path);
+    }
+    setLocation(next);
+  }
+
   function handleLogout() {
     clearTokens();
     setUser(null);
     setMustSetup2FA(false);
+    navigate({ view: 'servers', activeServer: null });
   }
 
   function goTo(next: View) {
-    setActiveServer(null);
-    setView(next);
+    navigate({ view: next, activeServer: null });
     setMobileNavOpen(false);
+  }
+
+  function openServer(uuid: string) {
+    navigate({ view, activeServer: uuid });
+  }
+
+  function closeServer() {
+    navigate({ view, activeServer: null });
   }
 
   if (!user) {
@@ -166,7 +213,7 @@ export function App() {
 
         <main className="main">
           {activeServer ? (
-            <ServerView uuid={activeServer} onBack={() => setActiveServer(null)} />
+            <ServerView uuid={activeServer} onBack={closeServer} />
           ) : view === 'nodes' ? (
             <Nodes />
           ) : view === 'users' ? (
@@ -178,7 +225,7 @@ export function App() {
           ) : view === 'account' ? (
             <Account />
           ) : (
-            <Dashboard onManage={setActiveServer} />
+            <Dashboard onManage={openServer} />
           )}
         </main>
       </div>

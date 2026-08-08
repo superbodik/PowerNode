@@ -69,6 +69,43 @@ func (h *Handlers) CreateServer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// RebuildServer recreates the container from the spec the panel sends, keeping
+// the server's files. The panel calls it when a server's published ports change.
+func (h *Handlers) RebuildServer(w http.ResponseWriter, r *http.Request) {
+	serverUUID, err := uuid.Parse(chi.URLParam(r, "uuid"))
+	if err != nil {
+		http.Error(w, "invalid server uuid", http.StatusBadRequest)
+		return
+	}
+
+	var req createServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	req.ServerUUID = serverUUID
+
+	if err := h.Docker.RecreateContainer(r.Context(), docker.CreateSpec{
+		ServerUUID:     req.ServerUUID,
+		DockerImage:    req.DockerImage,
+		StartupCommand: req.StartupCommand,
+		Environment:    req.Environment,
+		MemoryMB:       req.MemoryMB,
+		SwapMB:         req.SwapMB,
+		IOWeight:       req.IOWeight,
+		CPUPercent:     req.CPUPercent,
+		PortBindings:   req.PortBindings,
+	}); err != nil {
+		writeJSON(w, http.StatusBadGateway, operationResponse{
+			ServerUUID: serverUUID, Success: false, Message: err.Error(),
+		})
+		return
+	}
+
+	state, _ := h.Docker.InspectState(r.Context(), docker.ContainerNameFor(serverUUID))
+	writeJSON(w, http.StatusOK, operationResponse{ServerUUID: serverUUID, Success: true, State: state})
+}
+
 type powerRequest struct {
 	Action string `json:"action"`
 }

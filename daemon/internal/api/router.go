@@ -60,6 +60,8 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(150 * time.Second))
+			r.Post("/api/v1/servers/{uuid}/rebuild", h.RebuildServer)
+
 			r.Post("/api/v1/servers/{uuid}/domains", h.AddDomain)
 			r.Delete("/api/v1/servers/{uuid}/domains/{domain}", h.RemoveDomain)
 

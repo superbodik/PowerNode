@@ -242,6 +242,7 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		portBindings[fmt.Sprintf("%d/tcp", allocPort)] = fmt.Sprintf("%d", allocPort)
+		portBindings[fmt.Sprintf("%d/udp", allocPort)] = fmt.Sprintf("%d", allocPort)
 	}
 
 	daemonResp, err := client.CreateServer(ctx, daemonclient.CreateServerRequest{

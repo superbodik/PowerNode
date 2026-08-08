@@ -25,6 +25,9 @@ const (
 	PermBackupsRead    = "backups.read"
 	PermBackupsWrite   = "backups.write"
 
+	PermAllocationsRead  = "allocations.read"
+	PermAllocationsWrite = "allocations.write"
+
 	PermServersRead  = "servers.read"
 	PermServersWrite = "servers.write"
 )
@@ -45,8 +48,12 @@ var validPermissions = map[string]struct{}{
 	PermDomainsWrite:   {},
 	PermBackupsRead:    {},
 	PermBackupsWrite:   {},
-	PermServersRead:    {},
-	PermServersWrite:   {},
+
+	PermAllocationsRead:  {},
+	PermAllocationsWrite: {},
+
+	PermServersRead:  {},
+	PermServersWrite: {},
 }
 
 func IsValidPermission(code string) bool {

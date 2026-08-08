@@ -165,6 +165,15 @@ export interface Allocation {
   server_id: number | null;
 }
 
+export interface ServerAllocation {
+  id: number;
+  ip: string;
+  port: number;
+  alias: string | null;
+  is_primary: boolean;
+  is_own: boolean;
+}
+
 export interface CreateServerRequest {
   name: string;
   description?: string;
@@ -267,6 +276,8 @@ export const SUBUSER_PERMISSIONS: { code: string; label: string }[] = [
   { code: 'domains.write', label: 'Manage domains' },
   { code: 'backups.read', label: 'View backups' },
   { code: 'backups.write', label: 'Manage backups' },
+  { code: 'allocations.read', label: 'View ports' },
+  { code: 'allocations.write', label: 'Manage ports' },
 ];
 
 export const API_KEY_PERMISSIONS: { code: string; label: string }[] = [

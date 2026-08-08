@@ -20,6 +20,7 @@ import type {
   PowerAction,
   Schedule,
   Server,
+  ServerAllocation,
   ServerBackup,
   ServerDatabase,
   ServerDomain,
@@ -300,6 +301,17 @@ export const api = {
 
   deleteServerDatabase: (uuid: string, id: number) =>
     request<void>(`/servers/${uuid}/databases/${id}`, { method: 'DELETE' }),
+
+  listServerAllocations: (uuid: string) => request<ServerAllocation[]>(`/servers/${uuid}/allocations`),
+
+  createServerAllocation: (uuid: string, port: number, alias?: string) =>
+    request<ServerAllocation[]>(`/servers/${uuid}/allocations`, {
+      method: 'POST',
+      body: JSON.stringify({ port, alias: alias ?? '' }),
+    }),
+
+  deleteServerAllocation: (uuid: string, id: number) =>
+    request<void>(`/servers/${uuid}/allocations/${id}`, { method: 'DELETE' }),
 
   listServerDomains: (uuid: string) => request<ServerDomain[]>(`/servers/${uuid}/domains`),
 

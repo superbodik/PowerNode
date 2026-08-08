@@ -5,6 +5,7 @@ import { BackupManager } from '../components/BackupManager';
 import { DatabaseManager } from '../components/DatabaseManager';
 import { DomainManager } from '../components/DomainManager';
 import { FileManager } from '../components/FileManager';
+import { PortManager } from '../components/PortManager';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { SubuserManager } from '../components/SubuserManager';
 import type { PowerAction, ResourceStats, Server } from '../types';
@@ -14,7 +15,7 @@ interface Props {
   onBack: () => void;
 }
 
-type Tab = 'overview' | 'console' | 'files' | 'databases' | 'domains' | 'backups' | 'schedules' | 'sharing';
+type Tab = 'overview' | 'console' | 'files' | 'databases' | 'network' | 'domains' | 'backups' | 'schedules' | 'sharing';
 
 function pct(used: number, limitMB: number): number {
   const limitBytes = limitMB * 1024 * 1024;
@@ -215,7 +216,7 @@ export function ServerView({ uuid, onBack }: Props) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tab-bar">
-            {(['overview', 'console', 'files', 'databases', 'domains', 'backups', 'schedules', 'sharing'] as Tab[]).map((t) => (
+            {(['overview', 'console', 'files', 'databases', 'network', 'domains', 'backups', 'schedules', 'sharing'] as Tab[]).map((t) => (
               <div
                 key={t}
                 className={`tab-btn ${tab === t ? 'active' : ''}`}
@@ -358,6 +359,10 @@ export function ServerView({ uuid, onBack }: Props) {
 
           <div className={`tab-panel ${tab === 'databases' ? 'active' : ''}`}>
             {tab === 'databases' && <DatabaseManager uuid={uuid} />}
+          </div>
+
+          <div className={`tab-panel ${tab === 'network' ? 'active' : ''}`}>
+            {tab === 'network' && <PortManager uuid={uuid} />}
           </div>
 
           <div className={`tab-panel ${tab === 'domains' ? 'active' : ''}`}>

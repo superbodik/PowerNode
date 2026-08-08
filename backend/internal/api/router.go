@@ -94,6 +94,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	serverDatabaseHandler := &handlers.ServerDatabaseHandler{DB: deps.DB, Subusers: subusers, Encrypt: deps.EncryptionKey}
 	serverDomainHandler := &handlers.ServerDomainHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
 	serverBackupHandler := &handlers.ServerBackupHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
+	serverAllocationHandler := &handlers.ServerAllocationHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
 	sshKeyHandler := &handlers.SSHKeyHandler{DB: deps.DB}
 	sftpAuthHandler := &handlers.SFTPAuthHandler{DB: deps.DB, Subusers: subusers, EncryptionKey: deps.EncryptionKey}
 
@@ -149,6 +150,8 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/servers/{uuid}/databases", serverDatabaseHandler.Create)
 			r.Delete("/servers/{uuid}/databases/{id}", serverDatabaseHandler.Delete)
 
+			r.Get("/servers/{uuid}/allocations", serverAllocationHandler.List)
+
 			r.Get("/servers/{uuid}/domains", serverDomainHandler.List)
 
 			r.Get("/servers/{uuid}/backups", serverBackupHandler.List)
@@ -187,6 +190,11 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(150 * time.Second))
 			r.Use(auth.Middleware(deps.Token, resolveAPIKey(deps.DB)))
+
+			// Adding or removing a port recreates the container, so these get
+			// the long timeout rather than the default 30s.
+			r.Post("/servers/{uuid}/allocations", serverAllocationHandler.Create)
+			r.Delete("/servers/{uuid}/allocations/{id}", serverAllocationHandler.Delete)
 
 			r.Post("/servers/{uuid}/domains", serverDomainHandler.Create)
 			r.Delete("/servers/{uuid}/domains/{id}", serverDomainHandler.Delete)

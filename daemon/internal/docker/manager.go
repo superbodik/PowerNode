@@ -121,6 +121,69 @@ func (m *Manager) CreateContainer(ctx context.Context, spec CreateSpec) (string,
 	return created.ID, nil
 }
 
+// RecreateContainer replaces a server's container with one built from spec,
+// keeping its /home/container bind mount (and therefore its files) intact.
+// Docker can't change published ports on an existing container, so this is how
+// an allocation added after creation reaches the server.
+//
+// The old container is renamed aside rather than deleted outright, so a failed
+// create can be rolled back to exactly what was running before.
+func (m *Manager) RecreateContainer(ctx context.Context, spec CreateSpec) error {
+	name := ContainerNameFor(spec.ServerUUID)
+	oldName := name + "-rebuild"
+
+	wasRunning := false
+	if state, err := m.InspectState(ctx, name); err == nil {
+		wasRunning = state == "running"
+	}
+
+	// Clean up after an earlier rebuild that died halfway through.
+	_ = m.cli.ContainerRemove(ctx, oldName, container.RemoveOptions{Force: true, RemoveVolumes: true})
+
+	hadContainer := true
+	if err := m.cli.ContainerRename(ctx, name, oldName); err != nil {
+		if !client.IsErrNotFound(err) {
+			return fmt.Errorf("rename existing container: %w", err)
+		}
+		hadContainer = false
+	}
+
+	if hadContainer && wasRunning {
+		timeout := 30
+		if err := m.cli.ContainerStop(ctx, oldName, container.StopOptions{Timeout: &timeout}); err != nil {
+			m.restoreContainer(ctx, oldName, name, wasRunning)
+			return fmt.Errorf("stop existing container: %w", err)
+		}
+	}
+
+	if _, err := m.CreateContainer(ctx, spec); err != nil {
+		m.restoreContainer(ctx, oldName, name, wasRunning)
+		return err
+	}
+
+	if hadContainer {
+		if err := m.cli.ContainerRemove(ctx, oldName, container.RemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
+			return fmt.Errorf("remove previous container: %w", err)
+		}
+	}
+
+	if wasRunning {
+		if err := m.StartContainer(ctx, name); err != nil {
+			return fmt.Errorf("start recreated container: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *Manager) restoreContainer(ctx context.Context, oldName, name string, wasRunning bool) {
+	if err := m.cli.ContainerRename(ctx, oldName, name); err != nil {
+		return
+	}
+	if wasRunning {
+		_ = m.StartContainer(ctx, name)
+	}
+}
+
 func (m *Manager) ensureImage(ctx context.Context, image string) error {
 	_, _, err := m.cli.ImageInspectWithRaw(ctx, image)
 	if err == nil {
