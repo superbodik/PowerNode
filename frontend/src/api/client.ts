@@ -315,10 +315,10 @@ export const api = {
 
   listServerDomains: (uuid: string) => request<ServerDomain[]>(`/servers/${uuid}/domains`),
 
-  createServerDomain: (uuid: string, domain: string, email: string) =>
+  createServerDomain: (uuid: string, domain: string, email: string, allocationId?: number) =>
     request<ServerDomain>(`/servers/${uuid}/domains`, {
       method: 'POST',
-      body: JSON.stringify({ domain, email }),
+      body: JSON.stringify({ domain, email, allocation_id: allocationId ?? null }),
     }),
 
   deleteServerDomain: (uuid: string, id: number) =>

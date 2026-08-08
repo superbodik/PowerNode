@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { ServerDomain } from '../types';
+import type { ServerAllocation, ServerDomain } from '../types';
 
 interface Props {
   uuid: string;
@@ -8,9 +8,11 @@ interface Props {
 
 export function DomainManager({ uuid }: Props) {
   const [domains, setDomains] = useState<ServerDomain[] | null>(null);
+  const [allocations, setAllocations] = useState<ServerAllocation[]>([]);
   const [forbidden, setForbidden] = useState(false);
   const [domain, setDomain] = useState('');
   const [email, setEmail] = useState('');
+  const [allocationId, setAllocationId] = useState<number | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,12 +31,23 @@ export function DomainManager({ uuid }: Props) {
 
   useEffect(refresh, [uuid]);
 
+  useEffect(() => {
+    api
+      .listServerAllocations(uuid)
+      .then((list) => {
+        setAllocations(list);
+        const primary = list.find((a) => a.is_primary);
+        if (primary) setAllocationId(primary.id);
+      })
+      .catch(() => setAllocations([]));
+  }, [uuid]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
-      await api.createServerDomain(uuid, domain, email);
+      await api.createServerDomain(uuid, domain, email, allocationId === '' ? undefined : allocationId);
       setDomain('');
       refresh();
     } catch (err) {
@@ -76,7 +89,9 @@ export function DomainManager({ uuid }: Props) {
         <div className="settings-card-title">Add a custom domain</div>
         <p className="srv-desc" style={{ marginBottom: 12 }}>
           Point the domain's DNS A record at this server's node before adding it here, or
-          certificate issuance will fail and it'll stay on plain HTTP.
+          certificate issuance will fail and it'll stay on plain HTTP. Subdomains work too —
+          add each one separately and point it at a different port below to run several
+          services off the same server.
         </p>
         <form onSubmit={handleCreate}>
           <div className="settings-grid">
@@ -86,9 +101,29 @@ export function DomainManager({ uuid }: Props) {
                 id="domain-name"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="example.com"
+                placeholder="sub.example.com"
                 required
               />
+            </div>
+            <div className="sfield">
+              <label htmlFor="domain-port">Port</label>
+              <select
+                id="domain-port"
+                value={allocationId}
+                onChange={(e) => setAllocationId(e.target.value === '' ? '' : Number(e.target.value))}
+                required
+              >
+                <option value="" disabled>
+                  Select a port…
+                </option>
+                {allocations.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    :{a.port}
+                    {a.is_primary ? ' (main)' : ''}
+                    {a.alias ? ` — ${a.alias}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="sfield">
               <label htmlFor="domain-email">Contact email (optional)</label>
@@ -101,11 +136,16 @@ export function DomainManager({ uuid }: Props) {
               />
             </div>
           </div>
+          {allocations.length === 0 && (
+            <p className="srv-desc" style={{ marginTop: 8 }}>
+              This server has no ports yet — add one on the Network tab first.
+            </p>
+          )}
           <div className="settings-foot">
             <button
               className="btn-primary"
               type="submit"
-              disabled={submitting}
+              disabled={submitting || allocations.length === 0}
               style={{ width: 'auto', padding: '10px 20px' }}
             >
               {submitting ? 'Adding…' : 'Add domain'}
@@ -118,7 +158,12 @@ export function DomainManager({ uuid }: Props) {
         {domains.map((d) => (
           <div className="sch-card" key={d.id}>
             <div className="sch-head">
-              <span className="sch-name">{d.domain}</span>
+              <span className="sch-name">
+                {d.domain}
+                <span className="srv-desc" style={{ fontSize: 10, marginLeft: 8, border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
+                  :{d.port}
+                </span>
+              </span>
               <button className="file-act-btn del" onClick={() => handleDelete(d)}>
                 Delete
               </button>

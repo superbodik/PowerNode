@@ -314,6 +314,7 @@ export interface ServerDatabase {
 export interface ServerDomain {
   id: number;
   domain: string;
+  port: number;
   tls_status: string;
   created_at: string;
 }

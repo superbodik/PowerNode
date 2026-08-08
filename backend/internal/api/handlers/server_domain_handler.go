@@ -61,6 +61,7 @@ func (h *ServerDomainHandler) resolveServer(w http.ResponseWriter, r *http.Reque
 type serverDomainSummary struct {
 	ID        int64  `json:"id"`
 	Domain    string `json:"domain"`
+	Port      int    `json:"port"`
 	TLSStatus string `json:"tls_status"`
 	CreatedAt string `json:"created_at"`
 }
@@ -72,7 +73,7 @@ func (h *ServerDomainHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.DB.Query(r.Context(),
-		`SELECT id, domain, tls_status, created_at FROM server_domains WHERE server_id = $1 ORDER BY created_at`, serverID)
+		`SELECT id, domain, port, tls_status, created_at FROM server_domains WHERE server_id = $1 ORDER BY created_at`, serverID)
 	if err != nil {
 		http.Error(w, "failed to list domains", http.StatusInternalServerError)
 		return
@@ -83,7 +84,7 @@ func (h *ServerDomainHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d serverDomainSummary
 		var createdAt time.Time
-		if err := rows.Scan(&d.ID, &d.Domain, &d.TLSStatus, &createdAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.Domain, &d.Port, &d.TLSStatus, &createdAt); err != nil {
 			http.Error(w, "failed to read domains", http.StatusInternalServerError)
 			return
 		}
@@ -95,8 +96,9 @@ func (h *ServerDomainHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 type createServerDomainRequest struct {
-	Domain string `json:"domain"`
-	Email  string `json:"email"`
+	Domain       string `json:"domain"`
+	Email        string `json:"email"`
+	AllocationID *int64 `json:"allocation_id"`
 }
 
 func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +119,18 @@ func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var port int
-	if err := h.DB.QueryRow(r.Context(),
+	if req.AllocationID != nil {
+		// Bind this (sub)domain to a specific one of the server's ports,
+		// rather than always the server's primary address — lets
+		// sub1.example.com and sub2.example.com point at different ports
+		// on the same server.
+		if err := h.DB.QueryRow(r.Context(),
+			`SELECT port FROM allocations WHERE id = $1 AND server_id = $2`, *req.AllocationID, serverID,
+		).Scan(&port); err != nil {
+			http.Error(w, "that port does not belong to this server", http.StatusBadRequest)
+			return
+		}
+	} else if err := h.DB.QueryRow(r.Context(),
 		`SELECT port FROM allocations WHERE server_id = $1 ORDER BY id LIMIT 1`, serverID,
 	).Scan(&port); err != nil {
 		http.Error(w, "this server has no allocation to attach a domain to", http.StatusConflict)
@@ -133,10 +146,10 @@ func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var createdAt time.Time
 	if err := h.DB.QueryRow(r.Context(), `
-		INSERT INTO server_domains (server_id, domain, tls_status, admin_email)
-		VALUES ($1, $2, 'pending', $3)
+		INSERT INTO server_domains (server_id, domain, port, tls_status, admin_email)
+		VALUES ($1, $2, $3, 'pending', $4)
 		RETURNING id, created_at`,
-		serverID, domain, req.Email,
+		serverID, domain, port, req.Email,
 	).Scan(&id, &createdAt); err != nil {
 		http.Error(w, "domain already in use", http.StatusConflict)
 		return
@@ -159,7 +172,7 @@ func (h *ServerDomainHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, serverDomainSummary{
-		ID: id, Domain: domain, TLSStatus: resp.TLSStatus, CreatedAt: createdAt.Format(time.RFC3339),
+		ID: id, Domain: domain, Port: port, TLSStatus: resp.TLSStatus, CreatedAt: createdAt.Format(time.RFC3339),
 	})
 }
 
