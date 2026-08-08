@@ -49,6 +49,7 @@ export function ServerView({ uuid, onBack }: Props) {
   const [command, setCommand] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [suspending, setSuspending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PowerAction | null>(null);
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -84,10 +85,15 @@ export function ServerView({ uuid, onBack }: Props) {
   }, [consoleLines]);
 
   async function handlePower(action: PowerAction) {
+    if (pendingAction) return;
+    setPendingAction(action);
+    setError(null);
     try {
       await api.power(uuid, action);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -157,24 +163,32 @@ export function ServerView({ uuid, onBack }: Props) {
             <button
               className="power-btn start"
               onClick={() => handlePower('start')}
-              disabled={server.is_suspended}
+              disabled={server.is_suspended || !!pendingAction}
               title={server.is_suspended ? 'This server is suspended' : undefined}
             >
-              Start
+              {pendingAction === 'start' ? 'Starting…' : 'Start'}
             </button>
-            <button className="power-btn stop" onClick={() => handlePower('stop')}>
-              Stop
+            <button
+              className="power-btn stop"
+              onClick={() => handlePower('stop')}
+              disabled={!!pendingAction}
+            >
+              {pendingAction === 'stop' ? 'Stopping…' : 'Stop'}
             </button>
             <button
               className="power-btn"
               onClick={() => handlePower('restart')}
-              disabled={server.is_suspended}
+              disabled={server.is_suspended || !!pendingAction}
               title={server.is_suspended ? 'This server is suspended' : undefined}
             >
-              Restart
+              {pendingAction === 'restart' ? 'Restarting…' : 'Restart'}
             </button>
-            <button className="power-btn kill" onClick={() => handlePower('kill')}>
-              Kill
+            <button
+              className="power-btn kill"
+              onClick={() => handlePower('kill')}
+              disabled={!!pendingAction}
+            >
+              {pendingAction === 'kill' ? 'Killing…' : 'Kill'}
             </button>
           </div>
           {server.is_suspended && (

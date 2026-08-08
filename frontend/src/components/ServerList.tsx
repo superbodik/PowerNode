@@ -17,6 +17,7 @@ export function ServerList({ onManage }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [pendingActions, setPendingActions] = useState<Record<string, PowerAction>>({});
 
   useEffect(() => {
     api.me().then((me) => setIsAdmin(me.is_admin)).catch(() => {});
@@ -68,6 +69,8 @@ export function ServerList({ onManage }: Props) {
   );
 
   async function handlePower(uuid: string, action: PowerAction) {
+    if (pendingActions[uuid]) return;
+    setPendingActions((prev) => ({ ...prev, [uuid]: action }));
     setServers((prev) =>
       prev.map((s) => (s.uuid === uuid ? { ...s, status: action === 'stop' ? 'stopping' : 'starting' } : s)),
     );
@@ -75,6 +78,12 @@ export function ServerList({ onManage }: Props) {
       await api.power(uuid, action);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPendingActions((prev) => {
+        const next = { ...prev };
+        delete next[uuid];
+        return next;
+      });
     }
   }
 
@@ -199,6 +208,7 @@ export function ServerList({ onManage }: Props) {
             server={server}
             onManage={onManage}
             onPower={handlePower}
+            pendingAction={pendingActions[server.uuid] ?? null}
             selectable={selectMode}
             selected={selected.has(server.uuid)}
             onToggleSelect={toggleSelected}

@@ -316,6 +316,23 @@ func (c *Client) DownloadBackup(ctx context.Context, serverUUID uuid.UUID, backu
 	return resp.Body, nil
 }
 
+// daemonErrorMessage pulls the human-readable reason out of a failed daemon
+// response, whether it came back as {"message": "..."} (most endpoints) or
+// plain text (http.Error responses like "invalid request body").
+func daemonErrorMessage(resp *http.Response) string {
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil || len(raw) == 0 {
+		return "no further detail"
+	}
+	var parsed struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(raw, &parsed) == nil && parsed.Message != "" {
+		return parsed.Message
+	}
+	return strings.TrimSpace(string(raw))
+}
+
 func (c *Client) doJSON(ctx context.Context, method, path string, body, out interface{}) error {
 	return c.doJSONWith(c.http, ctx, method, path, body, out)
 }
@@ -346,7 +363,7 @@ func (c *Client) doJSONWith(client *http.Client, ctx context.Context, method, pa
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("node daemon returned %d", resp.StatusCode)
+		return fmt.Errorf("node daemon returned %d: %s", resp.StatusCode, daemonErrorMessage(resp))
 	}
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

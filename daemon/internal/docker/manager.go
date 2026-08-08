@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/errdefs"
 	"github.com/docker/go-connections/nat"
 	"github.com/google/uuid"
 )
@@ -198,17 +199,44 @@ func (m *Manager) ensureImage(ctx context.Context, image string) error {
 	return err
 }
 
+// StartContainer, StopContainer and KillContainer are idempotent: reaching a
+// state the container is already in counts as success rather than an error.
+// A user mashing the power buttons in the panel fires several of these for
+// the same container in quick succession, and Docker itself rejects e.g. a
+// second kill on a container that's already dead — without this, that
+// rejection surfaced all the way up as a 502 in the panel.
 func (m *Manager) StartContainer(ctx context.Context, containerID string) error {
-	return m.cli.ContainerStart(ctx, containerID, container.StartOptions{})
+	if state, err := m.InspectState(ctx, containerID); err == nil && state == "running" {
+		return nil
+	}
+	err := m.cli.ContainerStart(ctx, containerID, container.StartOptions{})
+	if err != nil && errdefs.IsNotModified(err) {
+		return nil
+	}
+	return err
 }
 
 func (m *Manager) StopContainer(ctx context.Context, containerID string, timeoutSeconds int) error {
+	if state, err := m.InspectState(ctx, containerID); err == nil && state == "offline" {
+		return nil
+	}
 	timeout := timeoutSeconds
-	return m.cli.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout})
+	err := m.cli.ContainerStop(ctx, containerID, container.StopOptions{Timeout: &timeout})
+	if err != nil && errdefs.IsNotModified(err) {
+		return nil
+	}
+	return err
 }
 
 func (m *Manager) KillContainer(ctx context.Context, containerID string) error {
-	return m.cli.ContainerKill(ctx, containerID, "SIGKILL")
+	if state, err := m.InspectState(ctx, containerID); err == nil && state == "offline" {
+		return nil
+	}
+	err := m.cli.ContainerKill(ctx, containerID, "SIGKILL")
+	if err != nil && (errdefs.IsConflict(err) || errdefs.IsNotModified(err)) {
+		return nil
+	}
+	return err
 }
 
 func (m *Manager) RemoveContainer(ctx context.Context, containerID string) error {
