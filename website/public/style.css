@@ -371,6 +371,28 @@ tbody tr td:nth-child(2) {
 .callout.danger { border-left-color: var(--red); }
 .callout.danger .callout-label { color: var(--red); }
 
+/* ── API reference ─────────────────────────────────────── */
+.endpoint {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 22px 0 8px; padding-top: 18px; border-top: 1px solid var(--border);
+}
+.docs-section .endpoint:first-of-type { border-top: none; padding-top: 0; }
+.method {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: .03em; padding: 3px 8px; border-radius: 5px; flex-shrink: 0;
+}
+.method-get { color: var(--green); background: rgba(35,165,89,.12); }
+.method-post { color: var(--pink-b); background: rgba(232,168,184,.12); }
+.method-patch { color: var(--yellow); background: rgba(240,178,50,.12); }
+.method-delete { color: var(--red); background: rgba(242,63,67,.12); }
+.endpoint code { font-size: 13px; }
+.perm {
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px;
+  margin-left: auto;
+}
+.docs-section table code { font-size: 11.5px; padding: 1px 5px; }
+
 /* ── Footer ────────────────────────────────────────────── */
 footer { border-top: 1px solid var(--border); padding: 32px 24px; position: relative; z-index: 1; }
 .footer-inner {

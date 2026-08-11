@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>API Reference — PowerNode</title>
+<meta name="description" content="PowerNode REST API reference: authentication, scoped API keys, and how to automate game server provisioning end to end." />
+<link rel="canonical" href="https://powernode.pp.ua/api.html" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="bg-blobs" aria-hidden="true">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <span class="brand-mark">⚡</span>
+      <span class="brand-text">PowerNode</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html#features">Features</a>
+      <a href="index.html#compare">Compare</a>
+      <a href="index.html#deploy">Install</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+    </div>
+    <a class="btn-ghost" href="https://github.com/superbodik/PowerNode" target="_blank" rel="noopener">
+      <span>GitHub</span>
+      <span class="star">★</span>
+    </a>
+  </div>
+</nav>
+
+<main>
+
+  <div class="docs-hero">
+    <h1>API Reference</h1>
+    <p>Everything the panel's own UI calls, callable from a script. Scoped API keys, every
+    endpoint, and a full walkthrough for automating server provisioning.</p>
+  </div>
+
+  <div class="docs-layout">
+    <aside class="docs-toc">
+      <div class="docs-toc-label">On this page</div>
+      <a href="#auth">Authentication</a>
+      <a href="#automate">Automate provisioning</a>
+      <a href="#servers">Servers</a>
+      <a href="#power">Power actions</a>
+      <a href="#network">Network (ports)</a>
+      <a href="#domains">Domains</a>
+      <a href="#files">Files</a>
+      <a href="#databases">Databases</a>
+      <a href="#backups">Backups</a>
+      <a href="#schedules">Schedules</a>
+      <a href="#sharing">Sharing</a>
+      <a href="#eggs-nodes">Eggs &amp; nodes</a>
+      <a href="#account">Account &amp; admin</a>
+      <a href="#errors">Errors</a>
+    </aside>
+
+    <div class="docs-content">
+
+      <section class="docs-section" id="auth">
+        <h2>Authentication</h2>
+        <p class="docs-lede">Every request under <code>/api/v1</code> needs an
+        <code>Authorization: Bearer &lt;token&gt;</code> header. There are two kinds of token.</p>
+
+        <h3>API keys — what you want for automation</h3>
+        <p>Create one from <strong>Account → API Keys</strong> in the panel (this first step needs a
+        browser — there's no way to mint a key without already being logged in). Pick exactly the
+        permissions the key needs; leave all boxes unchecked for a key with the same access as your
+        account, or check specific ones to scope it down. The raw token is shown <strong>once</strong>,
+        at creation — the panel only ever stores its hash, so copy it immediately.</p>
+        <pre><code>curl -H "Authorization: Bearer pk_live_xxxxxxxxxxxx" \
+  https://your-panel.example.com/api/v1/servers</code></pre>
+        <p>API keys never expire on their own and aren't tied to a browser session — delete them
+        from the same page when a key is no longer needed.</p>
+
+        <h3>Permission codes</h3>
+        <p>These are the exact strings a key (or a subuser, on the sharing side) can be granted.
+        Anything not granted gets <code>403 Forbidden</code>, not a partial response.</p>
+        <table>
+          <thead><tr><th>Code</th><th>Grants</th></tr></thead>
+          <tbody>
+            <tr><td><code>servers.read</code></td><td>List and view servers</td></tr>
+            <tr><td><code>servers.write</code></td><td>Create and delete servers</td></tr>
+            <tr><td><code>control.start</code></td><td>Power on</td></tr>
+            <tr><td><code>control.stop</code></td><td>Power off</td></tr>
+            <tr><td><code>control.restart</code></td><td>Restart</td></tr>
+            <tr><td><code>control.kill</code></td><td>Force-kill</td></tr>
+            <tr><td><code>console</code></td><td>Console WebSocket (read + send commands)</td></tr>
+            <tr><td><code>files.read</code> / <code>files.write</code></td><td>Browse/download vs. edit/upload/delete files</td></tr>
+            <tr><td><code>databases.read</code> / <code>databases.write</code></td><td>View vs. create/delete per-server databases</td></tr>
+            <tr><td><code>domains.read</code> / <code>domains.write</code></td><td>View vs. attach/remove custom domains</td></tr>
+            <tr><td><code>backups.read</code> / <code>backups.write</code></td><td>View/download vs. create/restore/delete backups</td></tr>
+            <tr><td><code>schedules.read</code> / <code>schedules.write</code></td><td>View vs. create/toggle/delete cron schedules</td></tr>
+            <tr><td><code>allocations.read</code> / <code>allocations.write</code></td><td>View vs. add/remove a server's own ports</td></tr>
+          </tbody>
+        </table>
+        <p>The server owner and admins always have full access regardless of key scope — these codes
+        only ever <em>restrict</em> a key or a subuser, never grant more than the account already has.</p>
+
+        <h3>JWT (what the browser uses)</h3>
+        <p>The panel's own frontend logs in via <code>POST /auth/login</code> (email + password,
+        + TOTP code if 2FA is on) and refreshes via <code>POST /auth/refresh</code>. You can use this
+        flow too, but for scripts and CI a long-lived API key is almost always simpler — no refresh
+        logic to write, and you can scope it down instead of holding a full-account session.</p>
+
+        <div class="callout">
+          <div class="callout-label">Base URL</div>
+          Every path on this page is relative to <code>https://&lt;your-panel&gt;/api/v1</code>.
+          Only <code>/auth/login</code>, <code>/auth/refresh</code> and the two-factor endpoints on
+          login are rate-limited; the rest of the API has no built-in throttling — be a reasonable
+          neighbor to your own panel.
+        </div>
+      </section>
+
+      <section class="docs-section" id="automate">
+        <h2>Automating server provisioning</h2>
+        <p class="docs-lede">Everything the "Create Server" form does is five plain requests. This
+        is the whole thing, start to finish.</p>
+
+        <p>Server creation is <strong>synchronous</strong> — the panel calls the node's daemon
+        inline and only returns <code>201</code> once the container actually exists. There's no job
+        queue to poll: a successful response means the server is real and ready for a
+        <code>power</code> call.</p>
+
+        <pre><code>export PANEL="https://your-panel.example.com"
+export TOKEN="pk_live_xxxxxxxxxxxx"   # from Account → API Keys</code></pre>
+
+        <div class="endpoint">
+          <span class="method method-get">GET</span>
+          <code>/nodes</code>
+          <span class="perm">any authenticated user</span>
+        </div>
+        <p>Pick a node to deploy on. Non-admins only see nodes marked public.</p>
+        <pre><code>curl -s -H "Authorization: Bearer $TOKEN" \
+  "$PANEL/api/v1/nodes" | jq '.[] | {id, name, is_public}'</code></pre>
+
+        <div class="endpoint">
+          <span class="method method-get">GET</span>
+          <code>/allocations?node_id={id}&amp;free=true</code>
+          <span class="perm">any authenticated user</span>
+        </div>
+        <p>Find a free port on that node to bind the new server to. Non-admins can only query
+        allocations on nodes marked public — same visibility rule as picking a node above.</p>
+        <pre><code>curl -s -H "Authorization: Bearer $TOKEN" \
+  "$PANEL/api/v1/allocations?node_id=1&free=true" | jq '.[0]'</code></pre>
+
+        <div class="endpoint">
+          <span class="method method-get">GET</span>
+          <code>/eggs</code>
+          <span class="perm">any authenticated user</span>
+        </div>
+        <p>List available deploy templates — Minecraft, a generic Python app, the static-HTML egg,
+        your own Docker image, and so on — including each egg's editable environment variables.</p>
+        <pre><code>curl -s -H "Authorization: Bearer $TOKEN" \
+  "$PANEL/api/v1/eggs" | jq '.[] | {id, name, docker_image}'</code></pre>
+
+        <div class="endpoint">
+          <span class="method method-post">POST</span>
+          <code>/servers</code>
+          <span class="perm">servers.write</span>
+        </div>
+        <p>Create it. <code>allocation_id</code> is optional — a server can also be created with no
+        port and have one added afterward via the network endpoints below.</p>
+        <pre><code>curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "name": "mc-survival-01",
+    "node_id": 1,
+    "egg_id": 2,
+    "docker_image": "itzg/minecraft-server",
+    "startup_command": "",
+    "environment": { "EULA": "TRUE" },
+    "memory_mb": 2048,
+    "swap_mb": 0,
+    "disk_mb": 10240,
+    "allocation_id": 42
+  }' \
+  "$PANEL/api/v1/servers"
+# -> 201 {"id": 17, "uuid": "6f1c...-...-..."}</code></pre>
+
+        <div class="endpoint">
+          <span class="method method-post">POST</span>
+          <code>/servers/{uuid}/power</code>
+          <span class="perm">control.start</span>
+        </div>
+        <p>Turn it on.</p>
+        <pre><code>curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"action": "start"}' \
+  "$PANEL/api/v1/servers/6f1c.../power"</code></pre>
+
+        <div class="callout">
+          <div class="callout-label">One key, every step</div>
+          A single API key with <code>servers.read</code>, <code>servers.write</code> and
+          <code>control.start</code> covers this whole flow — mint it once from
+          <strong>Account → API Keys</strong> and the rest is headless from there. Wrap the five
+          calls above in whatever provisions your fleet: a CI job, a Discord bot's <code>/deploy</code>
+          command, a signup webhook — the panel doesn't care who's calling.
+        </div>
+      </section>
+
+      <section class="docs-section" id="servers">
+        <h2>Servers</h2>
+
+        <div class="endpoint"><span class="method method-get">GET</span><code>/servers</code><span class="perm">servers.read</span></div>
+        <p>List every server you own, share access to, or (as admin) every server on the panel.</p>
+
+        <div class="endpoint"><span class="method method-get">GET</span><code>/servers/{uuid}</code><span class="perm">servers.read</span></div>
+        <p>Full detail for one server — status, resource limits, primary address, node, egg.</p>
+
+        <div class="endpoint"><span class="method method-post">POST</span><code>/servers</code><span class="perm">servers.write</span></div>
+        <p>See <a href="#automate">Automating server provisioning</a> above for the full request body.</p>
+
+        <div class="endpoint"><span class="method method-delete">DELETE</span><code>/servers/{uuid}</code><span class="perm">servers.write</span></div>
+        <p>Stops and removes the container plus all its data. Admins can add
+        <code>?force=true</code> to delete the panel record even if the node is unreachable.</p>
+
+        <div class="endpoint"><span class="method method-post">POST</span><code>/servers/{uuid}/suspend</code> / <code>/unsuspend</code><span class="perm">admin</span></div>
+        <p>Suspend stops the server and blocks starting it again until unsuspended — for billing
+        holds or abuse response, not a regular power action.</p>
+      </section>
+
+      <section class="docs-section" id="power">
+        <h2>Power actions</h2>
+        <div class="endpoint">
+          <span class="method method-post">POST</span>
+          <code>/servers/{uuid}/power</code>
+          <span class="perm">control.*</span>
+        </div>
+        <p>Body: <code>{"action": "start" | "stop" | "restart" | "kill"}</code>. Each action needs
+        its own matching permission (<code>control.start</code> for <code>start</code>, etc.) — a key
+        scoped to only <code>control.stop</code> can't also kill. Actions are idempotent: calling
+        <code>start</code> on an already-running server, or <code>kill</code> on an already-dead one,
+        succeeds rather than erroring.</p>
+        <pre><code>curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"action": "restart"}' \
+  "$PANEL/api/v1/servers/{uuid}/power"
+# -> 200 {"server_uuid": "...", "success": true, "state": "starting"}</code></pre>
+        <p>Live state and resource usage (CPU/RAM/disk, updated every couple of seconds) are only
+        available over the <code>/ws/servers/{uuid}</code> WebSocket, which the panel's own dashboard
+        uses — there's no polling REST endpoint for it. Send the access token as the
+        <code>Sec-WebSocket-Protocol</code> value to authenticate.</p>
+        <div class="callout">
+          <div class="callout-label">API keys don't work here</div>
+          The WebSocket endpoints only accept a JWT access token from <code>/auth/login</code> —
+          not an API key. A script that only needs REST (provisioning, power, files, …) never needs
+          this; one that wants live stats or the console feed has to log in like the browser does.
+        </div>
+      </section>
+
+      <section class="docs-section" id="network">
+        <h2>Network (a server's own ports)</h2>
+        <div class="endpoint"><span class="method method-get">GET</span><code>/servers/{uuid}/allocations</code><span class="perm">allocations.read</span></div>
+        <p>Every port published for this server. The oldest one is flagged <code>is_primary</code> —
+        that's the address shown on the server card and what domains proxy to by default.</p>
+
+        <div class="endpoint"><span class="method method-post">POST</span><code>/servers/{uuid}/allocations</code><span class="perm">allocations.write</span></div>
+        <p>Body: <code>{"port": 25566, "alias": "query port"}</code> (alias optional). Port must be
+        1024–65535 and not one the node itself needs (22, 80, 443, 2022, or the node's own daemon
+        port). Applying this recreates the server's container — files are kept, but it briefly
+        restarts.</p>
+
+        <div class="endpoint"><span class="method method-delete">DELETE</span><code>/servers/{uuid}/allocations/{id}</code><span class="perm">allocations.write</span></div>
+        <p>Also recreates the container. Refused if it's the primary port and the server still has
+        domains pointed at it — remove those first.</p>
+      </section>
+
+      <section class="docs-section" id="domains">
+        <h2>Domains</h2>
+        <div class="endpoint"><span class="method method-get">GET</span><code>/servers/{uuid}/domains</code><span class="perm">domains.read</span></div>
+
+        <div class="endpoint"><span class="method method-post">POST</span><code>/servers/{uuid}/domains</code><span class="perm">domains.write</span></div>
+        <p>Body: <code>{"domain": "sub.example.com", "email": "you@example.com", "allocation_id": 42}</code>
+        — <code>email</code> and <code>allocation_id</code> are both optional (email is used for
+        Let's Encrypt renewal notices; omitting <code>allocation_id</code> uses the server's primary
+        port). Point the domain's DNS <code>A</code> record at the node <em>before</em> calling this —
+        certificate issuance needs it to already resolve. Subdomains work the same as root domains;
+        each one can point at a different port to run several services off one server.</p>
+
+        <div class="endpoint"><span class="method method-delete">DELETE</span><code>/servers/{uuid}/domains/{id}</code><span class="perm">domains.write</span></div>
+      </section>
+
+      <section class="docs-section" id="files">
+        <h2>Files</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Permission</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /servers/{uuid}/files?path=</code></td><td>files.read</td><td>List a directory</td></tr>
+            <tr><td><code>GET /servers/{uuid}/files/contents?path=</code></td><td>files.read</td><td>Read a file; response carries an <code>X-File-Mtime</code> header</td></tr>
+            <tr><td><code>PUT /servers/{uuid}/files/contents?path=</code></td><td>files.write</td><td>Write a file. Send <code>X-Expected-Mtime</code> (from the header above) to get a <code>409</code> instead of clobbering a concurrent edit</td></tr>
+            <tr><td><code>DELETE /servers/{uuid}/files?path=</code></td><td>files.write</td><td>Delete a file or directory</td></tr>
+            <tr><td><code>POST /servers/{uuid}/files/directory?path=</code></td><td>files.write</td><td>Create a directory</td></tr>
+            <tr><td><code>POST /servers/{uuid}/files/rename</code></td><td>files.write</td><td>Body: <code>{"from": "...", "to": "..."}</code></td></tr>
+          </tbody>
+        </table>
+        <p>All paths are jailed to the server's own <code>/home/container</code> — there's no way to
+        escape it with <code>..</code> segments.</p>
+      </section>
+
+      <section class="docs-section" id="databases">
+        <h2>Databases</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Permission</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /servers/{uuid}/databases</code></td><td>databases.read</td><td>Includes the plaintext password — it's a credential for your app, not a bearer token, so it isn't hidden like an API key</td></tr>
+            <tr><td><code>POST /servers/{uuid}/databases</code></td><td>databases.write</td><td>Body: <code>{"database_host_id": 1, "name": "myapp"}</code></td></tr>
+            <tr><td><code>DELETE /servers/{uuid}/databases/{id}</code></td><td>databases.write</td><td>Drops the database and its user</td></tr>
+          </tbody>
+        </table>
+        <p>Requires an admin to have registered at least one database host first
+        (<strong>Nodes → Database hosts</strong> in the panel) — there's no endpoint to provision a
+        MySQL/MariaDB server itself, only databases on one that already exists.</p>
+      </section>
+
+      <section class="docs-section" id="backups">
+        <h2>Backups</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Permission</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /servers/{uuid}/backups</code></td><td>backups.read</td><td></td></tr>
+            <tr><td><code>POST /servers/{uuid}/backups</code></td><td>backups.write</td><td>Body: <code>{"name": "before-update", "ignored_files": ["*.log"]}</code>. Synchronous — can take a while for a large server</td></tr>
+            <tr><td><code>POST /servers/{uuid}/backups/{id}/restore</code></td><td>backups.write</td><td>Overwrites current files</td></tr>
+            <tr><td><code>GET /servers/{uuid}/backups/{id}/download</code></td><td>backups.read</td><td>Streams the archive</td></tr>
+            <tr><td><code>DELETE /servers/{uuid}/backups/{id}</code></td><td>backups.write</td><td></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="docs-section" id="schedules">
+        <h2>Schedules</h2>
+        <div class="endpoint"><span class="method method-post">POST</span><code>/servers/{uuid}/schedules</code><span class="perm">schedules.write</span></div>
+        <p>A schedule is a cron trigger plus an ordered list of steps, each with its own delay
+        before it runs:</p>
+        <pre><code>curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{
+    "name": "Nightly restart",
+    "cron_minute": "0", "cron_hour": "4",
+    "cron_day_of_week": "*", "cron_day_of_month": "*",
+    "only_when_online": true,
+    "tasks": [
+      { "action": "power", "payload": "stop", "time_offset_seconds": 0 },
+      { "action": "backup", "payload": "nightly", "time_offset_seconds": 5 },
+      { "action": "power", "payload": "start", "time_offset_seconds": 30 }
+    ]
+  }' \
+  "$PANEL/api/v1/servers/{uuid}/schedules"</code></pre>
+        <p><code>action</code> is one of <code>power</code> (payload: start/stop/restart/kill),
+        <code>command</code> (payload: a console command string), or <code>backup</code> (payload: a
+        name, or blank to auto-name it). Cron fields use <code>*</code> or a literal number, no
+        ranges or steps.</p>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Permission</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /servers/{uuid}/schedules</code></td><td>schedules.read</td></tr>
+            <tr><td><code>POST /servers/{uuid}/schedules/{id}/toggle</code></td><td>schedules.write</td></tr>
+            <tr><td><code>DELETE /servers/{uuid}/schedules/{id}</code></td><td>schedules.write</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="docs-section" id="sharing">
+        <h2>Sharing (subusers)</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /servers/{uuid}/subusers</code></td><td>Owner or admin only</td></tr>
+            <tr><td><code>POST /servers/{uuid}/subusers</code></td><td>Body: <code>{"email": "...", "permissions": [...]}</code> — grants an existing panel user scoped access to this one server, using the same permission codes as API keys</td></tr>
+            <tr><td><code>PATCH /servers/{uuid}/subusers/{id}</code></td><td>Body: <code>{"permissions": [...]}</code> — replaces the set</td></tr>
+            <tr><td><code>DELETE /servers/{uuid}/subusers/{id}</code></td><td></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="docs-section" id="eggs-nodes">
+        <h2>Eggs &amp; nodes (read)</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /eggs</code></td><td>Every deploy template, with its editable environment variables and their validation rules</td></tr>
+            <tr><td><code>GET /nodes</code></td><td>Non-admins only see nodes marked public</td></tr>
+            <tr><td><code>GET /allocations?node_id={id}&amp;free=true</code></td><td>Free ports on a node — what <a href="#automate">provisioning</a> uses to pick one</td></tr>
+          </tbody>
+        </table>
+        <p>Node/egg management (creating nodes, adding allocations to the pool, editing eggs) is
+        admin-only and mirrors the Nodes page in the panel — not covered here since it's a one-time
+        setup step, not something you'd automate per-server.</p>
+      </section>
+
+      <section class="docs-section" id="account">
+        <h2>Account &amp; admin</h2>
+        <table>
+          <thead><tr><th>Endpoint</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>GET /auth/me</code></td><td>Who this token is, and whether 2FA setup is still pending</td></tr>
+            <tr><td><code>GET/POST/DELETE /account/api-keys</code></td><td>Manage keys — an API key can manage other API keys on the same account</td></tr>
+            <tr><td><code>GET/POST/DELETE /account/ssh-keys</code></td><td>SFTP public keys</td></tr>
+            <tr><td><code>GET /version</code> / <code>/version/check</code></td><td>No auth beyond a valid token; useful for a monitoring check</td></tr>
+            <tr><td><code>GET /activity</code></td><td>Admin only — the same audit log shown on the Activity page</td></tr>
+            <tr><td><code>GET/POST /users</code>, <code>PATCH /users/{id}</code></td><td>Admin only — panel account management</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="docs-section" id="errors">
+        <h2>Errors</h2>
+        <p>Plain HTTP status codes, plain-text body — no envelope, no error-code taxonomy to
+        parse:</p>
+        <pre><code>HTTP/1.1 403 Forbidden
+Content-Type: text/plain; charset=utf-8
+
+forbidden</code></pre>
+        <table>
+          <thead><tr><th>Status</th><th>Means</th></tr></thead>
+          <tbody>
+            <tr><td><code>400</code></td><td>Bad request body or query param</td></tr>
+            <tr><td><code>401</code></td><td>Missing or invalid token</td></tr>
+            <tr><td><code>403</code></td><td>Valid token, missing permission</td></tr>
+            <tr><td><code>404</code></td><td>No such server/resource, or you can't see it</td></tr>
+            <tr><td><code>409</code></td><td>Conflict — a port already in use, a file changed since you read it, a name collision</td></tr>
+            <tr><td><code>502</code></td><td>The panel reached the node, but the node (or its daemon) rejected or failed the call</td></tr>
+          </tbody>
+        </table>
+        <p>Not sure what a specific response means beyond this table? Check
+        <code>journalctl -u panel -f</code> on the panel's server while you retry the call — see the
+        <a href="docs.html">Docs &amp; Guides</a> page for the full command reference.</p>
+      </section>
+
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="brand footer-brand">
+      <span class="brand-mark">⚡</span><span class="brand-text">PowerNode</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://powernode.pp.ua" target="_blank" rel="noopener">powernode.pp.ua</a>
+      <a href="https://github.com/superbodik/PowerNode" target="_blank" rel="noopener">GitHub</a>
+      <a href="docs.html">Docs</a>
+      <a href="index.html">Home</a>
+    </div>
+    <div class="footer-note">Self-hosted. Open source. Built different.</div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
