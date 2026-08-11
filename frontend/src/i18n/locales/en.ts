@@ -23,6 +23,8 @@ export const en = {
   'nav.account': 'Account',
   'nav.settings': 'Settings',
   'nav.logout': 'Log out',
+  'app.switchToRussian': 'Switch to Russian',
+  'app.switchToEnglish': 'Switch to English',
 
   // pages/Login.tsx
   'login.invalidWithCode': 'Invalid email, password, or code',

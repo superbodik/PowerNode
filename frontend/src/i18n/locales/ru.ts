@@ -25,6 +25,8 @@ export const ru: Dict = {
   'nav.account': 'Аккаунт',
   'nav.settings': 'Настройки',
   'nav.logout': 'Выйти',
+  'app.switchToRussian': 'Переключить на русский',
+  'app.switchToEnglish': 'Переключить на английский',
 
   // pages/Login.tsx
   'login.invalidWithCode': 'Неверный email, пароль или код',

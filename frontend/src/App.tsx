@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, clearTokens } from './api/client';
-import { t } from './i18n';
+import { locale, setLocale, t } from './i18n';
 import { Account } from './pages/Account';
 import { Activity } from './pages/Activity';
 import { Dashboard } from './pages/Dashboard';
@@ -150,6 +150,13 @@ export function App() {
           )}
         </nav>
         <div className="topbar-right">
+          <button
+            className="topbar-btn lang-switch"
+            onClick={() => setLocale(locale === 'ru' ? 'en' : 'ru')}
+            title={locale === 'ru' ? t('app.switchToEnglish') : t('app.switchToRussian')}
+          >
+            {locale === 'ru' ? 'EN' : 'RU'}
+          </button>
           <div className="user-chip" onClick={() => goTo('account')} style={{ cursor: 'pointer' }}>
             <div className="user-ava">{user.username.slice(0, 1).toUpperCase()}</div>
             <span className="user-name">{user.username}</span>
