@@ -77,16 +77,39 @@ func Write(baseDir, requestedPath string, r io.Reader, expectedMtime int64) erro
 			return ErrConflict
 		}
 	}
-	if err := os.MkdirAll(filepath.Dir(full), 0755); err != nil {
+	dir := filepath.Dir(full)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	f, err := os.Create(full)
+
+	// Write to a temp file in the same directory and rename into place on
+	// success, so a transfer that's interrupted partway (network drop,
+	// upload too large, browser tab closed) never leaves a truncated file
+	// at the real path — the original stays exactly as it was.
+	tmp, err := os.CreateTemp(dir, ".upload-*")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(f, r)
-	return err
+	tmpPath := tmp.Name()
+	if _, err := io.Copy(tmp, r); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Chmod(0644); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, full); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func Delete(baseDir, requestedPath string) error {

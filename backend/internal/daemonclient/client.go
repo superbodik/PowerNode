@@ -164,7 +164,11 @@ func (c *Client) ListFiles(ctx context.Context, serverUUID uuid.UUID, path strin
 
 var ErrFileConflict = errors.New("file changed on disk since it was last read")
 
-func (c *Client) ReadFile(ctx context.Context, serverUUID uuid.UUID, path string) ([]byte, int64, error) {
+// ReadFile streams the file straight from the daemon's response instead of
+// buffering it in the panel process first — the caller must Close the
+// returned body. Uses longHTTP since transfer time scales with file size,
+// same reasoning as backups.
+func (c *Client) ReadFile(ctx context.Context, serverUUID uuid.UUID, path string) (io.ReadCloser, int64, error) {
 	p := fmt.Sprintf("/api/v1/servers/%s/files/contents?path=%s", serverUUID, url.QueryEscape(path))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+p, nil)
 	if err != nil {
@@ -172,25 +176,31 @@ func (c *Client) ReadFile(ctx context.Context, serverUUID uuid.UUID, path string
 	}
 	req.Header.Set("Authorization", "Bearer "+c.daemonToken)
 
-	resp, err := c.http.Do(req)
+	resp, err := c.longHTTP.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("call node daemon: %w", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		return nil, 0, fmt.Errorf("node daemon returned %d", resp.StatusCode)
+		defer resp.Body.Close()
+		return nil, 0, fmt.Errorf("node daemon returned %d: %s", resp.StatusCode, daemonErrorMessage(resp))
 	}
 	mtime, _ := strconv.ParseInt(resp.Header.Get("X-File-Mtime"), 10, 64)
-	content, err := io.ReadAll(resp.Body)
-	return content, mtime, err
+	return resp.Body, mtime, nil
 }
 
-func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path string, content []byte, expectedMtime int64) error {
+// WriteFile streams body straight through to the daemon instead of buffering
+// it in the panel process first. size should be the known content length
+// (e.g. the incoming request's Content-Length) or <= 0 if unknown, in which
+// case the request is sent chunked.
+func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path string, body io.Reader, size int64, expectedMtime int64) error {
 	p := fmt.Sprintf("/api/v1/servers/%s/files/contents?path=%s", serverUUID, url.QueryEscape(path))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+p, bytes.NewReader(content))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+p, body)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
+	}
+	if size > 0 {
+		req.ContentLength = size
 	}
 	req.Header.Set("Authorization", "Bearer "+c.daemonToken)
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -198,7 +208,7 @@ func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path strin
 		req.Header.Set("X-Expected-Mtime", strconv.FormatInt(expectedMtime, 10))
 	}
 
-	resp, err := c.http.Do(req)
+	resp, err := c.longHTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("call node daemon: %w", err)
 	}
@@ -208,7 +218,7 @@ func (c *Client) WriteFile(ctx context.Context, serverUUID uuid.UUID, path strin
 		return ErrFileConflict
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("node daemon returned %d", resp.StatusCode)
+		return fmt.Errorf("node daemon returned %d: %s", resp.StatusCode, daemonErrorMessage(resp))
 	}
 	return nil
 }

@@ -76,17 +76,18 @@ func (h *FileHandler) Read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, mtime, err := client.ReadFile(r.Context(), serverUUID, r.URL.Query().Get("path"))
+	body, mtime, err := client.ReadFile(r.Context(), serverUUID, r.URL.Query().Get("path"))
 	if err != nil {
 		http.Error(w, "failed to read file: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	defer body.Close()
 
 	if mtime > 0 {
 		w.Header().Set("X-File-Mtime", strconv.FormatInt(mtime, 10))
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write(content)
+	_, _ = io.Copy(w, body)
 }
 
 func (h *FileHandler) Write(w http.ResponseWriter, r *http.Request) {
@@ -95,18 +96,16 @@ func (h *FileHandler) Write(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "file too large or failed to read request body", http.StatusBadRequest)
-		return
-	}
-
 	var expectedMtime int64
 	if raw := r.Header.Get("X-Expected-Mtime"); raw != "" {
 		expectedMtime, _ = strconv.ParseInt(raw, 10, 64)
 	}
 
-	err = client.WriteFile(r.Context(), serverUUID, r.URL.Query().Get("path"), content, expectedMtime)
+	// Streamed straight through to the daemon rather than buffered here —
+	// r.Body is already wrapped by the router's MaxBytesReader, so an
+	// over-limit upload still fails, just as a transport error partway
+	// through instead of a clean 400 up front.
+	err := client.WriteFile(r.Context(), serverUUID, r.URL.Query().Get("path"), r.Body, r.ContentLength, expectedMtime)
 	if errors.Is(err, daemonclient.ErrFileConflict) {
 		http.Error(w, "this file was changed on disk since you opened it — reload it and re-apply your edits", http.StatusConflict)
 		return

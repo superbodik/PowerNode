@@ -135,8 +135,6 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Delete("/servers/{uuid}", serverHandler.Delete)
 
 			r.Get("/servers/{uuid}/files", fileHandler.List)
-			r.Get("/servers/{uuid}/files/contents", fileHandler.Read)
-			r.Put("/servers/{uuid}/files/contents", fileHandler.Write)
 			r.Delete("/servers/{uuid}/files", fileHandler.Delete)
 			r.Post("/servers/{uuid}/files/directory", fileHandler.CreateDirectory)
 			r.Post("/servers/{uuid}/files/rename", fileHandler.Rename)
@@ -195,6 +193,11 @@ func NewRouter(deps Dependencies) http.Handler {
 			// the long timeout rather than the default 30s.
 			r.Post("/servers/{uuid}/allocations", serverAllocationHandler.Create)
 			r.Delete("/servers/{uuid}/allocations/{id}", serverAllocationHandler.Delete)
+
+			// File content transfer time scales with file size, not a fixed
+			// operation cost — same reasoning as backups below.
+			r.Get("/servers/{uuid}/files/contents", fileHandler.Read)
+			r.Put("/servers/{uuid}/files/contents", fileHandler.Write)
 
 			r.Post("/servers/{uuid}/domains", serverDomainHandler.Create)
 			r.Delete("/servers/{uuid}/domains/{id}", serverDomainHandler.Delete)

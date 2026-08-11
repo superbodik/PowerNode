@@ -50,8 +50,6 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 				r.Get("/servers/{uuid}/stats", h.Stats)
 
 				r.Get("/servers/{uuid}/files", h.ListFiles)
-				r.Get("/servers/{uuid}/files/contents", h.ReadFile)
-				r.Put("/servers/{uuid}/files/contents", h.WriteFile)
 				r.Delete("/servers/{uuid}/files", h.DeleteFile)
 				r.Post("/servers/{uuid}/files/directory", h.CreateDirectory)
 				r.Post("/servers/{uuid}/files/rename", h.RenameFile)
@@ -61,6 +59,11 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(150 * time.Second))
 			r.Post("/api/v1/servers/{uuid}/rebuild", h.RebuildServer)
+
+			// File content transfers get the long timeout, not the 60s
+			// metadata-op default, since they're proportional to file size.
+			r.Get("/api/v1/servers/{uuid}/files/contents", h.ReadFile)
+			r.Put("/api/v1/servers/{uuid}/files/contents", h.WriteFile)
 
 			r.Post("/api/v1/servers/{uuid}/domains", h.AddDomain)
 			r.Delete("/api/v1/servers/{uuid}/domains/{domain}", h.RemoveDomain)
