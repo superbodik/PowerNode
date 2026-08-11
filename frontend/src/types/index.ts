@@ -190,6 +190,16 @@ export interface CreateServerRequest {
   allocation_id?: number;
 }
 
+export interface UpdateServerRequest {
+  name: string;
+  description?: string;
+  docker_image: string;
+  startup_command: string;
+  memory_mb: number;
+  swap_mb: number;
+  disk_mb: number;
+}
+
 export interface CreateAllocationRequest {
   node_id: number;
   ip: string;

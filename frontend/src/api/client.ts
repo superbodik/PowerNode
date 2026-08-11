@@ -30,6 +30,7 @@ import type {
   TwoFAStatus,
   UpdateCheck,
   UpdateNodeRequest,
+  UpdateServerRequest,
   UpdateUserRequest,
   VersionInfo,
 } from '../types';
@@ -239,6 +240,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  updateServer: (uuid: string, payload: UpdateServerRequest) =>
+    request<void>(`/servers/${uuid}`, { method: 'PATCH', body: JSON.stringify(payload) }),
 
   power: (uuid: string, action: PowerAction) =>
     request<{ success: boolean; state: string }>(`/servers/${uuid}/power`, {

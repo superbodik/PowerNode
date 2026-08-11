@@ -279,6 +279,12 @@ export const en = {
   'serverView.connectingToNode': 'Connecting to the node…',
   'serverView.typeCommand': 'Type a command…',
   'serverView.send': 'Send',
+  'serverView.edit': 'Edit',
+  'serverView.name': 'Name',
+  'serverView.description': 'Description (optional)',
+  'serverView.saveChanges': 'Save changes',
+  'serverView.editHint':
+    'Changing the image, startup command, or memory recreates the container — files and ports are kept, but it briefly restarts. Disk limit is a capacity number only, applied immediately with no restart.',
 
   // components/StatusBadge.tsx
   'status.running': 'Online',

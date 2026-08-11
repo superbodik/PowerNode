@@ -63,6 +63,17 @@ export function ServerView({ uuid, onBack }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [pendingAction, setPendingAction] = useState<PowerAction | null>(null);
+  const [editingInfo, setEditingInfo] = useState(false);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const [infoForm, setInfoForm] = useState({
+    name: '',
+    description: '',
+    docker_image: '',
+    startup_command: '',
+    memory_mb: 0,
+    disk_mb: 0,
+  });
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -148,6 +159,36 @@ export function ServerView({ uuid, onBack }: Props) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSuspending(false);
+    }
+  }
+
+  function startEditInfo() {
+    if (!server) return;
+    setInfoForm({
+      name: server.name,
+      description: server.description ?? '',
+      docker_image: server.docker_image,
+      startup_command: server.startup_command,
+      memory_mb: server.memory_mb,
+      disk_mb: server.disk_mb,
+    });
+    setInfoError(null);
+    setEditingInfo(true);
+  }
+
+  async function handleSaveInfo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!server) return;
+    setSavingInfo(true);
+    setInfoError(null);
+    try {
+      await api.updateServer(uuid, { ...infoForm, swap_mb: server.swap_mb });
+      setEditingInfo(false);
+      refreshServer();
+    } catch (err) {
+      setInfoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingInfo(false);
     }
   }
 
@@ -256,33 +297,123 @@ export function ServerView({ uuid, onBack }: Props) {
 
           <div className={`tab-panel ${tab === 'overview' ? 'active' : ''}`}>
             <div className="settings-card">
-              <div className="settings-card-title">{t('serverView.serverInfo')}</div>
-              <div className="settings-grid">
-                <div className="sfield">
-                  <label>{t('serverView.status')}</label>
-                  <input readOnly value={live?.state ?? server.status} />
-                </div>
-                <div className="sfield">
-                  <label>{t('serverView.node')}</label>
-                  <input readOnly value={server.node_name ?? '—'} />
-                </div>
-                <div className="sfield">
-                  <label>{t('serverView.address')}</label>
-                  <input readOnly value={server.primary_address ?? t('serverView.noAllocation')} />
-                </div>
-                <div className="sfield">
-                  <label>{t('serverView.startupCommand')}</label>
-                  <input readOnly value={server.startup_command} />
-                </div>
-                <div className="sfield">
-                  <label>{t('serverView.memoryLimit')}</label>
-                  <input readOnly value={`${server.memory_mb} MB`} />
-                </div>
-                <div className="sfield">
-                  <label>{t('serverView.diskLimit')}</label>
-                  <input readOnly value={`${server.disk_mb} MB`} />
-                </div>
+              <div className="settings-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {t('serverView.serverInfo')}
+                {!editingInfo && (
+                  <button className="btn-sm" onClick={startEditInfo}>
+                    {t('serverView.edit')}
+                  </button>
+                )}
               </div>
+
+              {editingInfo ? (
+                <form onSubmit={handleSaveInfo}>
+                  <div className="settings-grid">
+                    <div className="sfield">
+                      <label htmlFor="edit-srv-name">{t('serverView.name')}</label>
+                      <input
+                        id="edit-srv-name"
+                        value={infoForm.name}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="sfield span2">
+                      <label htmlFor="edit-srv-desc">{t('serverView.description')}</label>
+                      <input
+                        id="edit-srv-desc"
+                        value={infoForm.description}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, description: e.target.value }))}
+                      />
+                    </div>
+                    <div className="sfield span2">
+                      <label htmlFor="edit-srv-image">{t('createServer.dockerImage')}</label>
+                      <input
+                        id="edit-srv-image"
+                        value={infoForm.docker_image}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, docker_image: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="sfield span2">
+                      <label htmlFor="edit-srv-startup">{t('serverView.startupCommand')}</label>
+                      <input
+                        id="edit-srv-startup"
+                        value={infoForm.startup_command}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, startup_command: e.target.value }))}
+                      />
+                    </div>
+                    <div className="sfield">
+                      <label htmlFor="edit-srv-memory">{t('createServer.memoryMb')}</label>
+                      <input
+                        id="edit-srv-memory"
+                        type="number"
+                        value={infoForm.memory_mb}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, memory_mb: Number(e.target.value) }))}
+                        required
+                      />
+                    </div>
+                    <div className="sfield">
+                      <label htmlFor="edit-srv-disk">{t('createServer.diskMb')}</label>
+                      <input
+                        id="edit-srv-disk"
+                        type="number"
+                        value={infoForm.disk_mb}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, disk_mb: Number(e.target.value) }))}
+                        required
+                      />
+                    </div>
+                  </div>
+                  {infoError && <div className="login-error show" style={{ marginTop: 12 }}>{infoError}</div>}
+                  <p className="srv-desc" style={{ marginTop: 8 }}>
+                    {t('serverView.editHint')}
+                  </p>
+                  <div className="settings-foot" style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn-primary"
+                      type="submit"
+                      disabled={savingInfo}
+                      style={{ width: 'auto', padding: '10px 20px' }}
+                    >
+                      {savingInfo ? t('common.saving') : t('serverView.saveChanges')}
+                    </button>
+                    <button className="btn-sm" type="button" onClick={() => setEditingInfo(false)} disabled={savingInfo}>
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="settings-grid">
+                  <div className="sfield">
+                    <label>{t('serverView.status')}</label>
+                    <input readOnly value={live?.state ?? server.status} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.node')}</label>
+                    <input readOnly value={server.node_name ?? '—'} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.address')}</label>
+                    <input readOnly value={server.primary_address ?? t('serverView.noAllocation')} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('createServer.dockerImage')}</label>
+                    <input readOnly value={server.docker_image} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.startupCommand')}</label>
+                    <input readOnly value={server.startup_command} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.memoryLimit')}</label>
+                    <input readOnly value={`${server.memory_mb} MB`} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.diskLimit')}</label>
+                    <input readOnly value={`${server.disk_mb} MB`} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="settings-card" style={{ marginTop: 20 }}>

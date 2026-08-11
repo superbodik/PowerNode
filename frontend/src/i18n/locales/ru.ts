@@ -281,6 +281,12 @@ export const ru: Dict = {
   'serverView.connectingToNode': 'Подключение к ноде…',
   'serverView.typeCommand': 'Введите команду…',
   'serverView.send': 'Отправить',
+  'serverView.edit': 'Изменить',
+  'serverView.name': 'Название',
+  'serverView.description': 'Описание (опционально)',
+  'serverView.saveChanges': 'Сохранить изменения',
+  'serverView.editHint':
+    'Изменение образа, команды запуска или памяти пересоздаёт контейнер — файлы и порты сохраняются, но сервер ненадолго перезапустится. Лимит диска — просто расчётное число, применяется сразу без перезапуска.',
 
   // components/StatusBadge.tsx
   'status.running': 'Онлайн',

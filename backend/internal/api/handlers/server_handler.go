@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -342,6 +343,201 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, s)
+}
+
+type updateServerRequest struct {
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	DockerImage    string `json:"docker_image"`
+	StartupCommand string `json:"startup_command"`
+	MemoryMB       int64  `json:"memory_mb"`
+	SwapMB         int64  `json:"swap_mb"`
+	DiskMB         int64  `json:"disk_mb"`
+}
+
+// Update lets the owner (or an admin) rename a server, resize it, or change
+// its image/startup command. disk_mb is never enforced by cgroups in this
+// architecture (bind-mounted volumes, no per-container quota) so changing it
+// is a plain DB update; memory/image/command changes require recreating the
+// container, so those go through the same daemon rebuild path allocations
+// use, keeping the server's files and ports intact.
+func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !claims.HasKeyPermission(auth.PermServersWrite) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	id, err := uuid.Parse(chi.URLParam(r, "uuid"))
+	if err != nil {
+		http.Error(w, "invalid server uuid", http.StatusBadRequest)
+		return
+	}
+
+	var req updateServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" || req.DockerImage == "" || req.MemoryMB <= 0 || req.DiskMB <= 0 {
+		http.Error(w, "name, docker_image, memory_mb and disk_mb are required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.DB.Begin(ctx)
+	if err != nil {
+		http.Error(w, "failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var serverID, nodeID, ownerID, oldMemoryMB, oldSwapMB int64
+	var oldDockerImage, oldStartupCommand string
+	var environmentJSON []byte
+	var ioWeight int
+	var cpuPercent *int
+	if err := tx.QueryRow(ctx, `
+		SELECT id, node_id, owner_id, memory_mb, swap_mb, docker_image, startup_command,
+		       environment, io_weight, cpu_percent
+		FROM servers WHERE uuid = $1 FOR UPDATE`, id,
+	).Scan(&serverID, &nodeID, &ownerID, &oldMemoryMB, &oldSwapMB, &oldDockerImage,
+		&oldStartupCommand, &environmentJSON, &ioWeight, &cpuPercent); err != nil {
+		http.Error(w, "server not found", http.StatusNotFound)
+		return
+	}
+	if !claims.IsAdmin && claims.UserID != ownerID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var nodeMemoryMB, nodeDiskMB int64
+	var memoryOverallocate, diskOverallocate int
+	if err := tx.QueryRow(ctx,
+		`SELECT memory_mb, memory_overallocate, disk_mb, disk_overallocate FROM nodes WHERE id = $1 FOR UPDATE`, nodeID,
+	).Scan(&nodeMemoryMB, &memoryOverallocate, &nodeDiskMB, &diskOverallocate); err != nil {
+		http.Error(w, "failed to check node capacity", http.StatusInternalServerError)
+		return
+	}
+
+	var usedMemoryMB, usedDiskMB int64
+	if err := tx.QueryRow(ctx,
+		`SELECT COALESCE(SUM(memory_mb), 0), COALESCE(SUM(disk_mb), 0) FROM servers WHERE node_id = $1 AND id != $2`,
+		nodeID, serverID,
+	).Scan(&usedMemoryMB, &usedDiskMB); err != nil {
+		http.Error(w, "failed to check node capacity", http.StatusInternalServerError)
+		return
+	}
+	memoryCapacity := effectiveCapacity(nodeMemoryMB, memoryOverallocate)
+	diskCapacity := effectiveCapacity(nodeDiskMB, diskOverallocate)
+	if usedMemoryMB+req.MemoryMB > memoryCapacity {
+		http.Error(w, fmt.Sprintf("node does not have enough memory: %d MB used by other servers + %d MB requested exceeds %d MB capacity",
+			usedMemoryMB, req.MemoryMB, memoryCapacity), http.StatusConflict)
+		return
+	}
+	if usedDiskMB+req.DiskMB > diskCapacity {
+		http.Error(w, fmt.Sprintf("node does not have enough disk: %d MB used by other servers + %d MB requested exceeds %d MB capacity",
+			usedDiskMB, req.DiskMB, diskCapacity), http.StatusConflict)
+		return
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE servers SET name = $1, description = $2, docker_image = $3, startup_command = $4,
+		                    memory_mb = $5, swap_mb = $6, disk_mb = $7, updated_at = now()
+		WHERE id = $8`,
+		req.Name, req.Description, req.DockerImage, req.StartupCommand,
+		req.MemoryMB, req.SwapMB, req.DiskMB, serverID,
+	); err != nil {
+		http.Error(w, "failed to update server", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "failed to commit server update", http.StatusInternalServerError)
+		return
+	}
+
+	needsRebuild := req.DockerImage != oldDockerImage || req.StartupCommand != oldStartupCommand ||
+		req.MemoryMB != oldMemoryMB || req.SwapMB != oldSwapMB
+	if needsRebuild {
+		if err := h.rebuildServerContainer(ctx, serverID, nodeID, id, req.DockerImage, req.StartupCommand,
+			req.MemoryMB, req.SwapMB, environmentJSON, ioWeight, cpuPercent); err != nil {
+			http.Error(w, "server updated but failed to apply the change to the running container: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+
+	activity.Record(ctx, h.DB, activity.Entry{
+		ActorUserID: &claims.UserID,
+		ServerID:    &serverID,
+		NodeID:      &nodeID,
+		Event:       "server.update",
+		IPAddress:   activity.RequestIP(r),
+	})
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// rebuildServerContainer recreates a server's container from its current DB
+// state, preserving whatever ports it already has published — the same
+// preserve-files-and-ports rebuild ServerAllocationHandler uses when a port
+// is added or removed.
+func (h *ServerHandler) rebuildServerContainer(
+	ctx context.Context, serverID, nodeID int64, serverUUID uuid.UUID,
+	dockerImage, startupCommand string, memoryMB, swapMB int64,
+	environmentJSON []byte, ioWeight int, cpuPercent *int,
+) error {
+	environment := map[string]string{}
+	if err := json.Unmarshal(environmentJSON, &environment); err != nil {
+		return fmt.Errorf("read server environment: %w", err)
+	}
+
+	rows, err := h.DB.Query(ctx, `SELECT port FROM allocations WHERE server_id = $1 ORDER BY id`, serverID)
+	if err != nil {
+		return fmt.Errorf("load ports: %w", err)
+	}
+	defer rows.Close()
+
+	portBindings := map[string]string{}
+	for rows.Next() {
+		var port int
+		if err := rows.Scan(&port); err != nil {
+			return fmt.Errorf("read ports: %w", err)
+		}
+		portBindings[fmt.Sprintf("%d/tcp", port)] = strconv.Itoa(port)
+		portBindings[fmt.Sprintf("%d/udp", port)] = strconv.Itoa(port)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read ports: %w", err)
+	}
+
+	client, err := h.NodeClient(nodeID)
+	if err != nil {
+		return fmt.Errorf("node unavailable: %w", err)
+	}
+
+	resp, err := client.RebuildServer(ctx, serverUUID, daemonclient.CreateServerRequest{
+		ServerUUID:     serverUUID,
+		DockerImage:    dockerImage,
+		StartupCommand: startupCommand,
+		Environment:    environment,
+		MemoryMB:       memoryMB,
+		SwapMB:         swapMB,
+		IOWeight:       ioWeight,
+		CPUPercent:     derefInt(cpuPercent),
+		PortBindings:   portBindings,
+	})
+	if err != nil {
+		return err
+	}
+	if !resp.Success {
+		return fmt.Errorf("%s", resp.Message)
+	}
+	return nil
 }
 
 func (h *ServerHandler) Delete(w http.ResponseWriter, r *http.Request) {

@@ -189,6 +189,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Use(middleware.Timeout(150 * time.Second))
 			r.Use(auth.Middleware(deps.Token, resolveAPIKey(deps.DB)))
 
+			// Editing a server can recreate its container (image, startup
+			// command, or memory changing), so it gets the long timeout too.
+			r.Patch("/servers/{uuid}", serverHandler.Update)
+
 			// Adding or removing a port recreates the container, so these get
 			// the long timeout rather than the default 30s.
 			r.Post("/servers/{uuid}/allocations", serverAllocationHandler.Create)
