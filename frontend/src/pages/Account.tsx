@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { ApiKey, CreateApiKeyResponse, SSHKey, TwoFASetup, TwoFAStatus } from '../types';
 import { API_KEY_PERMISSIONS } from '../types';
 import { canGenerateKeyPair, downloadPrivateKey, generateEd25519KeyPair } from '../sshKeygen';
@@ -204,13 +205,13 @@ export function Account() {
   return (
     <div className="view active">
       <div className="dash-head">
-        <h1>Account</h1>
-        <p>API keys for programmatic access.</p>
+        <h1>{t('account.title')}</h1>
+        <p>{t('account.subtitle')}</p>
       </div>
 
       <div className="acc-grid">
         <div className="acc-card">
-          <div className="acc-card-title">API Keys</div>
+          <div className="acc-card-title">{t('account.apiKeys')}</div>
 
           {justCreated && (
             <div className="api-item" style={{ marginBottom: 12 }}>
@@ -219,7 +220,7 @@ export function Account() {
                 className="btn-sm"
                 onClick={() => navigator.clipboard?.writeText(justCreated.token)}
               >
-                Copy
+                {t('common.copy')}
               </button>
             </div>
           )}
@@ -230,36 +231,35 @@ export function Account() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="api-memo">{k.name}</span>
                   <span className="api-used">
-                    {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'never used'}
+                    {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : t('account.neverUsed')}
                   </span>
                   <button className="file-act-btn del" onClick={() => handleDelete(k.id)}>
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </div>
                 <span className="srv-desc" style={{ fontSize: 11 }}>
                   {k.permissions.length === 0
-                    ? 'Full access (same as your account)'
+                    ? t('account.fullAccess')
                     : k.permissions.join(', ')}
                 </span>
               </div>
             ))}
-            {keys.length === 0 && <p className="srv-desc">No API keys yet.</p>}
+            {keys.length === 0 && <p className="srv-desc">{t('account.noApiKeysYet')}</p>}
           </div>
 
           <form onSubmit={handleCreate} style={{ marginTop: 16 }}>
             <div className="sfield" style={{ marginBottom: 14 }}>
-              <label htmlFor="key-name">New key name</label>
+              <label htmlFor="key-name">{t('account.newKeyName')}</label>
               <input
                 id="key-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. CI deploy"
+                placeholder={t('account.newKeyPlaceholder')}
                 required
               />
             </div>
             <p className="srv-desc" style={{ marginBottom: 8 }}>
-              Leave all unchecked for full access (same as your account). Check specific
-              permissions to restrict this key.
+              {t('account.permissionsHint')}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
               {API_KEY_PERMISSIONS.map((p) => (
@@ -289,18 +289,19 @@ export function Account() {
                 disabled={submitting}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {submitting ? 'Creating…' : 'Create key'}
+                {submitting ? t('common.saving') : t('account.createKey')}
               </button>
             </div>
           </form>
         </div>
 
         <div className="acc-card">
-          <div className="acc-card-title">SSH Keys (SFTP access)</div>
+          <div className="acc-card-title">{t('account.sshKeysTitle')}</div>
           <p className="srv-desc" style={{ marginBottom: 12 }}>
-            Add a public key here, then connect with any SFTP client using{' '}
-            <code>{loadUsername()}.&lt;server-id&gt;</code> as the username and port{' '}
-            <code>2022</code> on the server's node — the server ID is shown on its Overview tab.
+            {t('account.sshKeysHintPrefix')}
+            <code>{loadUsername()}.&lt;server-id&gt;</code>
+            {t('account.sshKeysHintMiddle')}
+            <code>2022</code> {t('account.sshKeysHintSuffix')}
           </p>
 
           <div className="api-list">
@@ -309,7 +310,7 @@ export function Account() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="api-memo">{k.name}</span>
                   <button className="file-act-btn del" onClick={() => handleDeleteSSHKey(k.id)}>
-                    Delete
+                    {t('common.delete')}
                   </button>
                 </div>
                 <span className="srv-desc" style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>
@@ -317,23 +318,22 @@ export function Account() {
                 </span>
               </div>
             ))}
-            {sshKeys.length === 0 && <p className="srv-desc">No SSH keys yet.</p>}
+            {sshKeys.length === 0 && <p className="srv-desc">{t('account.noSshKeysYet')}</p>}
           </div>
 
           {justGenerated && (
             <div className="login-error show" style={{ marginTop: 16, borderColor: 'var(--green)', color: 'var(--green)' }}>
-              Key pair generated and downloaded — that file is the only copy of your private key,
-              the panel never stores it. Keep it safe; if you lose it you'll need to generate a new one.
+              {t('account.keyPairGenerated')}
             </div>
           )}
 
           <div className="sfield" style={{ marginTop: 16, marginBottom: 0 }}>
-            <label htmlFor="ssh-key-name">Key name</label>
+            <label htmlFor="ssh-key-name">{t('account.keyName')}</label>
             <input
               id="ssh-key-name"
               value={sshKeyName}
               onChange={(e) => setSSHKeyName(e.target.value)}
-              placeholder="e.g. laptop"
+              placeholder={t('account.keyNamePlaceholder')}
             />
           </div>
 
@@ -346,23 +346,23 @@ export function Account() {
                 disabled={generatingKey}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {generatingKey ? 'Generating…' : 'Generate a new key pair'}
+                {generatingKey ? t('nodes.generating') : t('account.generateKeyPair')}
               </button>
             </div>
           )}
 
           <p className="srv-desc" style={{ marginTop: canGenerateKeyPair() ? 16 : 0, marginBottom: 8 }}>
-            {canGenerateKeyPair() ? 'Or paste an existing public key:' : 'Paste an existing public key:'}
+            {canGenerateKeyPair() ? t('account.orPasteExisting') : t('account.pasteExisting')}
           </p>
 
           <form onSubmit={handleCreateSSHKey}>
             <div className="sfield" style={{ marginBottom: 14 }}>
-              <label htmlFor="ssh-key-value">Public key</label>
+              <label htmlFor="ssh-key-value">{t('account.publicKey')}</label>
               <textarea
                 id="ssh-key-value"
                 value={sshPublicKey}
                 onChange={(e) => setSSHPublicKey(e.target.value)}
-                placeholder="ssh-ed25519 AAAA... you@host"
+                placeholder={t('account.publicKeyPlaceholder')}
                 rows={3}
                 required
                 style={{
@@ -384,17 +384,17 @@ export function Account() {
                 disabled={sshSubmitting}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {sshSubmitting ? 'Adding…' : 'Add key'}
+                {sshSubmitting ? t('nodes.adding') : t('account.addKey')}
               </button>
             </div>
           </form>
         </div>
 
         <div className="acc-card">
-          <div className="acc-card-title">Change password</div>
+          <div className="acc-card-title">{t('account.changePassword')}</div>
           <form onSubmit={handleChangePassword}>
             <div className="sfield" style={{ marginBottom: 14 }}>
-              <label htmlFor="current-password">Current password</label>
+              <label htmlFor="current-password">{t('account.currentPassword')}</label>
               <input
                 id="current-password"
                 type="password"
@@ -405,14 +405,14 @@ export function Account() {
               />
             </div>
             <div className="sfield" style={{ marginBottom: 14 }}>
-              <label htmlFor="new-password">New password</label>
+              <label htmlFor="new-password">{t('account.newPassword')}</label>
               <input
                 id="new-password"
                 type="password"
                 autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="at least 8 characters"
+                placeholder={t('users.passwordPlaceholder')}
                 required
               />
             </div>
@@ -423,7 +423,7 @@ export function Account() {
             )}
             {passwordSuccess && (
               <p className="srv-desc" style={{ color: 'var(--green)', marginBottom: 12 }}>
-                Password updated.
+                {t('account.passwordUpdated')}
               </p>
             )}
             <div className="settings-foot">
@@ -433,26 +433,26 @@ export function Account() {
                 disabled={changingPassword}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {changingPassword ? 'Updating…' : 'Update password'}
+                {changingPassword ? t('account.updating') : t('account.updatePassword')}
               </button>
             </div>
           </form>
         </div>
 
         <div className="acc-card">
-          <div className="acc-card-title">Two-Factor Authentication</div>
+          <div className="acc-card-title">{t('account.twofaTitle')}</div>
 
           <div style={{ textAlign: 'center' }}>
             <div className="twofa-icon">🔒</div>
             <div className="twofa-title">
-              {twofaStatus === null ? 'Loading…' : twofaStatus.enabled ? 'Enabled' : 'Disabled'}
+              {twofaStatus === null ? t('common.loading') : twofaStatus.enabled ? t('account.twofaEnabled') : t('account.twofaDisabled')}
             </div>
             <div className="twofa-desc">
               {twofaStatus?.enabled
-                ? 'Your account requires a code from your authenticator app at sign-in.'
-                : 'Add an authenticator app (Google Authenticator, Authy, etc.) for a second layer of protection at sign-in.'}
+                ? t('account.twofaEnabledHint')
+                : t('account.twofaDisabledHint')}
             </div>
-            {twofaStatus?.enabled && <div className="twofa-status">✓ Active</div>}
+            {twofaStatus?.enabled && <div className="twofa-status">{t('account.twofaActive')}</div>}
           </div>
 
           {twofaError && (
@@ -463,14 +463,14 @@ export function Account() {
 
           {twofaStatus && !twofaStatus.enabled && !twofaSetup && (
             <button className="btn-primary" onClick={handleStartSetup}>
-              Enable 2FA
+              {t('account.enable2fa')}
             </button>
           )}
 
           {twofaSetup && (
             <div>
               <p className="srv-desc" style={{ marginBottom: 10 }}>
-                Scan this with your authenticator app, or add it manually with the secret below.
+                {t('account.scanHint')}
               </p>
               {qrCodeUrl && (
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -489,7 +489,7 @@ export function Account() {
                   className="btn-sm"
                   onClick={() => navigator.clipboard?.writeText(twofaSetup.otpauth_url)}
                 >
-                  Copy
+                  {t('common.copy')}
                 </button>
               </div>
               <div className="api-item" style={{ marginBottom: 16 }}>
@@ -498,12 +498,12 @@ export function Account() {
                   className="btn-sm"
                   onClick={() => navigator.clipboard?.writeText(twofaSetup.secret)}
                 >
-                  Copy
+                  {t('common.copy')}
                 </button>
               </div>
               <form onSubmit={handleVerify}>
                 <div className="sfield">
-                  <label htmlFor="verify-code">Enter the 6-digit code to confirm</label>
+                  <label htmlFor="verify-code">{t('account.enterCodeToConfirm')}</label>
                   <input
                     id="verify-code"
                     inputMode="numeric"
@@ -520,10 +520,10 @@ export function Account() {
                     disabled={twofaBusy}
                     style={{ width: 'auto', padding: '10px 20px' }}
                   >
-                    {twofaBusy ? 'Verifying…' : 'Verify & enable'}
+                    {twofaBusy ? t('login.verifying') : t('account.verifyAndEnable')}
                   </button>
                   <button className="btn-sm" type="button" onClick={handleCancelSetup}>
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </form>
@@ -533,7 +533,7 @@ export function Account() {
           {twofaStatus?.enabled && (
             <form onSubmit={handleDisable}>
               <div className="sfield">
-                <label htmlFor="disable-password">Password (to disable)</label>
+                <label htmlFor="disable-password">{t('account.disablePassword')}</label>
                 <input
                   id="disable-password"
                   type="password"
@@ -550,7 +550,7 @@ export function Account() {
                   disabled={twofaBusy}
                   style={{ width: 'auto', padding: '10px 20px' }}
                 >
-                  {twofaBusy ? 'Disabling…' : 'Disable 2FA'}
+                  {twofaBusy ? t('account.disabling') : t('account.disable2fa')}
                 </button>
               </div>
             </form>

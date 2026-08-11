@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 export type ServerStatus =
   | 'installing'
   | 'install_failed'
@@ -261,28 +263,28 @@ export interface Subuser {
 }
 
 export const SUBUSER_PERMISSIONS: { code: string; label: string }[] = [
-  { code: 'control.start', label: 'Start' },
-  { code: 'control.stop', label: 'Stop' },
-  { code: 'control.restart', label: 'Restart' },
-  { code: 'control.kill', label: 'Kill' },
-  { code: 'console', label: 'Console' },
-  { code: 'files.read', label: 'View files' },
-  { code: 'files.write', label: 'Manage files' },
-  { code: 'schedules.read', label: 'View schedules' },
-  { code: 'schedules.write', label: 'Manage schedules' },
-  { code: 'databases.read', label: 'View databases' },
-  { code: 'databases.write', label: 'Manage databases' },
-  { code: 'domains.read', label: 'View domains' },
-  { code: 'domains.write', label: 'Manage domains' },
-  { code: 'backups.read', label: 'View backups' },
-  { code: 'backups.write', label: 'Manage backups' },
-  { code: 'allocations.read', label: 'View ports' },
-  { code: 'allocations.write', label: 'Manage ports' },
+  { code: 'control.start', label: t('perm.controlStart') },
+  { code: 'control.stop', label: t('perm.controlStop') },
+  { code: 'control.restart', label: t('perm.controlRestart') },
+  { code: 'control.kill', label: t('perm.controlKill') },
+  { code: 'console', label: t('perm.console') },
+  { code: 'files.read', label: t('perm.filesRead') },
+  { code: 'files.write', label: t('perm.filesWrite') },
+  { code: 'schedules.read', label: t('perm.schedulesRead') },
+  { code: 'schedules.write', label: t('perm.schedulesWrite') },
+  { code: 'databases.read', label: t('perm.databasesRead') },
+  { code: 'databases.write', label: t('perm.databasesWrite') },
+  { code: 'domains.read', label: t('perm.domainsRead') },
+  { code: 'domains.write', label: t('perm.domainsWrite') },
+  { code: 'backups.read', label: t('perm.backupsRead') },
+  { code: 'backups.write', label: t('perm.backupsWrite') },
+  { code: 'allocations.read', label: t('perm.allocationsRead') },
+  { code: 'allocations.write', label: t('perm.allocationsWrite') },
 ];
 
 export const API_KEY_PERMISSIONS: { code: string; label: string }[] = [
-  { code: 'servers.read', label: 'List/view servers' },
-  { code: 'servers.write', label: 'Create/delete servers' },
+  { code: 'servers.read', label: t('perm.serversRead') },
+  { code: 'servers.write', label: t('perm.serversWrite') },
   ...SUBUSER_PERMISSIONS,
 ];
 

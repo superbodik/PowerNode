@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { ServerBackup } from '../types';
 
 interface Props {
@@ -57,7 +58,7 @@ export function BackupManager({ uuid }: Props) {
   }
 
   async function handleRestore(b: ServerBackup) {
-    if (!window.confirm(`Restore "${b.name}"? This overwrites files currently on the server.`)) {
+    if (!window.confirm(t('backups.confirmRestore', { name: b.name }))) {
       return;
     }
     setBusyId(b.id);
@@ -72,7 +73,7 @@ export function BackupManager({ uuid }: Props) {
   }
 
   async function handleDelete(b: ServerBackup) {
-    if (!window.confirm(`Delete backup "${b.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(t('backups.confirmDelete', { name: b.name }))) return;
     setBusyId(b.id);
     setError(null);
     try {
@@ -101,11 +102,11 @@ export function BackupManager({ uuid }: Props) {
   }
 
   if (forbidden) {
-    return <p className="srv-desc">You don't have permission to view this server's backups.</p>;
+    return <p className="srv-desc">{t('backups.forbidden')}</p>;
   }
 
   if (backups === null) {
-    return <p className="srv-desc">Loading…</p>;
+    return <p className="srv-desc">{t('common.loading')}</p>;
   }
 
   return (
@@ -113,30 +114,29 @@ export function BackupManager({ uuid }: Props) {
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>
-        <div className="settings-card-title">Create backup</div>
+        <div className="settings-card-title">{t('backups.createBackup')}</div>
         <p className="srv-desc" style={{ marginBottom: 12 }}>
-          Archives every file on the server except what you ignore below. Can take a while for
-          large servers — this page will show it once it's done.
+          {t('backups.hint')}
         </p>
         <form onSubmit={handleCreate}>
           <div className="settings-grid">
             <div className="sfield">
-              <label htmlFor="backup-name">Name</label>
+              <label htmlFor="backup-name">{t('backups.name')}</label>
               <input
                 id="backup-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="before-update"
+                placeholder={t('backups.namePlaceholder')}
                 required
               />
             </div>
             <div className="sfield">
-              <label htmlFor="backup-ignored">Ignore (comma-separated globs)</label>
+              <label htmlFor="backup-ignored">{t('backups.ignore')}</label>
               <input
                 id="backup-ignored"
                 value={ignoredFiles}
                 onChange={(e) => setIgnoredFiles(e.target.value)}
-                placeholder="*.log, cache"
+                placeholder={t('backups.ignorePlaceholder')}
               />
             </div>
           </div>
@@ -147,7 +147,7 @@ export function BackupManager({ uuid }: Props) {
               disabled={creating}
               style={{ width: 'auto', padding: '10px 20px' }}
             >
-              {creating ? 'Creating…' : 'Create backup'}
+              {creating ? t('backups.creatingBackup') : t('backups.createBackup')}
             </button>
           </div>
         </form>
@@ -164,27 +164,27 @@ export function BackupManager({ uuid }: Props) {
                   disabled={!b.is_successful || busyId === b.id}
                   onClick={() => handleDownload(b)}
                 >
-                  Download
+                  {t('backups.download')}
                 </button>
                 <button
                   className="btn-sm"
                   disabled={!b.is_successful || busyId === b.id}
                   onClick={() => handleRestore(b)}
                 >
-                  {busyId === b.id ? 'Working…' : 'Restore'}
+                  {busyId === b.id ? t('backups.working') : t('backups.restore')}
                 </button>
                 <button className="file-act-btn del" disabled={busyId === b.id} onClick={() => handleDelete(b)}>
-                  Delete
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
             <div className="sch-meta">
-              <span>{b.is_successful ? formatBytes(b.bytes) : 'Failed'}</span>
-              <span>Created: {new Date(b.created_at).toLocaleString()}</span>
+              <span>{b.is_successful ? formatBytes(b.bytes) : t('backups.failed')}</span>
+              <span>{t('backups.createdLine')}{new Date(b.created_at).toLocaleString()}</span>
             </div>
           </div>
         ))}
-        {backups.length === 0 && <p className="srv-desc">No backups yet.</p>}
+        {backups.length === 0 && <p className="srv-desc">{t('backups.noBackupsYet')}</p>}
       </div>
     </div>
   );

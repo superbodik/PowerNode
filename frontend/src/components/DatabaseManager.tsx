@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { DatabaseHost, ServerDatabase } from '../types';
 
 interface Props {
@@ -50,7 +51,7 @@ export function DatabaseManager({ uuid }: Props) {
   }
 
   async function handleDelete(db: ServerDatabase) {
-    if (!window.confirm(`Delete database "${db.database_name}"? This drops it and its user permanently.`)) {
+    if (!window.confirm(t('db.confirmDelete', { name: db.database_name }))) {
       return;
     }
     try {
@@ -64,13 +65,13 @@ export function DatabaseManager({ uuid }: Props) {
   if (forbidden) {
     return (
       <p className="srv-desc">
-        You don't have permission to view this server's databases.
+        {t('db.forbidden')}
       </p>
     );
   }
 
   if (databases === null) {
-    return <p className="srv-desc">Loading…</p>;
+    return <p className="srv-desc">{t('common.loading')}</p>;
   }
 
   return (
@@ -79,18 +80,18 @@ export function DatabaseManager({ uuid }: Props) {
 
       {hosts.length === 0 ? (
         <p className="srv-desc">
-          No database hosts registered yet — an admin needs to add one on the Nodes page first.
+          {t('db.noHostsYet')}
         </p>
       ) : (
         <div className="settings-card" style={{ marginBottom: 20 }}>
-          <div className="settings-card-title">Create database</div>
+          <div className="settings-card-title">{t('db.createDatabase')}</div>
           <form onSubmit={handleCreate}>
             <div className="settings-grid">
               <div className="sfield">
-                <label htmlFor="db-host">Host</label>
+                <label htmlFor="db-host">{t('db.host')}</label>
                 <select id="db-host" value={hostId} onChange={(e) => setHostId(Number(e.target.value))} required>
                   <option value={0} disabled>
-                    Select a host…
+                    {t('db.selectHost')}
                   </option>
                   {hosts.map((h) => (
                     <option key={h.id} value={h.id}>
@@ -100,12 +101,12 @@ export function DatabaseManager({ uuid }: Props) {
                 </select>
               </div>
               <div className="sfield">
-                <label htmlFor="db-name">Name</label>
+                <label htmlFor="db-name">{t('db.name')}</label>
                 <input
                   id="db-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="letters, digits, underscore"
+                  placeholder={t('db.namePlaceholder')}
                   required
                 />
               </div>
@@ -117,7 +118,7 @@ export function DatabaseManager({ uuid }: Props) {
                 disabled={submitting}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {submitting ? 'Creating…' : 'Create database'}
+                {submitting ? t('db.creatingDatabase') : t('db.createDatabase')}
               </button>
             </div>
           </form>
@@ -130,33 +131,33 @@ export function DatabaseManager({ uuid }: Props) {
             <div className="sch-head">
               <span className="sch-name">{db.database_name}</span>
               <button className="file-act-btn del" onClick={() => handleDelete(db)}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
             <div className="sch-meta" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
-              <span>Host: {db.host}:{db.port}</span>
-              <span>User: {db.username}</span>
+              <span>{t('db.hostLine', { host: db.host, port: db.port })}</span>
+              <span>{t('db.userLine', { username: db.username })}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                Password: {revealed[db.id] ? db.password : '••••••••••••'}
+                {t('db.passwordLine')}{revealed[db.id] ? db.password : '••••••••••••'}
                 <button
                   className="btn-sm"
                   type="button"
                   onClick={() => setRevealed((r) => ({ ...r, [db.id]: !r[db.id] }))}
                 >
-                  {revealed[db.id] ? 'Hide' : 'Show'}
+                  {revealed[db.id] ? t('common.hide') : t('common.show')}
                 </button>
                 <button
                   className="btn-sm"
                   type="button"
                   onClick={() => navigator.clipboard?.writeText(db.password)}
                 >
-                  Copy
+                  {t('common.copy')}
                 </button>
               </span>
             </div>
           </div>
         ))}
-        {databases.length === 0 && <p className="srv-desc">No databases yet.</p>}
+        {databases.length === 0 && <p className="srv-desc">{t('db.noDatabasesYet')}</p>}
       </div>
     </div>
   );

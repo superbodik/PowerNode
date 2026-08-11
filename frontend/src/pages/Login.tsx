@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, storeTokens, TOTPRequiredError } from '../api/client';
+import { t } from '../i18n';
 
 interface Props {
   onLoggedIn: () => void;
@@ -25,7 +26,7 @@ export function Login({ onLoggedIn }: Props) {
       if (err instanceof TOTPRequiredError) {
         setNeedsTotp(true);
       } else {
-        setError(needsTotp ? 'Invalid email, password, or code' : 'Invalid email or password');
+        setError(needsTotp ? t('login.invalidWithCode') : t('login.invalid'));
       }
     } finally {
       setSubmitting(false);
@@ -50,13 +51,13 @@ export function Login({ onLoggedIn }: Props) {
         {!needsTotp ? (
           <div className="login-step" key="credentials">
             <div className="login-head">
-              <h1>Sign in</h1>
-              <p>Use your PowerNode account to continue.</p>
+              <h1>{t('login.signIn')}</h1>
+              <p>{t('login.signInHint')}</p>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="form-field">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">{t('login.email')}</label>
                 <input
                   id="email"
                   type="email"
@@ -68,7 +69,7 @@ export function Login({ onLoggedIn }: Props) {
                 />
               </div>
               <div className="form-field">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">{t('login.password')}</label>
                 <input
                   id="password"
                   type="password"
@@ -80,7 +81,7 @@ export function Login({ onLoggedIn }: Props) {
               </div>
 
               <button className="btn-primary" type="submit" disabled={submitting}>
-                {submitting ? 'Signing in…' : 'Sign in'}
+                {submitting ? t('login.signingIn') : t('login.signIn')}
               </button>
 
               {error && <div className="login-error show">{error}</div>}
@@ -89,13 +90,13 @@ export function Login({ onLoggedIn }: Props) {
         ) : (
           <div className="login-step" key="totp">
             <div className="login-head">
-              <h1>Verification code</h1>
-              <p>Enter the 6-digit code from your authenticator app.</p>
+              <h1>{t('login.verificationCode')}</h1>
+              <p>{t('login.verificationHint')}</p>
             </div>
 
             <form onSubmit={handleSubmit}>
               <div className="form-field">
-                <label htmlFor="totp-code">Authenticator code</label>
+                <label htmlFor="totp-code">{t('login.authenticatorCode')}</label>
                 <input
                   id="totp-code"
                   inputMode="numeric"
@@ -109,7 +110,7 @@ export function Login({ onLoggedIn }: Props) {
               </div>
 
               <button className="btn-primary" type="submit" disabled={submitting}>
-                {submitting ? 'Verifying…' : 'Verify & sign in'}
+                {submitting ? t('login.verifying') : t('login.verifyAndSignIn')}
               </button>
 
               {error && <div className="login-error show">{error}</div>}
@@ -123,7 +124,7 @@ export function Login({ onLoggedIn }: Props) {
                   setError(null);
                 }}
               >
-                ← Back
+                {t('login.back')}
               </button>
             </form>
           </div>

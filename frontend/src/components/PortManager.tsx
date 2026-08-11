@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { ServerAllocation } from '../types';
 
 interface Props {
@@ -48,8 +49,8 @@ export function PortManager({ uuid }: Props) {
 
   async function handleDelete(a: ServerAllocation) {
     const warning = a.is_primary
-      ? `Remove port ${a.port}? This is the server's main address — its listed address will change. The container will be recreated to apply this and will briefly restart.`
-      : `Remove port ${a.port}? The server's container will be recreated to apply this — it will briefly restart.`;
+      ? t('ports.confirmRemovePrimary', { port: a.port })
+      : t('ports.confirmRemove', { port: a.port });
     if (!window.confirm(warning)) {
       return;
     }
@@ -68,13 +69,13 @@ export function PortManager({ uuid }: Props) {
   if (forbidden) {
     return (
       <p className="srv-desc">
-        You don't have permission to view this server's ports.
+        {t('ports.forbidden')}
       </p>
     );
   }
 
   if (allocations === null) {
-    return <p className="srv-desc">Loading…</p>;
+    return <p className="srv-desc">{t('common.loading')}</p>;
   }
 
   return (
@@ -82,15 +83,14 @@ export function PortManager({ uuid }: Props) {
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>
-        <div className="settings-card-title">Add a port</div>
+        <div className="settings-card-title">{t('ports.addPort')}</div>
         <p className="srv-desc" style={{ marginBottom: 12 }}>
-          Publishes a TCP/UDP port from your server's container to the node's network.
-          Applying this recreates the container (files are kept) and briefly restarts it.
+          {t('ports.hint')}
         </p>
         <form onSubmit={handleCreate}>
           <div className="settings-grid">
             <div className="sfield">
-              <label htmlFor="alloc-port">Port</label>
+              <label htmlFor="alloc-port">{t('ports.port')}</label>
               <input
                 id="alloc-port"
                 type="number"
@@ -103,12 +103,12 @@ export function PortManager({ uuid }: Props) {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="alloc-alias">Label (optional)</label>
+              <label htmlFor="alloc-alias">{t('ports.labelOptional')}</label>
               <input
                 id="alloc-alias"
                 value={alias}
                 onChange={(e) => setAlias(e.target.value)}
-                placeholder="query port"
+                placeholder={t('ports.labelPlaceholder')}
               />
             </div>
           </div>
@@ -119,7 +119,7 @@ export function PortManager({ uuid }: Props) {
               disabled={submitting}
               style={{ width: 'auto', padding: '10px 20px' }}
             >
-              {submitting ? 'Adding…' : 'Add port'}
+              {submitting ? t('ports.adding') : t('ports.addPortButton')}
             </button>
           </div>
         </form>
@@ -133,7 +133,7 @@ export function PortManager({ uuid }: Props) {
                 {a.ip}:{a.port}
                 {a.is_primary && (
                   <span className="srv-desc" style={{ fontSize: 10, marginLeft: 8, border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
-                    Main
+                    {t('ports.main')}
                   </span>
                 )}
               </span>
@@ -142,7 +142,7 @@ export function PortManager({ uuid }: Props) {
                 onClick={() => handleDelete(a)}
                 disabled={deletingId === a.id}
               >
-                {deletingId === a.id ? 'Removing…' : 'Delete'}
+                {deletingId === a.id ? t('ports.removing') : t('common.delete')}
               </button>
             </div>
             {a.alias && (
@@ -152,7 +152,7 @@ export function PortManager({ uuid }: Props) {
             )}
           </div>
         ))}
-        {allocations.length === 0 && <p className="srv-desc">No ports assigned yet.</p>}
+        {allocations.length === 0 && <p className="srv-desc">{t('ports.noPortsAssignedYet')}</p>}
       </div>
     </div>
   );

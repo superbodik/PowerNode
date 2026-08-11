@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, FileConflictError } from '../api/client';
+import { t } from '../i18n';
 import type { FileEntry } from '../types';
 
 interface Props {
@@ -71,7 +72,7 @@ export function FileManager({ uuid }: Props) {
     try {
       const { text, mtime } = await api.readFile(uuid, target);
       if (looksBinary(text)) {
-        setError(`"${entry.name}" looks like a binary file — use Download instead of editing it as text.`);
+        setError(t('files.looksBinary', { name: entry.name }));
         return;
       }
       setEditingFile(target);
@@ -91,7 +92,7 @@ export function FileManager({ uuid }: Props) {
       refresh();
     } catch (err) {
       if (err instanceof FileConflictError) {
-        setError(`"${editingFile.split('/').pop()}" was changed on disk since you opened it — reopen it to see the latest version before saving again.`);
+        setError(t('files.conflict', { name: editingFile.split('/').pop() ?? editingFile }));
       } else {
         setError(err instanceof Error ? err.message : String(err));
       }
@@ -102,7 +103,7 @@ export function FileManager({ uuid }: Props) {
 
   async function handleDelete(entry: FileEntry, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm(`Delete ${entry.name}?`)) return;
+    if (!window.confirm(t('files.confirmDelete', { name: entry.name }))) return;
     try {
       await api.deleteFile(uuid, joinPath(path, entry.name));
       refresh();
@@ -188,10 +189,10 @@ export function FileManager({ uuid }: Props) {
         <div className="files-toolbar">
           <div className="files-path">{editingFile}</div>
           <button className="btn-sm primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
           <button className="btn-sm" onClick={() => setEditingFile(null)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
         <textarea
@@ -238,7 +239,7 @@ export function FileManager({ uuid }: Props) {
           onChange={handleUploadChange}
         />
         <button className="btn-sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-          {uploading ? 'Uploading…' : 'Upload'}
+          {uploading ? t('files.uploading') : t('files.upload')}
         </button>
         <button
           className="btn-sm primary"
@@ -247,7 +248,7 @@ export function FileManager({ uuid }: Props) {
             setNewFolderName('');
           }}
         >
-          + Folder
+          {t('files.addFolder')}
         </button>
       </div>
 
@@ -257,30 +258,30 @@ export function FileManager({ uuid }: Props) {
             autoFocus
             value={newFolderName}
             onChange={(e) => setNewFolderName(e.target.value)}
-            placeholder="Folder name"
+            placeholder={t('files.folderName')}
           />
           <button className="btn-sm primary" type="submit">
-            Create
+            {t('files.create')}
           </button>
           <button className="btn-sm" type="button" onClick={() => setCreatingFolder(false)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </form>
       )}
 
       {renamingEntry && (
         <form className="files-inline-form" onSubmit={submitRename}>
-          <span className="srv-desc">Rename "{renamingEntry.name}" to</span>
+          <span className="srv-desc">{t('files.renamePrefix', { name: renamingEntry.name })}</span>
           <input
             autoFocus
             value={renameValue}
             onChange={(e) => setRenameValue(e.target.value)}
           />
           <button className="btn-sm primary" type="submit">
-            Save
+            {t('common.save')}
           </button>
           <button className="btn-sm" type="button" onClick={() => setRenamingEntry(null)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </form>
       )}
@@ -293,14 +294,14 @@ export function FileManager({ uuid }: Props) {
 
       <div className="files-table">
         <div className="files-table-head">
-          <span>Name</span>
-          <span>Size</span>
-          <span>Modified</span>
-          <span>Actions</span>
+          <span>{t('files.colName')}</span>
+          <span>{t('files.colSize')}</span>
+          <span>{t('files.colModified')}</span>
+          <span>{t('files.colActions')}</span>
         </div>
         {loading ? (
           <p className="srv-desc" style={{ padding: 16 }}>
-            Loading…
+            {t('common.loading')}
           </p>
         ) : (
           entries.map((entry) => (
@@ -317,18 +318,18 @@ export function FileManager({ uuid }: Props) {
                 {!entry.is_directory && (
                   <button
                     className="file-act-btn"
-                    title="Download"
+                    title={t('files.download')}
                     onClick={(e) => handleDownload(entry, e)}
                   >
                     ⬇
                   </button>
                 )}
-                <button className="file-act-btn" title="Rename" onClick={(e) => startRename(entry, e)}>
+                <button className="file-act-btn" title={t('files.rename')} onClick={(e) => startRename(entry, e)}>
                   ✎
                 </button>
                 <button
                   className="file-act-btn del"
-                  title="Delete"
+                  title={t('files.delete')}
                   onClick={(e) => handleDelete(entry, e)}
                 >
                   ✕
@@ -339,7 +340,7 @@ export function FileManager({ uuid }: Props) {
         )}
         {!loading && entries.length === 0 && (
           <p className="srv-desc" style={{ padding: 16 }}>
-            Empty directory.
+            {t('files.emptyDirectory')}
           </p>
         )}
       </div>

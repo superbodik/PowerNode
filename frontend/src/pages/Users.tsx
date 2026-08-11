@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { PanelUser } from '../types';
 
 export function Users() {
@@ -152,17 +153,17 @@ export function Users() {
   return (
     <div className="view active">
       <div className="dash-head">
-        <h1>Users</h1>
-        <p>Everyone with a PowerNode account.</p>
+        <h1>{t('users.title')}</h1>
+        <p>{t('users.subtitle')}</p>
       </div>
 
       {!forbidden && (
         <div className="settings-card" style={{ marginBottom: 24 }}>
-          <div className="settings-card-title">Create user</div>
+          <div className="settings-card-title">{t('users.createUser')}</div>
           <form onSubmit={handleCreate}>
             <div className="settings-grid">
               <div className="sfield">
-                <label htmlFor="user-email">Email</label>
+                <label htmlFor="user-email">{t('users.email')}</label>
                 <input
                   id="user-email"
                   type="email"
@@ -172,7 +173,7 @@ export function Users() {
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="user-username">Username</label>
+                <label htmlFor="user-username">{t('users.username')}</label>
                 <input
                   id="user-username"
                   value={createForm.username}
@@ -181,25 +182,25 @@ export function Users() {
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="user-password">Password</label>
+                <label htmlFor="user-password">{t('users.password')}</label>
                 <input
                   id="user-password"
                   type="password"
                   autoComplete="new-password"
                   value={createForm.password}
                   onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="at least 8 characters"
+                  placeholder={t('users.passwordPlaceholder')}
                   required
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="user-limit">Server limit</label>
+                <label htmlFor="user-limit">{t('users.serverLimit')}</label>
                 <input
                   id="user-limit"
                   type="number"
                   value={createForm.server_limit}
                   onChange={(e) => setCreateForm((f) => ({ ...f, server_limit: e.target.value }))}
-                  placeholder="unlimited"
+                  placeholder={t('users.unlimited')}
                 />
               </div>
             </div>
@@ -210,23 +211,23 @@ export function Users() {
               >
                 <div className="toggle-knob" />
               </div>
-              Admin
+              {t('users.admin')}
             </label>
             {createError && <div className="login-error show" style={{ marginBottom: 12 }}>{createError}</div>}
             <div className="settings-foot">
               <button className="btn-primary" type="submit" disabled={creating} style={{ width: 'auto', padding: '10px 20px' }}>
-                {creating ? 'Creating…' : 'Create user'}
+                {creating ? t('users.creatingUser') : t('users.createUser')}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {forbidden && <p className="srv-desc">Only admins can manage users.</p>}
+      {forbidden && <p className="srv-desc">{t('users.forbidden')}</p>}
 
       {error && <div className="login-error show" style={{ marginBottom: 16 }}>{error}</div>}
 
-      {!forbidden && users === null && <p className="srv-desc">Loading…</p>}
+      {!forbidden && users === null && <p className="srv-desc">{t('common.loading')}</p>}
 
       {users && (
         <>
@@ -235,7 +236,7 @@ export function Users() {
             <span className="search-icon">⌕</span>
             <input
               type="text"
-              placeholder="Search users…"
+              placeholder={t('users.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -243,10 +244,10 @@ export function Users() {
         </div>
         <div className="db-table">
           <div className="db-head">
-            <span>User</span>
-            <span>Admin</span>
-            <span>Active</span>
-            <span>Server limit</span>
+            <span>{t('users.colUser')}</span>
+            <span>{t('users.colAdmin')}</span>
+            <span>{t('users.colActive')}</span>
+            <span>{t('users.colServerLimit')}</span>
           </div>
           {filteredUsers.map((u) => (
             <div key={u.id}>
@@ -280,7 +281,7 @@ export function Users() {
               <span style={{ display: 'flex', gap: 6 }}>
                 <input
                   type="number"
-                  placeholder="unlimited"
+                  placeholder={t('users.unlimited')}
                   value={drafts[u.id]?.serverLimit ?? ''}
                   onChange={(e) =>
                     setDrafts((d) => ({ ...d, [u.id]: { serverLimit: e.target.value } }))
@@ -298,7 +299,7 @@ export function Users() {
                   }}
                 />
                 <button className="btn-sm" disabled={saving === u.id} onClick={() => handleSaveLimit(u)}>
-                  Save
+                  {t('common.save')}
                 </button>
               </span>
             </div>
@@ -309,23 +310,23 @@ export function Users() {
                   style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}
                 >
                   <div className="sfield" style={{ margin: 0 }}>
-                    <label htmlFor={`reset-pw-${u.id}`}>Reset password for {u.username}</label>
+                    <label htmlFor={`reset-pw-${u.id}`}>{t('users.resetPasswordFor', { username: u.username })}</label>
                     <input
                       id={`reset-pw-${u.id}`}
                       type="password"
                       autoComplete="new-password"
                       value={resetPasswordValue}
                       onChange={(e) => setResetPasswordValue(e.target.value)}
-                      placeholder="at least 8 characters"
+                      placeholder={t('users.passwordPlaceholder')}
                       required
                     />
                   </div>
                   <button className="btn-primary" type="submit" disabled={resetSubmitting} style={{ width: 'auto', padding: '10px 20px' }}>
-                    {resetSubmitting ? 'Resetting…' : 'Reset password'}
+                    {resetSubmitting ? t('users.resetting') : t('users.resetPassword')}
                   </button>
                   {resetSuccess && (
                     <span className="srv-desc" style={{ color: 'var(--green)' }}>
-                      Password reset.
+                      {t('users.passwordResetDone')}
                     </span>
                   )}
                 </form>
@@ -333,9 +334,9 @@ export function Users() {
             )}
             </div>
           ))}
-          {users.length === 0 && <p className="srv-desc" style={{ padding: 16 }}>No users yet.</p>}
+          {users.length === 0 && <p className="srv-desc" style={{ padding: 16 }}>{t('users.noUsersYet')}</p>}
           {users.length > 0 && filteredUsers.length === 0 && (
-            <p className="srv-desc" style={{ padding: 16 }}>No users match your search.</p>
+            <p className="srv-desc" style={{ padding: 16 }}>{t('users.noUsersMatch')}</p>
           )}
         </div>
         </>

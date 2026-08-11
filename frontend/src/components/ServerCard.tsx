@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { PowerAction, Server } from '../types';
 import { StatusBadge } from './StatusBadge';
 
@@ -66,19 +67,19 @@ export function ServerCard({
       {server.primary_address && <div className="srv-addr">{server.primary_address}</div>}
 
       <div className="srv-resources">
-        <ResRow label="CPU" pct={cpuPct} value={live ? `${cpuPct}%` : '—'} />
-        <ResRow label="RAM" pct={memPct} value={live ? formatBytes(live.memory_bytes) : '—'} />
-        <ResRow label="Disk" pct={diskPct} value={live ? formatBytes(live.disk_bytes) : '—'} />
+        <ResRow label={t('serverView.cpu')} pct={cpuPct} value={live ? `${cpuPct}%` : '—'} />
+        <ResRow label={t('serverView.ram')} pct={memPct} value={live ? formatBytes(live.memory_bytes) : '—'} />
+        <ResRow label={t('serverView.disk')} pct={diskPct} value={live ? formatBytes(live.disk_bytes) : '—'} />
       </div>
 
       <div className="srv-card-foot" onClick={(e) => e.stopPropagation()}>
         <button className="btn-manage" onClick={() => onManage(server.uuid)}>
-          Manage
+          {t('serverCard.manage')}
         </button>
         {server.status === 'running' ? (
           <button
             className="btn-icon"
-            title="Stop"
+            title={t('serverCard.stop')}
             disabled={!!pendingAction}
             onClick={() => onPower(server.uuid, 'stop')}
           >
@@ -87,7 +88,7 @@ export function ServerCard({
         ) : (
           <button
             className="btn-icon"
-            title="Start"
+            title={t('serverCard.start')}
             disabled={!!pendingAction}
             onClick={() => onPower(server.uuid, 'start')}
           >
@@ -96,7 +97,7 @@ export function ServerCard({
         )}
         <button
           className="btn-icon"
-          title="Restart"
+          title={t('serverCard.restart')}
           disabled={!!pendingAction}
           onClick={() => onPower(server.uuid, 'restart')}
         >

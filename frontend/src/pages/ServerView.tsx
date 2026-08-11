@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, connectConsoleSocketWithRetry, connectServerSocketWithRetry } from '../api/client';
 import type { ConsoleHandle } from '../api/client';
+import { t } from '../i18n';
 import { BackupManager } from '../components/BackupManager';
 import { DatabaseManager } from '../components/DatabaseManager';
 import { DomainManager } from '../components/DomainManager';
@@ -16,6 +17,18 @@ interface Props {
 }
 
 type Tab = 'overview' | 'console' | 'files' | 'databases' | 'network' | 'domains' | 'backups' | 'schedules' | 'sharing';
+
+const TAB_LABEL_KEYS: Record<Tab, Parameters<typeof t>[0]> = {
+  overview: 'serverView.tabOverview',
+  console: 'serverView.tabConsole',
+  files: 'serverView.tabFiles',
+  databases: 'serverView.tabDatabases',
+  network: 'serverView.tabNetwork',
+  domains: 'serverView.tabDomains',
+  backups: 'serverView.tabBackups',
+  schedules: 'serverView.tabSchedules',
+  sharing: 'serverView.tabSharing',
+};
 
 function pct(used: number, limitMB: number): number {
   const limitBytes = limitMB * 1024 * 1024;
@@ -104,7 +117,7 @@ export function ServerView({ uuid, onBack }: Props) {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Delete "${server?.name}"? This stops and removes its container. This cannot be undone.`)) {
+    if (!window.confirm(t('serverView.confirmDelete', { name: server?.name ?? '' }))) {
       return;
     }
     setDeleting(true);
@@ -120,7 +133,7 @@ export function ServerView({ uuid, onBack }: Props) {
   async function handleSuspendToggle() {
     if (!server) return;
     const willSuspend = !server.is_suspended;
-    if (willSuspend && !window.confirm(`Suspend "${server.name}"? This stops it and blocks starting it again until unsuspended.`)) {
+    if (willSuspend && !window.confirm(t('serverView.confirmSuspend', { name: server.name }))) {
       return;
     }
     setSuspending(true);
@@ -139,7 +152,7 @@ export function ServerView({ uuid, onBack }: Props) {
   }
 
   if (error) return <div className="login-error show">{error}</div>;
-  if (!server) return <p className="srv-desc">Loading…</p>;
+  if (!server) return <p className="srv-desc">{t('common.loading')}</p>;
 
   const cpuPct = live ? Math.min(100, Math.round(live.cpu_percent)) : 0;
   const memPct = live ? pct(live.memory_bytes, server.memory_mb) : 0;
@@ -149,7 +162,7 @@ export function ServerView({ uuid, onBack }: Props) {
     <div className="view active">
       <div className="server-head">
         <span className="bc-sep" onClick={onBack} style={{ cursor: 'pointer' }}>
-          ← Back
+          {t('serverView.back')}
         </span>
         <h1 style={{ marginTop: 8 }}>{server.name}</h1>
         <p>
@@ -164,43 +177,43 @@ export function ServerView({ uuid, onBack }: Props) {
               className="power-btn start"
               onClick={() => handlePower('start')}
               disabled={server.is_suspended || !!pendingAction}
-              title={server.is_suspended ? 'This server is suspended' : undefined}
+              title={server.is_suspended ? t('serverView.suspendedTitle') : undefined}
             >
-              {pendingAction === 'start' ? 'Starting…' : 'Start'}
+              {pendingAction === 'start' ? t('serverView.starting') : t('serverView.start')}
             </button>
             <button
               className="power-btn stop"
               onClick={() => handlePower('stop')}
               disabled={!!pendingAction}
             >
-              {pendingAction === 'stop' ? 'Stopping…' : 'Stop'}
+              {pendingAction === 'stop' ? t('serverView.stopping') : t('serverView.stop')}
             </button>
             <button
               className="power-btn"
               onClick={() => handlePower('restart')}
               disabled={server.is_suspended || !!pendingAction}
-              title={server.is_suspended ? 'This server is suspended' : undefined}
+              title={server.is_suspended ? t('serverView.suspendedTitle') : undefined}
             >
-              {pendingAction === 'restart' ? 'Restarting…' : 'Restart'}
+              {pendingAction === 'restart' ? t('serverView.restarting') : t('serverView.restart')}
             </button>
             <button
               className="power-btn kill"
               onClick={() => handlePower('kill')}
               disabled={!!pendingAction}
             >
-              {pendingAction === 'kill' ? 'Killing…' : 'Kill'}
+              {pendingAction === 'kill' ? t('serverView.killing') : t('serverView.kill')}
             </button>
           </div>
           {server.is_suspended && (
             <p className="srv-desc" style={{ marginTop: 8, marginBottom: 0 }}>
-              This server is suspended.
+              {t('serverView.suspended')}
             </p>
           )}
 
           <div className="res-list">
             <div className="res-item">
               <div className="res-head">
-                <span>CPU</span>
+                <span>{t('serverView.cpu')}</span>
                 <span className="res-val">{live ? `${cpuPct}%` : '—'}</span>
               </div>
               <div className="res-bar">
@@ -209,7 +222,7 @@ export function ServerView({ uuid, onBack }: Props) {
             </div>
             <div className="res-item">
               <div className="res-head">
-                <span>RAM</span>
+                <span>{t('serverView.ram')}</span>
                 <span className="res-val">{live ? formatBytes(live.memory_bytes) : '—'}</span>
               </div>
               <div className="res-bar">
@@ -218,7 +231,7 @@ export function ServerView({ uuid, onBack }: Props) {
             </div>
             <div className="res-item">
               <div className="res-head">
-                <span>Disk</span>
+                <span>{t('serverView.disk')}</span>
                 <span className="res-val">{live ? formatBytes(live.disk_bytes) : '—'}</span>
               </div>
               <div className="res-bar">
@@ -230,65 +243,66 @@ export function ServerView({ uuid, onBack }: Props) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="tab-bar">
-            {(['overview', 'console', 'files', 'databases', 'network', 'domains', 'backups', 'schedules', 'sharing'] as Tab[]).map((t) => (
+            {(['overview', 'console', 'files', 'databases', 'network', 'domains', 'backups', 'schedules', 'sharing'] as Tab[]).map((tabKey) => (
               <div
-                key={t}
-                className={`tab-btn ${tab === t ? 'active' : ''}`}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                className={`tab-btn ${tab === tabKey ? 'active' : ''}`}
+                onClick={() => setTab(tabKey)}
               >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {t(TAB_LABEL_KEYS[tabKey])}
               </div>
             ))}
           </div>
 
           <div className={`tab-panel ${tab === 'overview' ? 'active' : ''}`}>
             <div className="settings-card">
-              <div className="settings-card-title">Server info</div>
+              <div className="settings-card-title">{t('serverView.serverInfo')}</div>
               <div className="settings-grid">
                 <div className="sfield">
-                  <label>Status</label>
+                  <label>{t('serverView.status')}</label>
                   <input readOnly value={live?.state ?? server.status} />
                 </div>
                 <div className="sfield">
-                  <label>Node</label>
+                  <label>{t('serverView.node')}</label>
                   <input readOnly value={server.node_name ?? '—'} />
                 </div>
                 <div className="sfield">
-                  <label>Address</label>
-                  <input readOnly value={server.primary_address ?? 'no allocation assigned'} />
+                  <label>{t('serverView.address')}</label>
+                  <input readOnly value={server.primary_address ?? t('serverView.noAllocation')} />
                 </div>
                 <div className="sfield">
-                  <label>Startup command</label>
+                  <label>{t('serverView.startupCommand')}</label>
                   <input readOnly value={server.startup_command} />
                 </div>
                 <div className="sfield">
-                  <label>Memory limit</label>
+                  <label>{t('serverView.memoryLimit')}</label>
                   <input readOnly value={`${server.memory_mb} MB`} />
                 </div>
                 <div className="sfield">
-                  <label>Disk limit</label>
+                  <label>{t('serverView.diskLimit')}</label>
                   <input readOnly value={`${server.disk_mb} MB`} />
                 </div>
               </div>
             </div>
 
             <div className="settings-card" style={{ marginTop: 20 }}>
-              <div className="settings-card-title">SFTP access</div>
+              <div className="settings-card-title">{t('serverView.sftpAccess')}</div>
               <p className="srv-desc" style={{ marginBottom: 12 }}>
-                Connect with any SFTP client — add your public key on the{' '}
-                <strong>Account</strong> page first if you haven't already.
+                {t('serverView.sftpHintPrefix')}
+                <strong>{t('nav.account')}</strong>
+                {t('serverView.sftpHintSuffix')}
               </p>
               <div className="settings-grid">
                 <div className="sfield">
-                  <label>Host</label>
-                  <input readOnly value={server.primary_address?.split(':')[0] ?? 'no allocation assigned'} />
+                  <label>{t('serverView.host')}</label>
+                  <input readOnly value={server.primary_address?.split(':')[0] ?? t('serverView.noAllocation')} />
                 </div>
                 <div className="sfield">
-                  <label>Port</label>
+                  <label>{t('serverView.port')}</label>
                   <input readOnly value="2022" />
                 </div>
                 <div className="sfield">
-                  <label>Username</label>
+                  <label>{t('serverView.username')}</label>
                   <input readOnly value={`${loadUsername()}.${server.uuid_short}`} />
                 </div>
               </div>
@@ -297,15 +311,15 @@ export function ServerView({ uuid, onBack }: Props) {
             <div className="danger-card" style={{ marginTop: 20 }}>
               <div className="danger-row">
                 <div className="danger-info">
-                  <h3>{server.is_suspended ? 'Unsuspend server' : 'Suspend server'}</h3>
+                  <h3>{server.is_suspended ? t('serverView.unsuspendServer') : t('serverView.suspendServer')}</h3>
                   <p>
                     {server.is_suspended
-                      ? 'Allow this server to be started again.'
-                      : "Stops the server and blocks starting it again until it's unsuspended."}
+                      ? t('serverView.allowStartAgain')
+                      : t('serverView.suspendHint')}
                   </p>
                 </div>
                 <button className="btn-sm" onClick={handleSuspendToggle} disabled={suspending}>
-                  {suspending ? 'Working…' : server.is_suspended ? 'Unsuspend' : 'Suspend'}
+                  {suspending ? t('serverView.working') : server.is_suspended ? t('serverView.unsuspend') : t('serverView.suspend')}
                 </button>
               </div>
             </div>
@@ -313,11 +327,11 @@ export function ServerView({ uuid, onBack }: Props) {
             <div className="danger-card" style={{ marginTop: 20 }}>
               <div className="danger-row">
                 <div className="danger-info">
-                  <h3>Delete server</h3>
-                  <p>Stops and permanently removes this server's container and data.</p>
+                  <h3>{t('serverView.deleteServer')}</h3>
+                  <p>{t('serverView.deleteServerHint')}</p>
                 </div>
                 <button className="btn-danger" onClick={handleDelete} disabled={deleting}>
-                  {deleting ? 'Deleting…' : 'Delete'}
+                  {deleting ? t('common.deleting') : t('common.delete')}
                 </button>
               </div>
             </div>
@@ -331,7 +345,7 @@ export function ServerView({ uuid, onBack }: Props) {
                 <span className="console-dot g" />
                 <span className="console-title">{server.name}</span>
                 <span className={`console-status ${consoleConnected ? 'online' : ''}`}>
-                  {consoleConnected ? 'Connected' : 'Connecting…'}
+                  {consoleConnected ? t('serverView.connected') : t('serverView.connecting')}
                 </span>
               </div>
               <div className="console-output" ref={outputRef}>
@@ -343,7 +357,7 @@ export function ServerView({ uuid, onBack }: Props) {
                 {consoleLines.length === 0 && (
                   <div className="con-line">
                     <span className="con-msg">
-                      {consoleConnected ? 'Waiting for output…' : 'Connecting to the node…'}
+                      {consoleConnected ? t('serverView.waitingForOutput') : t('serverView.connectingToNode')}
                     </span>
                   </div>
                 )}
@@ -357,11 +371,11 @@ export function ServerView({ uuid, onBack }: Props) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') sendCommand();
                   }}
-                  placeholder={consoleConnected ? 'Type a command…' : 'Connecting…'}
+                  placeholder={consoleConnected ? t('serverView.typeCommand') : t('serverView.connecting')}
                   disabled={!consoleConnected}
                 />
                 <button className="console-send" onClick={sendCommand} disabled={!consoleConnected}>
-                  Send
+                  {t('serverView.send')}
                 </button>
               </div>
             </div>

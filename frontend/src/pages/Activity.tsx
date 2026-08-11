@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { ActivityEntry } from '../types';
 
 const PAGE_SIZE = 100;
@@ -16,7 +17,7 @@ export function Activity() {
     const q = query.trim().toLowerCase();
     if (!q) return entries;
     return entries.filter(
-      (e) => (e.username ?? 'system').toLowerCase().includes(q) || e.event.toLowerCase().includes(q),
+      (e) => (e.username ?? t('activity.system')).toLowerCase().includes(q) || e.event.toLowerCase().includes(q),
     );
   }, [entries, query]);
 
@@ -45,13 +46,13 @@ export function Activity() {
     }
   }
 
-  if (error) return <p className="srv-desc">Only admins can view the activity log.</p>;
+  if (error) return <p className="srv-desc">{t('activity.forbidden')}</p>;
 
   return (
     <div className="view active">
       <div className="dash-head">
-        <h1>Activity</h1>
-        <p>Recent actions across the panel.</p>
+        <h1>{t('activity.title')}</h1>
+        <p>{t('activity.subtitle')}</p>
       </div>
 
       {!loading && (
@@ -60,7 +61,7 @@ export function Activity() {
             <span className="search-icon">⌕</span>
             <input
               type="text"
-              placeholder="Search by user or event…"
+              placeholder={t('activity.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -69,14 +70,14 @@ export function Activity() {
       )}
 
       {loading ? (
-        <p className="srv-desc">Loading…</p>
+        <p className="srv-desc">{t('common.loading')}</p>
       ) : (
         <div className="act-table">
           <div className="act-head">
-            <span>User</span>
-            <span>Event</span>
-            <span>IP</span>
-            <span>Time</span>
+            <span>{t('activity.colUser')}</span>
+            <span>{t('activity.colEvent')}</span>
+            <span>{t('activity.colIp')}</span>
+            <span>{t('activity.colTime')}</span>
           </div>
           {filtered.map((entry) => (
             <div className="act-row" key={entry.id}>
@@ -84,7 +85,7 @@ export function Activity() {
                 <div className="act-ava">
                   {(entry.username ?? '?').slice(0, 1).toUpperCase()}
                 </div>
-                <span>{entry.username ?? 'system'}</span>
+                <span>{entry.username ?? t('activity.system')}</span>
               </div>
               <span className="act-event">{entry.event}</span>
               <span className="act-ip">{entry.ip_address ?? '—'}</span>
@@ -93,12 +94,12 @@ export function Activity() {
           ))}
           {entries.length === 0 && (
             <p className="srv-desc" style={{ padding: 16 }}>
-              No activity yet.
+              {t('activity.noActivityYet')}
             </p>
           )}
           {entries.length > 0 && filtered.length === 0 && (
             <p className="srv-desc" style={{ padding: 16 }}>
-              No activity matches your search.
+              {t('activity.noActivityMatch')}
             </p>
           )}
         </div>
@@ -107,7 +108,7 @@ export function Activity() {
       {!loading && hasMore && entries.length > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
           <button className="btn-sm" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {loadingMore ? t('common.loading') : t('activity.loadMore')}
           </button>
         </div>
       )}

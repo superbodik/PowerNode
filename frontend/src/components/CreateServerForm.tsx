@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { Allocation, Egg, Node } from '../types';
 
 interface Props {
@@ -60,11 +61,11 @@ export function CreateServerForm({ onCreated }: Props) {
     e.preventDefault();
     setError(null);
     if (!form.node_id) {
-      setError('Select a node.');
+      setError(t('createServer.selectNodeRequired'));
       return;
     }
     if (!form.egg_id) {
-      setError('Select an egg.');
+      setError(t('createServer.selectEggRequired'));
       return;
     }
     setSubmitting(true);
@@ -95,18 +96,18 @@ export function CreateServerForm({ onCreated }: Props) {
   if (!open) {
     return (
       <button className="btn-sm primary" onClick={() => setOpen(true)} style={{ marginBottom: 16 }}>
-        + Create Server
+        {t('createServer.button')}
       </button>
     );
   }
 
   return (
     <div className="settings-card" style={{ marginBottom: 24 }}>
-      <div className="settings-card-title">Create server</div>
+      <div className="settings-card-title">{t('createServer.title')}</div>
       <form onSubmit={handleSubmit}>
         <div className="settings-grid">
           <div className="sfield">
-            <label htmlFor="srv-name">Name</label>
+            <label htmlFor="srv-name">{t('createServer.name')}</label>
             <input
               id="srv-name"
               value={form.name}
@@ -115,7 +116,7 @@ export function CreateServerForm({ onCreated }: Props) {
             />
           </div>
           <div className="sfield">
-            <label htmlFor="srv-node">Node</label>
+            <label htmlFor="srv-node">{t('createServer.node')}</label>
             <select
               id="srv-node"
               value={form.node_id}
@@ -123,7 +124,7 @@ export function CreateServerForm({ onCreated }: Props) {
               required
             >
               <option value={0} disabled>
-                Select a node…
+                {t('createServer.selectNode')}
               </option>
               {nodes.map((n) => (
                 <option key={n.id} value={n.id}>
@@ -133,7 +134,7 @@ export function CreateServerForm({ onCreated }: Props) {
             </select>
           </div>
           <div className="sfield">
-            <label htmlFor="srv-egg">Egg</label>
+            <label htmlFor="srv-egg">{t('createServer.egg')}</label>
             <select
               id="srv-egg"
               value={form.egg_id}
@@ -141,7 +142,7 @@ export function CreateServerForm({ onCreated }: Props) {
               required
             >
               <option value={0} disabled>
-                Select an egg…
+                {t('createServer.selectEgg')}
               </option>
               {eggs.map((egg) => (
                 <option key={egg.id} value={egg.id}>
@@ -151,13 +152,13 @@ export function CreateServerForm({ onCreated }: Props) {
             </select>
           </div>
           <div className="sfield">
-            <label htmlFor="srv-allocation">Allocation (optional)</label>
+            <label htmlFor="srv-allocation">{t('createServer.allocationOptional')}</label>
             <select
               id="srv-allocation"
               value={form.allocation_id}
               onChange={(e) => setForm((f) => ({ ...f, allocation_id: Number(e.target.value) }))}
             >
-              <option value={0}>None</option>
+              <option value={0}>{t('common.none')}</option>
               {allocations.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.ip}:{a.port}
@@ -166,7 +167,7 @@ export function CreateServerForm({ onCreated }: Props) {
             </select>
           </div>
           <div className="sfield span2">
-            <label htmlFor="srv-image">Docker image</label>
+            <label htmlFor="srv-image">{t('createServer.dockerImage')}</label>
             <input
               id="srv-image"
               value={form.docker_image}
@@ -175,16 +176,16 @@ export function CreateServerForm({ onCreated }: Props) {
             />
           </div>
           <div className="sfield span2">
-            <label htmlFor="srv-startup">Startup command</label>
+            <label htmlFor="srv-startup">{t('createServer.startupCommand')}</label>
             <input
               id="srv-startup"
               value={form.startup_command}
               onChange={(e) => setForm((f) => ({ ...f, startup_command: e.target.value }))}
-              placeholder="leave empty to use the image's own entrypoint"
+              placeholder={t('createServer.startupCommandPlaceholder')}
             />
           </div>
           <div className="sfield">
-            <label htmlFor="srv-memory">Memory (MB)</label>
+            <label htmlFor="srv-memory">{t('createServer.memoryMb')}</label>
             <input
               id="srv-memory"
               type="number"
@@ -194,7 +195,7 @@ export function CreateServerForm({ onCreated }: Props) {
             />
           </div>
           <div className="sfield">
-            <label htmlFor="srv-disk">Disk (MB)</label>
+            <label htmlFor="srv-disk">{t('createServer.diskMb')}</label>
             <input
               id="srv-disk"
               type="number"
@@ -240,10 +241,10 @@ export function CreateServerForm({ onCreated }: Props) {
             disabled={submitting}
             style={{ width: 'auto', padding: '10px 20px' }}
           >
-            {submitting ? 'Creating…' : 'Create'}
+            {submitting ? t('createServer.creating') : t('createServer.create')}
           </button>
           <button className="btn-sm" type="button" onClick={() => setOpen(false)}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </form>

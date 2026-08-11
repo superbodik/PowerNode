@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { Allocation, CreateNodeResponse, DatabaseHost, Node, NodeStatus } from '../types';
 
 const INSTALL_SCRIPT_URL = 'https://raw.githubusercontent.com/superbodik/PowerNode/main/install.sh';
@@ -61,7 +62,7 @@ export function Nodes() {
   }
 
   async function handleDeleteDbHost(id: number) {
-    if (!window.confirm('Delete this database host? Only possible if nothing is provisioned on it.')) return;
+    if (!window.confirm(t('nodes.confirmDeleteDbHost'))) return;
     try {
       await api.deleteDatabaseHost(id);
       refreshDbHosts();
@@ -123,7 +124,7 @@ export function Nodes() {
   }
 
   async function handleRegenerateToken(node: Node) {
-    if (!window.confirm(`Generate a new daemon token for "${node.name}"? You'll need to run one command on the node to apply it.`)) {
+    if (!window.confirm(t('nodes.confirmRegenToken', { name: node.name }))) {
       return;
     }
     setRegeneratingNodeId(node.id);
@@ -152,7 +153,7 @@ export function Nodes() {
   }
 
   async function handleDeleteNode(node: Node) {
-    if (!window.confirm(`Delete node "${node.name}"? This only removes it from the panel — it does not uninstall wingsd from the machine.`)) {
+    if (!window.confirm(t('nodes.confirmDeleteNode', { name: node.name }))) {
       return;
     }
     setDeletingNodeId(node.id);
@@ -211,7 +212,10 @@ export function Nodes() {
       setAllocForm((f) => ({ ...f, port: next, portEnd: next }));
       if (result.created < allocForm.portEnd - allocForm.port + 1) {
         setAllocError(
-          `Added ${result.created} of ${allocForm.portEnd - allocForm.port + 1} ports (some already existed).`,
+          t('nodes.addedPortsPartial', {
+            created: result.created,
+            total: allocForm.portEnd - allocForm.port + 1,
+          }),
         );
       }
       refreshAllocations(allocationNodeId);
@@ -262,16 +266,15 @@ export function Nodes() {
   return (
     <div className="view active">
       <div className="dash-head">
-        <h1>Nodes</h1>
-        <p>Machines running wingsd, ready to host servers.</p>
+        <h1>{t('nodes.title')}</h1>
+        <p>{t('nodes.subtitle')}</p>
       </div>
 
       {justCreated && (
         <div className="acc-card" style={{ marginBottom: 20 }}>
-          <div className="acc-card-title">Node created — run this on the node</div>
+          <div className="acc-card-title">{t('nodes.createdTitle')}</div>
           <p className="srv-desc" style={{ marginBottom: 10 }}>
-            Copy this command and run it on the node's server (as root). It installs Docker
-            and wingsd and registers the daemon token automatically — no prompts.
+            {t('nodes.createdHint')}
           </p>
           <div className="api-item">
             <span className="api-key">{nodeInstallCommand(justCreated.daemon_token)}</span>
@@ -279,11 +282,11 @@ export function Nodes() {
               className="btn-sm"
               onClick={() => navigator.clipboard?.writeText(nodeInstallCommand(justCreated.daemon_token))}
             >
-              Copy
+              {t('common.copy')}
             </button>
           </div>
           <p className="srv-desc" style={{ marginTop: 12, marginBottom: 6 }}>
-            Raw token, shown once, in case you're installing manually:
+            {t('nodes.rawTokenHint')}
           </p>
           <div className="api-item">
             <span className="api-key">{justCreated.daemon_token}</span>
@@ -291,12 +294,12 @@ export function Nodes() {
               className="btn-sm"
               onClick={() => navigator.clipboard?.writeText(justCreated.daemon_token)}
             >
-              Copy
+              {t('common.copy')}
             </button>
           </div>
           <div className="settings-foot">
             <button className="btn-sm" onClick={() => setJustCreated(null)}>
-              Done
+              {t('nodes.done')}
             </button>
           </div>
         </div>
@@ -305,42 +308,42 @@ export function Nodes() {
       {error && <div className="login-error show" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 24 }}>
-        <div className="settings-card-title">Add node</div>
+        <div className="settings-card-title">{t('nodes.addNode')}</div>
         <form onSubmit={handleCreate}>
           <div className="settings-grid">
             <div className="sfield">
-              <label htmlFor="node-name">Name</label>
+              <label htmlFor="node-name">{t('nodes.name')}</label>
               <input
                 id="node-name"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="node-1"
+                placeholder={t('nodes.placeholderNodeName')}
                 required
               />
             </div>
             <div className="sfield">
-              <label htmlFor="node-fqdn">FQDN / IP</label>
+              <label htmlFor="node-fqdn">{t('nodes.fqdnIp')}</label>
               <input
                 id="node-fqdn"
                 value={form.fqdn}
                 onChange={(e) => setForm((f) => ({ ...f, fqdn: e.target.value }))}
-                placeholder="node1.example.com"
+                placeholder={t('nodes.placeholderNodeFqdn')}
                 required
               />
             </div>
             <div className="sfield">
-              <label htmlFor="node-scheme">wingsd scheme</label>
+              <label htmlFor="node-scheme">{t('nodes.wingsdScheme')}</label>
               <select
                 id="node-scheme"
                 value={form.scheme}
                 onChange={(e) => setForm((f) => ({ ...f, scheme: e.target.value }))}
               >
-                <option value="http">http (default — no TLS cert configured on the node)</option>
-                <option value="https">https (only if WINGSD_TLS_CERT/KEY are set)</option>
+                <option value="http">{t('nodes.schemeHttpOption')}</option>
+                <option value="https">{t('nodes.schemeHttpsOption')}</option>
               </select>
             </div>
             <div className="sfield">
-              <label htmlFor="node-memory">Memory (MB)</label>
+              <label htmlFor="node-memory">{t('nodes.memoryMb')}</label>
               <input
                 id="node-memory"
                 type="number"
@@ -350,7 +353,7 @@ export function Nodes() {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="node-disk">Disk (MB)</label>
+              <label htmlFor="node-disk">{t('nodes.diskMb')}</label>
               <input
                 id="node-disk"
                 type="number"
@@ -360,7 +363,7 @@ export function Nodes() {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="node-location">Location ID</label>
+              <label htmlFor="node-location">{t('nodes.locationId')}</label>
               <input
                 id="node-location"
                 type="number"
@@ -372,7 +375,7 @@ export function Nodes() {
           </div>
           <div className="settings-foot">
             <button className="btn-primary" type="submit" disabled={submitting} style={{ width: 'auto', padding: '10px 20px' }}>
-              {submitting ? 'Creating…' : 'Create node'}
+              {submitting ? t('nodes.creatingNode') : t('nodes.createNode')}
             </button>
           </div>
         </form>
@@ -384,7 +387,7 @@ export function Nodes() {
             <span className="search-icon">⌕</span>
             <input
               type="text"
-              placeholder="Search nodes…"
+              placeholder={t('nodes.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -393,14 +396,14 @@ export function Nodes() {
       )}
 
       {loading ? (
-        <p className="srv-desc">Loading nodes…</p>
+        <p className="srv-desc">{t('nodes.loading')}</p>
       ) : (
         <div className="db-table">
           <div className="db-head">
-            <span>Name</span>
-            <span>Address</span>
-            <span>Memory / Disk</span>
-            <span>Status</span>
+            <span>{t('nodes.name')}</span>
+            <span>{t('nodes.colAddress')}</span>
+            <span>{t('nodes.colMemoryDisk')}</span>
+            <span>{t('nodes.colStatus')}</span>
           </div>
           {filteredNodes.map((node) => {
             const status = statuses[node.id];
@@ -416,12 +419,12 @@ export function Nodes() {
                     {node.name}
                     {!node.is_public && (
                       <span className="srv-desc" style={{ fontSize: 10, border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
-                        Private
+                        {t('nodes.private')}
                       </span>
                     )}
                     {node.maintenance_mode && (
                       <span style={{ fontSize: 10, color: 'var(--yellow, #f0b232)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
-                        Maintenance
+                        {t('nodes.maintenance')}
                       </span>
                     )}
                   </span>
@@ -431,13 +434,13 @@ export function Nodes() {
                   <span>{node.memory_mb} MB / {node.disk_mb} MB</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                     {status === 'checking' ? (
-                      'Checking…'
+                      t('nodes.checking')
                     ) : status ? (
                       <span
                         title={
                           status.error ??
                           (status.agent_version && panelVersion && status.agent_version !== panelVersion
-                            ? `Node is on v${status.agent_version}, panel is on v${panelVersion} — update this node`
+                            ? t('nodes.versionMismatch', { agent: status.agent_version, panel: panelVersion })
                             : '')
                         }
                         style={{
@@ -452,15 +455,15 @@ export function Nodes() {
                         }}
                       >
                         {status.online
-                          ? `Online${status.agent_version ?? node.agent_version ? ` · v${status.agent_version ?? node.agent_version}` : ''}`
-                          : `Unreachable: ${status.error ?? 'unknown error'}`}
+                          ? `${t('nodes.online')}${status.agent_version ?? node.agent_version ? ` · v${status.agent_version ?? node.agent_version}` : ''}`
+                          : t('nodes.unreachable', { error: status.error ?? t('nodes.unknownError') })}
                       </span>
                     ) : (
-                      node.agent_version ? `Last seen: v${node.agent_version}` : 'Unknown'
+                      node.agent_version ? t('nodes.lastSeen', { version: node.agent_version }) : t('nodes.unknown')
                     )}
                     <button
                       className="file-act-btn"
-                      title="Check connection"
+                      title={t('nodes.checkConnection')}
                       onClick={() => handleCheckStatus(node.id)}
                       style={{ flexShrink: 0 }}
                     >
@@ -472,7 +475,7 @@ export function Nodes() {
                   <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(192,100,120,.06)' }}>
                     <div className="settings-grid" style={{ marginBottom: 14 }}>
                       <div className="sfield">
-                        <label htmlFor={`edit-name-${node.id}`}>Name</label>
+                        <label htmlFor={`edit-name-${node.id}`}>{t('nodes.name')}</label>
                         <input
                           id={`edit-name-${node.id}`}
                           value={editForm.name}
@@ -480,7 +483,7 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-fqdn-${node.id}`}>FQDN / IP</label>
+                        <label htmlFor={`edit-fqdn-${node.id}`}>{t('nodes.fqdnIp')}</label>
                         <input
                           id={`edit-fqdn-${node.id}`}
                           value={editForm.fqdn}
@@ -488,18 +491,18 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-scheme-${node.id}`}>wingsd scheme</label>
+                        <label htmlFor={`edit-scheme-${node.id}`}>{t('nodes.wingsdScheme')}</label>
                         <select
                           id={`edit-scheme-${node.id}`}
                           value={editForm.scheme}
                           onChange={(e) => setEditForm((f) => ({ ...f, scheme: e.target.value }))}
                         >
-                          <option value="http">http (no TLS cert on the node)</option>
-                          <option value="https">https (WINGSD_TLS_CERT/KEY set)</option>
+                          <option value="http">{t('nodes.editSchemeHttpOption')}</option>
+                          <option value="https">{t('nodes.editSchemeHttpsOption')}</option>
                         </select>
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-port-${node.id}`}>Daemon port</label>
+                        <label htmlFor={`edit-port-${node.id}`}>{t('nodes.daemonPort')}</label>
                         <input
                           id={`edit-port-${node.id}`}
                           type="number"
@@ -510,7 +513,7 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-memory-${node.id}`}>Memory (MB)</label>
+                        <label htmlFor={`edit-memory-${node.id}`}>{t('nodes.memoryMb')}</label>
                         <input
                           id={`edit-memory-${node.id}`}
                           type="number"
@@ -521,7 +524,7 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-memory-overallocate-${node.id}`}>Memory overallocate (%)</label>
+                        <label htmlFor={`edit-memory-overallocate-${node.id}`}>{t('nodes.memoryOverallocate')}</label>
                         <input
                           id={`edit-memory-overallocate-${node.id}`}
                           type="number"
@@ -532,7 +535,7 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-disk-${node.id}`}>Disk (MB)</label>
+                        <label htmlFor={`edit-disk-${node.id}`}>{t('nodes.diskMb')}</label>
                         <input
                           id={`edit-disk-${node.id}`}
                           type="number"
@@ -543,7 +546,7 @@ export function Nodes() {
                         />
                       </div>
                       <div className="sfield">
-                        <label htmlFor={`edit-disk-overallocate-${node.id}`}>Disk overallocate (%)</label>
+                        <label htmlFor={`edit-disk-overallocate-${node.id}`}>{t('nodes.diskOverallocate')}</label>
                         <input
                           id={`edit-disk-overallocate-${node.id}`}
                           type="number"
@@ -562,7 +565,7 @@ export function Nodes() {
                         >
                           <div className="toggle-knob" />
                         </div>
-                        Public (visible to all users when creating a server)
+                        {t('nodes.publicToggleLabel')}
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                         <div
@@ -571,7 +574,7 @@ export function Nodes() {
                         >
                           <div className="toggle-knob" />
                         </div>
-                        Maintenance mode (blocks new servers)
+                        {t('nodes.maintenanceToggleLabel')}
                       </label>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -581,14 +584,14 @@ export function Nodes() {
                         disabled={savingNodeId === node.id}
                         onClick={() => handleSaveNode(node)}
                       >
-                        {savingNodeId === node.id ? 'Saving…' : 'Save'}
+                        {savingNodeId === node.id ? t('common.saving') : t('common.save')}
                       </button>
                       <button
                         className="btn-sm"
                         disabled={regeneratingNodeId === node.id}
                         onClick={() => handleRegenerateToken(node)}
                       >
-                        {regeneratingNodeId === node.id ? 'Generating…' : 'Regenerate token'}
+                        {regeneratingNodeId === node.id ? t('nodes.generating') : t('nodes.regenerateToken')}
                       </button>
                       <button
                         className="btn-danger"
@@ -596,16 +599,14 @@ export function Nodes() {
                         disabled={deletingNodeId === node.id}
                         onClick={() => handleDeleteNode(node)}
                       >
-                        {deletingNodeId === node.id ? 'Deleting…' : 'Delete node'}
+                        {deletingNodeId === node.id ? t('common.deleting') : t('nodes.deleteNode')}
                       </button>
                     </div>
 
                     {regeneratedToken && regeneratedToken.id === node.id && (
                       <div style={{ marginTop: 14 }}>
                         <p className="srv-desc" style={{ marginBottom: 8 }}>
-                          New token generated. Run this on the node to apply it —
-                          it updates the existing wingsd install and restarts it,
-                          nothing else changes.
+                          {t('nodes.newTokenHint')}
                         </p>
                         <div className="api-item">
                           <span className="api-key">{nodeInstallCommand(regeneratedToken.daemon_token)}</span>
@@ -615,7 +616,7 @@ export function Nodes() {
                               navigator.clipboard?.writeText(nodeInstallCommand(regeneratedToken.daemon_token))
                             }
                           >
-                            Copy
+                            {t('common.copy')}
                           </button>
                         </div>
                       </div>
@@ -625,25 +626,25 @@ export function Nodes() {
               </div>
             );
           })}
-          {nodes.length === 0 && <p className="srv-desc" style={{ padding: 16 }}>No nodes yet.</p>}
+          {nodes.length === 0 && <p className="srv-desc" style={{ padding: 16 }}>{t('nodes.noNodesYet')}</p>}
           {nodes.length > 0 && filteredNodes.length === 0 && (
-            <p className="srv-desc" style={{ padding: 16 }}>No nodes match your search.</p>
+            <p className="srv-desc" style={{ padding: 16 }}>{t('nodes.noNodesMatch')}</p>
           )}
         </div>
       )}
 
       <div className="settings-card" style={{ marginTop: 24 }}>
-        <div className="settings-card-title">Allocations</div>
+        <div className="settings-card-title">{t('nodes.allocationsTitle')}</div>
         <div className="settings-grid" style={{ marginBottom: 16 }}>
           <div className="sfield">
-            <label htmlFor="alloc-node">Node</label>
+            <label htmlFor="alloc-node">{t('nodes.selectNodeLabel')}</label>
             <select
               id="alloc-node"
               value={allocationNodeId}
               onChange={(e) => setAllocationNodeId(Number(e.target.value))}
             >
               <option value={0} disabled>
-                Select a node…
+                {t('nodes.selectNodePlaceholder')}
               </option>
               {nodes.map((n) => (
                 <option key={n.id} value={n.id}>
@@ -659,17 +660,17 @@ export function Nodes() {
             <form onSubmit={handleCreateAllocation}>
               <div className="settings-grid">
                 <div className="sfield">
-                  <label htmlFor="alloc-ip">IP</label>
+                  <label htmlFor="alloc-ip">{t('nodes.ip')}</label>
                   <input
                     id="alloc-ip"
                     value={allocForm.ip}
                     onChange={(e) => setAllocForm((f) => ({ ...f, ip: e.target.value }))}
-                    placeholder="node's public IP"
+                    placeholder={t('nodes.placeholderAllocIp')}
                     required
                   />
                 </div>
                 <div className="sfield">
-                  <label htmlFor="alloc-port">Port (start)</label>
+                  <label htmlFor="alloc-port">{t('nodes.portStart')}</label>
                   <input
                     id="alloc-port"
                     type="number"
@@ -686,7 +687,7 @@ export function Nodes() {
                   />
                 </div>
                 <div className="sfield">
-                  <label htmlFor="alloc-port-end">Port (end, optional range)</label>
+                  <label htmlFor="alloc-port-end">{t('nodes.portEndOptional')}</label>
                   <input
                     id="alloc-port-end"
                     type="number"
@@ -703,15 +704,15 @@ export function Nodes() {
                   type="submit"
                   disabled={allocSubmitting}
                 >
-                  {allocSubmitting ? 'Adding…' : 'Add allocation(s)'}
+                  {allocSubmitting ? t('nodes.adding') : t('nodes.addAllocations')}
                 </button>
               </div>
             </form>
 
             <div className="db-table" style={{ marginTop: 16 }}>
               <div className="db-head">
-                <span>Address</span>
-                <span>Status</span>
+                <span>{t('nodes.colAddress')}</span>
+                <span>{t('nodes.colStatus')}</span>
                 <span />
                 <span />
               </div>
@@ -720,12 +721,12 @@ export function Nodes() {
                   <span className="db-name">
                     {a.ip}:{a.port}
                   </span>
-                  <span>{a.server_id ? 'In use' : 'Free'}</span>
+                  <span>{a.server_id ? t('nodes.inUse') : t('nodes.free')}</span>
                   <span />
                   <span>
                     {!a.server_id && (
                       <button className="file-act-btn del" onClick={() => handleDeleteAllocation(a.id)}>
-                        Delete
+                        {t('common.delete')}
                       </button>
                     )}
                   </span>
@@ -733,7 +734,7 @@ export function Nodes() {
               ))}
               {allocations.length === 0 && (
                 <p className="srv-desc" style={{ padding: 16 }}>
-                  No allocations on this node yet.
+                  {t('nodes.noAllocationsYet')}
                 </p>
               )}
             </div>
@@ -742,36 +743,34 @@ export function Nodes() {
       </div>
 
       <div className="settings-card" style={{ marginTop: 24 }}>
-        <div className="settings-card-title">Database hosts</div>
+        <div className="settings-card-title">{t('nodes.dbHostsTitle')}</div>
         <p className="srv-desc" style={{ marginBottom: 14 }}>
-          Register a reachable MySQL/MariaDB server here so users can provision
-          per-server databases from the Databases tab. The admin credentials need
-          CREATE/DROP DATABASE, CREATE/DROP USER, and GRANT privileges.
+          {t('nodes.dbHostsHint')}
         </p>
         <form onSubmit={handleCreateDbHost}>
           <div className="settings-grid">
             <div className="sfield">
-              <label htmlFor="dbhost-name">Name</label>
+              <label htmlFor="dbhost-name">{t('nodes.name')}</label>
               <input
                 id="dbhost-name"
                 value={dbHostForm.name}
                 onChange={(e) => setDbHostForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="main-mysql"
+                placeholder={t('nodes.placeholderDbHostName')}
                 required
               />
             </div>
             <div className="sfield">
-              <label htmlFor="dbhost-host">Host</label>
+              <label htmlFor="dbhost-host">{t('nodes.host')}</label>
               <input
                 id="dbhost-host"
                 value={dbHostForm.host}
                 onChange={(e) => setDbHostForm((f) => ({ ...f, host: e.target.value }))}
-                placeholder="127.0.0.1 or a domain"
+                placeholder={t('nodes.placeholderDbHost')}
                 required
               />
             </div>
             <div className="sfield">
-              <label htmlFor="dbhost-port">Port</label>
+              <label htmlFor="dbhost-port">{t('nodes.port')}</label>
               <input
                 id="dbhost-port"
                 type="number"
@@ -781,7 +780,7 @@ export function Nodes() {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="dbhost-user">Admin username</label>
+              <label htmlFor="dbhost-user">{t('nodes.adminUsername')}</label>
               <input
                 id="dbhost-user"
                 value={dbHostForm.admin_username}
@@ -790,7 +789,7 @@ export function Nodes() {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="dbhost-pass">Admin password</label>
+              <label htmlFor="dbhost-pass">{t('nodes.adminPassword')}</label>
               <input
                 id="dbhost-pass"
                 type="password"
@@ -803,16 +802,16 @@ export function Nodes() {
           {dbHostError && <div className="login-error show" style={{ marginTop: 12 }}>{dbHostError}</div>}
           <div className="settings-foot">
             <button className="btn-sm primary" type="submit" disabled={dbHostSubmitting}>
-              {dbHostSubmitting ? 'Adding…' : 'Add database host'}
+              {dbHostSubmitting ? t('nodes.adding') : t('nodes.addDbHost')}
             </button>
           </div>
         </form>
 
         <div className="db-table" style={{ marginTop: 16 }}>
           <div className="db-head">
-            <span>Name</span>
-            <span>Address</span>
-            <span>Admin user</span>
+            <span>{t('nodes.name')}</span>
+            <span>{t('nodes.colAddress')}</span>
+            <span>{t('nodes.colAdminUser')}</span>
             <span />
           </div>
           {dbHosts.map((host) => (
@@ -822,14 +821,14 @@ export function Nodes() {
               <span>{host.admin_username}</span>
               <span>
                 <button className="file-act-btn del" onClick={() => handleDeleteDbHost(host.id)}>
-                  Delete
+                  {t('common.delete')}
                 </button>
               </span>
             </div>
           ))}
           {dbHosts.length === 0 && (
             <p className="srv-desc" style={{ padding: 16 }}>
-              No database hosts registered yet.
+              {t('nodes.noDbHostsYet')}
             </p>
           )}
         </div>

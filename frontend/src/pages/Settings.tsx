@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { UpdateCheck, VersionInfo } from '../types';
 
 function updateCommand(sourceDir: string): string {
@@ -34,31 +35,31 @@ export function Settings() {
   return (
     <div className="view active">
       <div className="dash-head">
-        <h1>Settings</h1>
-        <p>Panel version and updates.</p>
+        <h1>{t('settings.title')}</h1>
+        <p>{t('settings.subtitle')}</p>
       </div>
 
       <div className="settings-section">
         <div className="settings-card">
-          <div className="settings-card-title">Version</div>
+          <div className="settings-card-title">{t('settings.version')}</div>
           <div className="settings-grid">
             <div className="sfield">
-              <label>Version</label>
+              <label>{t('settings.version')}</label>
               <input readOnly value={version ? `v${version.version}` : '…'} />
             </div>
             <div className="sfield">
-              <label>Commit</label>
+              <label>{t('settings.commit')}</label>
               <input readOnly value={version?.commit ?? '…'} />
             </div>
             <div className="sfield">
-              <label>Build date</label>
+              <label>{t('settings.buildDate')}</label>
               <input readOnly value={version?.build_date ?? '…'} />
             </div>
           </div>
 
           <div className="settings-foot">
             <button className="btn-sm primary" onClick={handleCheck} disabled={checking}>
-              {checking ? 'Checking…' : 'Check for Updates'}
+              {checking ? t('settings.checking') : t('settings.checkForUpdates')}
             </button>
           </div>
 
@@ -69,8 +70,11 @@ export function Settings() {
               {updateCheck.update_available ? (
                 <>
                   <p className="srv-desc" style={{ marginBottom: 8 }}>
-                    Update available: <strong>v{updateCheck.current_version}</strong> →{' '}
-                    <strong>v{updateCheck.latest_version}</strong>. Run this on the panel's server:
+                    {t('settings.updateAvailablePrefix')}
+                    <strong>v{updateCheck.current_version}</strong>
+                    {t('settings.updateAvailableArrow')}
+                    <strong>v{updateCheck.latest_version}</strong>
+                    {t('settings.updateAvailableSuffix')}
                   </p>
                   <div className="api-item">
                     <span className="api-key">{updateCommand(version?.source_dir ?? '')}</span>
@@ -80,12 +84,12 @@ export function Settings() {
                         navigator.clipboard?.writeText(updateCommand(version?.source_dir ?? ''))
                       }
                     >
-                      Copy
+                      {t('common.copy')}
                     </button>
                   </div>
                 </>
               ) : (
-                <p className="srv-desc">You're up to date (v{updateCheck.current_version}).</p>
+                <p className="srv-desc">{t('settings.upToDate', { version: updateCheck.current_version })}</p>
               )}
             </div>
           )}

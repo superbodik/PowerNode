@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { Subuser } from '../types';
 import { SUBUSER_PERMISSIONS } from '../types';
 
@@ -61,7 +62,7 @@ export function SubuserManager({ uuid }: Props) {
   }
 
   async function handleRemove(s: Subuser) {
-    if (!window.confirm(`Remove ${s.email}'s access to this server?`)) return;
+    if (!window.confirm(t('subusers.confirmRemove', { email: s.email }))) return;
     try {
       await api.removeSubuser(uuid, s.id);
       refresh();
@@ -73,13 +74,13 @@ export function SubuserManager({ uuid }: Props) {
   if (forbidden) {
     return (
       <p className="srv-desc">
-        Only this server's owner or an admin can manage sharing.
+        {t('subusers.forbidden')}
       </p>
     );
   }
 
   if (subusers === null) {
-    return <p className="srv-desc">Loading…</p>;
+    return <p className="srv-desc">{t('common.loading')}</p>;
   }
 
   return (
@@ -91,16 +92,16 @@ export function SubuserManager({ uuid }: Props) {
       )}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>
-        <div className="settings-card-title">Add a collaborator</div>
+        <div className="settings-card-title">{t('subusers.addCollaborator')}</div>
         <form onSubmit={handleAdd}>
           <div className="sfield" style={{ marginBottom: 14 }}>
-            <label htmlFor="subuser-email">User's email</label>
+            <label htmlFor="subuser-email">{t('subusers.userEmail')}</label>
             <input
               id="subuser-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="teammate@example.com"
+              placeholder={t('subusers.emailPlaceholder')}
               required
             />
           </div>
@@ -127,7 +128,7 @@ export function SubuserManager({ uuid }: Props) {
               disabled={submitting}
               style={{ width: 'auto', padding: '10px 20px' }}
             >
-              {submitting ? 'Adding…' : 'Add collaborator'}
+              {submitting ? t('subusers.adding') : t('subusers.addCollaboratorButton')}
             </button>
           </div>
         </form>
@@ -139,7 +140,7 @@ export function SubuserManager({ uuid }: Props) {
             <div className="sch-head">
               <span className="sch-name">{s.email}</span>
               <button className="file-act-btn del" onClick={() => handleRemove(s)}>
-                Remove
+                {t('subusers.remove')}
               </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
@@ -160,7 +161,7 @@ export function SubuserManager({ uuid }: Props) {
             </div>
           </div>
         ))}
-        {subusers.length === 0 && <p className="srv-desc">No collaborators yet.</p>}
+        {subusers.length === 0 && <p className="srv-desc">{t('subusers.noCollaboratorsYet')}</p>}
       </div>
     </div>
   );

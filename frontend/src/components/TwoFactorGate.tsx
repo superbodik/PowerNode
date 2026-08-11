@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import QRCode from 'qrcode';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { TwoFASetup } from '../types';
 
 interface Props {
@@ -56,20 +57,20 @@ export function TwoFactorGate({ onVerified, onLogout }: Props) {
         </div>
 
         <div className="login-head">
-          <h1>2FA required</h1>
-          <p>Admin accounts on this panel must have two-factor authentication enabled before continuing.</p>
+          <h1>{t('twofaGate.required')}</h1>
+          <p>{t('twofaGate.hint')}</p>
         </div>
 
         {error && <div className="login-error show">{error}</div>}
 
         {!setup ? (
           <button className="btn-primary" style={{ width: '100%' }} onClick={handleStartSetup}>
-            Set up 2FA
+            {t('twofaGate.setUp')}
           </button>
         ) : (
           <div>
             <p className="srv-desc" style={{ marginBottom: 10 }}>
-              Scan this with your authenticator app, or add it manually with the secret below.
+              {t('account.scanHint')}
             </p>
             {qrCodeUrl && (
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
@@ -79,12 +80,12 @@ export function TwoFactorGate({ onVerified, onLogout }: Props) {
             <div className="api-item" style={{ marginBottom: 16 }}>
               <span className="api-key">{setup.secret}</span>
               <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(setup.secret)}>
-                Copy
+                {t('common.copy')}
               </button>
             </div>
             <form onSubmit={handleVerify}>
               <div className="sfield">
-                <label htmlFor="gate-verify-code">Enter the 6-digit code to confirm</label>
+                <label htmlFor="gate-verify-code">{t('account.enterCodeToConfirm')}</label>
                 <input
                   id="gate-verify-code"
                   inputMode="numeric"
@@ -100,7 +101,7 @@ export function TwoFactorGate({ onVerified, onLogout }: Props) {
                 disabled={busy}
                 style={{ width: '100%', marginTop: 12 }}
               >
-                {busy ? 'Verifying…' : 'Verify & continue'}
+                {busy ? t('login.verifying') : t('twofaGate.verifyAndContinue')}
               </button>
             </form>
           </div>
@@ -108,7 +109,7 @@ export function TwoFactorGate({ onVerified, onLogout }: Props) {
 
         <div style={{ textAlign: 'center', marginTop: 20 }}>
           <span className="bc-sep" style={{ cursor: 'pointer' }} onClick={onLogout}>
-            Log out
+            {t('nav.logout')}
           </span>
         </div>
       </div>

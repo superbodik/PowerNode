@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, clearTokens } from './api/client';
+import { t } from './i18n';
 import { Account } from './pages/Account';
 import { Activity } from './pages/Activity';
 import { Dashboard } from './pages/Dashboard';
@@ -118,7 +119,7 @@ export function App() {
         <button
           className="mobile-nav-toggle"
           onClick={() => setMobileNavOpen((v) => !v)}
-          aria-label="Toggle navigation"
+          aria-label={t('app.toggleNav')}
         >
           ☰
         </button>
@@ -130,16 +131,16 @@ export function App() {
         <nav className="breadcrumb">
           <span className={activeServer ? '' : 'bc-cur'} onClick={() => goTo('servers')}>
             {view === 'nodes'
-              ? 'Nodes'
+              ? t('nav.nodes')
               : view === 'settings'
-                ? 'Settings'
+                ? t('nav.settings')
                 : view === 'activity'
-                  ? 'Activity'
+                  ? t('nav.activity')
                   : view === 'account'
-                    ? 'Account'
+                    ? t('nav.account')
                     : view === 'users'
-                      ? 'Users'
-                      : 'Dashboard'}
+                      ? t('nav.users')
+                      : t('nav.dashboard')}
           </span>
           {activeServer && (
             <>
@@ -163,39 +164,39 @@ export function App() {
         />
         <aside className={`sidebar ${mobileNavOpen ? 'mobile-open' : ''}`}>
           <div className="nav-section">
-            <div className="nav-section-label">Overview</div>
+            <div className="nav-section-label">{t('nav.overview')}</div>
             <div
               className={`nav-item ${view === 'servers' ? 'active' : ''}`}
               onClick={() => goTo('servers')}
             >
-              <span className="nav-icon">▦</span> Servers
+              <span className="nav-icon">▦</span> {t('nav.servers')}
             </div>
           </div>
           <div className="nav-section">
-            <div className="nav-section-label">Admin</div>
+            <div className="nav-section-label">{t('nav.admin')}</div>
             <div
               className={`nav-item ${view === 'nodes' ? 'active' : ''}`}
               onClick={() => goTo('nodes')}
             >
-              <span className="nav-icon">◆</span> Nodes
+              <span className="nav-icon">◆</span> {t('nav.nodes')}
             </div>
             <div
               className={`nav-item ${view === 'users' ? 'active' : ''}`}
               onClick={() => goTo('users')}
             >
-              <span className="nav-icon">☺</span> Users
+              <span className="nav-icon">☺</span> {t('nav.users')}
             </div>
             <div
               className={`nav-item ${view === 'activity' ? 'active' : ''}`}
               onClick={() => goTo('activity')}
             >
-              <span className="nav-icon">☰</span> Activity
+              <span className="nav-icon">☰</span> {t('nav.activity')}
             </div>
             <div
               className={`nav-item ${view === 'account' ? 'active' : ''}`}
               onClick={() => goTo('account')}
             >
-              <span className="nav-icon">◈</span> Account
+              <span className="nav-icon">◈</span> {t('nav.account')}
             </div>
           </div>
           <div className="sidebar-footer">
@@ -203,10 +204,10 @@ export function App() {
               className={`nav-item ${view === 'settings' ? 'active' : ''}`}
               onClick={() => goTo('settings')}
             >
-              <span className="nav-icon">⚙</span> Settings
+              <span className="nav-icon">⚙</span> {t('nav.settings')}
             </div>
             <div className="nav-item logout-item" onClick={handleLogout}>
-              <span className="nav-icon">⏻</span> Log out
+              <span className="nav-icon">⏻</span> {t('nav.logout')}
             </div>
           </div>
         </aside>

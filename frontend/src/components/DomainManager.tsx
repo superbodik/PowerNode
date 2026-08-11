@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { ServerAllocation, ServerDomain } from '../types';
 
 interface Props {
@@ -58,7 +59,7 @@ export function DomainManager({ uuid }: Props) {
   }
 
   async function handleDelete(d: ServerDomain) {
-    if (!window.confirm(`Remove "${d.domain}"? This deletes its reverse proxy and TLS certificate.`)) {
+    if (!window.confirm(t('domains.confirmDelete', { domain: d.domain }))) {
       return;
     }
     try {
@@ -72,13 +73,13 @@ export function DomainManager({ uuid }: Props) {
   if (forbidden) {
     return (
       <p className="srv-desc">
-        You don't have permission to view this server's domains.
+        {t('domains.forbidden')}
       </p>
     );
   }
 
   if (domains === null) {
-    return <p className="srv-desc">Loading…</p>;
+    return <p className="srv-desc">{t('common.loading')}</p>;
   }
 
   return (
@@ -86,17 +87,14 @@ export function DomainManager({ uuid }: Props) {
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>
-        <div className="settings-card-title">Add a custom domain</div>
+        <div className="settings-card-title">{t('domains.addCustomDomain')}</div>
         <p className="srv-desc" style={{ marginBottom: 12 }}>
-          Point the domain's DNS A record at this server's node before adding it here, or
-          certificate issuance will fail and it'll stay on plain HTTP. Subdomains work too —
-          add each one separately and point it at a different port below to run several
-          services off the same server.
+          {t('domains.hint')}
         </p>
         <form onSubmit={handleCreate}>
           <div className="settings-grid">
             <div className="sfield">
-              <label htmlFor="domain-name">Domain</label>
+              <label htmlFor="domain-name">{t('domains.domain')}</label>
               <input
                 id="domain-name"
                 value={domain}
@@ -106,7 +104,7 @@ export function DomainManager({ uuid }: Props) {
               />
             </div>
             <div className="sfield">
-              <label htmlFor="domain-port">Port</label>
+              <label htmlFor="domain-port">{t('domains.port')}</label>
               <select
                 id="domain-port"
                 value={allocationId}
@@ -114,31 +112,31 @@ export function DomainManager({ uuid }: Props) {
                 required
               >
                 <option value="" disabled>
-                  Select a port…
+                  {t('domains.selectPort')}
                 </option>
                 {allocations.map((a) => (
                   <option key={a.id} value={a.id}>
                     :{a.port}
-                    {a.is_primary ? ' (main)' : ''}
+                    {a.is_primary ? t('domains.mainSuffix') : ''}
                     {a.alias ? ` — ${a.alias}` : ''}
                   </option>
                 ))}
               </select>
             </div>
             <div className="sfield">
-              <label htmlFor="domain-email">Contact email (optional)</label>
+              <label htmlFor="domain-email">{t('domains.contactEmailOptional')}</label>
               <input
                 id="domain-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="for Let's Encrypt renewal notices"
+                placeholder={t('domains.emailPlaceholder')}
               />
             </div>
           </div>
           {allocations.length === 0 && (
             <p className="srv-desc" style={{ marginTop: 8 }}>
-              This server has no ports yet — add one on the Network tab first.
+              {t('domains.noPortsYet')}
             </p>
           )}
           <div className="settings-foot">
@@ -148,7 +146,7 @@ export function DomainManager({ uuid }: Props) {
               disabled={submitting || allocations.length === 0}
               style={{ width: 'auto', padding: '10px 20px' }}
             >
-              {submitting ? 'Adding…' : 'Add domain'}
+              {submitting ? t('domains.adding') : t('domains.addDomain')}
             </button>
           </div>
         </form>
@@ -165,16 +163,16 @@ export function DomainManager({ uuid }: Props) {
                 </span>
               </span>
               <button className="file-act-btn del" onClick={() => handleDelete(d)}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
             <div className="sch-meta">
-              <span>TLS: {d.tls_status === 'active' ? 'HTTPS active' : 'HTTP only'}</span>
-              <span>Added: {new Date(d.created_at).toLocaleDateString()}</span>
+              <span>{t('domains.tlsLine')}{d.tls_status === 'active' ? t('domains.tlsActive') : t('domains.tlsHttpOnly')}</span>
+              <span>{t('domains.addedLine')}{new Date(d.created_at).toLocaleDateString()}</span>
             </div>
           </div>
         ))}
-        {domains.length === 0 && <p className="srv-desc">No custom domains yet.</p>}
+        {domains.length === 0 && <p className="srv-desc">{t('domains.noCustomDomainsYet')}</p>}
       </div>
     </div>
   );

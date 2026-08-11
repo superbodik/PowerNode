@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { t } from '../i18n';
 import type { Schedule, ScheduleTask } from '../types';
 
 interface Props {
@@ -20,14 +21,14 @@ function newTaskRow(): TaskFormRow {
   return { taskType: 'power', action: 'restart', command: '', backupName: '', offsetSeconds: 0 };
 }
 
-function taskLabel(t: ScheduleTask): string {
-  switch (t.action) {
+function taskLabel(task: ScheduleTask): string {
+  switch (task.action) {
     case 'command':
-      return `Command: ${t.payload}`;
+      return t('schedules.commandLabel', { payload: task.payload });
     case 'backup':
-      return `Backup${t.payload ? ': ' + t.payload : ' (auto-named)'}`;
+      return task.payload ? t('schedules.backupLabelNamed', { payload: task.payload }) : t('schedules.backupLabelAuto');
     default:
-      return t.payload;
+      return task.payload;
   }
 }
 
@@ -57,7 +58,7 @@ export function ScheduleManager({ uuid }: Props) {
   useEffect(refresh, [uuid]);
 
   function updateTask(index: number, patch: Partial<TaskFormRow>) {
-    setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, ...patch } : t)));
+    setTasks((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
 
   function addTask() {
@@ -107,7 +108,7 @@ export function ScheduleManager({ uuid }: Props) {
   }
 
   async function handleDelete(s: Schedule) {
-    if (!window.confirm(`Delete schedule "${s.name}"?`)) return;
+    if (!window.confirm(t('schedules.confirmDelete', { name: s.name }))) return;
     try {
       await api.deleteSchedule(uuid, s.id);
       refresh();
@@ -126,27 +127,27 @@ export function ScheduleManager({ uuid }: Props) {
 
       <div style={{ marginBottom: 16 }}>
         <button className="btn-sm primary" onClick={() => setShowForm((f) => !f)}>
-          {showForm ? 'Cancel' : '+ New Schedule'}
+          {showForm ? t('schedules.cancel') : t('schedules.newSchedule')}
         </button>
       </div>
 
       {showForm && (
         <div className="settings-card" style={{ marginBottom: 20 }}>
-          <div className="settings-card-title">New schedule</div>
+          <div className="settings-card-title">{t('schedules.newScheduleTitle')}</div>
           <form onSubmit={handleCreate}>
             <div className="settings-grid">
               <div className="sfield span2">
-                <label htmlFor="sch-name">Name</label>
+                <label htmlFor="sch-name">{t('schedules.name')}</label>
                 <input
                   id="sch-name"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Nightly restart"
+                  placeholder={t('schedules.namePlaceholder')}
                   required
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="sch-minute">Minute</label>
+                <label htmlFor="sch-minute">{t('schedules.minute')}</label>
                 <input
                   id="sch-minute"
                   value={form.cron_minute}
@@ -155,7 +156,7 @@ export function ScheduleManager({ uuid }: Props) {
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="sch-hour">Hour</label>
+                <label htmlFor="sch-hour">{t('schedules.hour')}</label>
                 <input
                   id="sch-hour"
                   value={form.cron_hour}
@@ -164,7 +165,7 @@ export function ScheduleManager({ uuid }: Props) {
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="sch-dom">Day of month</label>
+                <label htmlFor="sch-dom">{t('schedules.dayOfMonth')}</label>
                 <input
                   id="sch-dom"
                   value={form.cron_day_of_month}
@@ -173,7 +174,7 @@ export function ScheduleManager({ uuid }: Props) {
                 />
               </div>
               <div className="sfield">
-                <label htmlFor="sch-dow">Day of week</label>
+                <label htmlFor="sch-dow">{t('schedules.dayOfWeek')}</label>
                 <input
                   id="sch-dow"
                   value={form.cron_day_of_week}
@@ -185,7 +186,7 @@ export function ScheduleManager({ uuid }: Props) {
 
             <div style={{ marginTop: 16 }}>
               <div className="settings-card-title" style={{ fontSize: 13 }}>
-                Steps — run in order, each with its own delay before it starts
+                {t('schedules.stepsHint')}
               </div>
               {tasks.map((task, i) => (
                 <div
@@ -194,55 +195,55 @@ export function ScheduleManager({ uuid }: Props) {
                   style={{ marginTop: 10, paddingTop: 10, borderTop: i > 0 ? '1px solid var(--border)' : undefined }}
                 >
                   <div className="sfield">
-                    <label htmlFor={`sch-task-type-${i}`}>Step {i + 1}</label>
+                    <label htmlFor={`sch-task-type-${i}`}>{t('schedules.step', { n: i + 1 })}</label>
                     <select
                       id={`sch-task-type-${i}`}
                       value={task.taskType}
                       onChange={(e) => updateTask(i, { taskType: e.target.value as TaskType })}
                     >
-                      <option value="power">Power action</option>
-                      <option value="command">Console command</option>
-                      <option value="backup">Backup</option>
+                      <option value="power">{t('schedules.powerAction')}</option>
+                      <option value="command">{t('schedules.consoleCommand')}</option>
+                      <option value="backup">{t('schedules.backup')}</option>
                     </select>
                   </div>
                   {task.taskType === 'power' ? (
                     <div className="sfield">
-                      <label htmlFor={`sch-action-${i}`}>Action</label>
+                      <label htmlFor={`sch-action-${i}`}>{t('schedules.action')}</label>
                       <select
                         id={`sch-action-${i}`}
                         value={task.action}
                         onChange={(e) => updateTask(i, { action: e.target.value })}
                       >
-                        <option value="start">Start</option>
-                        <option value="stop">Stop</option>
-                        <option value="restart">Restart</option>
-                        <option value="kill">Kill</option>
+                        <option value="start">{t('schedules.start')}</option>
+                        <option value="stop">{t('schedules.stop')}</option>
+                        <option value="restart">{t('schedules.restart')}</option>
+                        <option value="kill">{t('schedules.kill')}</option>
                       </select>
                     </div>
                   ) : task.taskType === 'command' ? (
                     <div className="sfield">
-                      <label htmlFor={`sch-command-${i}`}>Command</label>
+                      <label htmlFor={`sch-command-${i}`}>{t('schedules.command')}</label>
                       <input
                         id={`sch-command-${i}`}
                         value={task.command}
                         onChange={(e) => updateTask(i, { command: e.target.value })}
-                        placeholder="say Server restarting soon"
+                        placeholder={t('schedules.commandPlaceholder')}
                         required
                       />
                     </div>
                   ) : (
                     <div className="sfield">
-                      <label htmlFor={`sch-backup-name-${i}`}>Backup name (optional)</label>
+                      <label htmlFor={`sch-backup-name-${i}`}>{t('schedules.backupNameOptional')}</label>
                       <input
                         id={`sch-backup-name-${i}`}
                         value={task.backupName}
                         onChange={(e) => updateTask(i, { backupName: e.target.value })}
-                        placeholder="nightly"
+                        placeholder={t('schedules.backupNamePlaceholder')}
                       />
                     </div>
                   )}
                   <div className="sfield">
-                    <label htmlFor={`sch-offset-${i}`}>Delay before this step (seconds)</label>
+                    <label htmlFor={`sch-offset-${i}`}>{t('schedules.delaySeconds')}</label>
                     <input
                       id={`sch-offset-${i}`}
                       type="number"
@@ -258,13 +259,13 @@ export function ScheduleManager({ uuid }: Props) {
                       onClick={() => removeTask(i)}
                       disabled={tasks.length === 1}
                     >
-                      Remove step
+                      {t('schedules.removeStep')}
                     </button>
                   </div>
                 </div>
               ))}
               <button type="button" className="btn-sm" style={{ marginTop: 12 }} onClick={addTask}>
-                + Add step
+                {t('schedules.addStep')}
               </button>
             </div>
 
@@ -275,7 +276,7 @@ export function ScheduleManager({ uuid }: Props) {
                 disabled={submitting}
                 style={{ width: 'auto', padding: '10px 20px' }}
               >
-                {submitting ? 'Creating…' : 'Create'}
+                {submitting ? t('schedules.creating') : t('schedules.create')}
               </button>
             </div>
           </form>
@@ -301,10 +302,10 @@ export function ScheduleManager({ uuid }: Props) {
             </div>
             <div className="sch-meta" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
               {s.tasks.length > 0 ? (
-                s.tasks.map((t, i) => (
+                s.tasks.map((entry, i) => (
                   <span key={i}>
-                    {i + 1}. {taskLabel(t)}
-                    {t.time_offset_seconds > 0 ? ` (+${t.time_offset_seconds}s)` : ''}
+                    {i + 1}. {taskLabel(entry)}
+                    {entry.time_offset_seconds > 0 ? ` (+${entry.time_offset_seconds}s)` : ''}
                   </span>
                 ))
               ) : (
@@ -312,17 +313,17 @@ export function ScheduleManager({ uuid }: Props) {
               )}
             </div>
             <div className="sch-meta">
-              <span>{s.only_when_online ? 'Only when online' : 'Always'}</span>
+              <span>{s.only_when_online ? t('schedules.onlyWhenOnline') : t('schedules.always')}</span>
               <span>
-                {s.last_run_at ? `Last run: ${new Date(s.last_run_at).toLocaleString()}` : 'Never run'}
+                {s.last_run_at ? t('schedules.lastRun', { when: new Date(s.last_run_at).toLocaleString() }) : t('schedules.neverRun')}
               </span>
               <button className="file-act-btn del" onClick={() => handleDelete(s)}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </div>
         ))}
-        {schedules.length === 0 && <p className="srv-desc">No schedules yet.</p>}
+        {schedules.length === 0 && <p className="srv-desc">{t('schedules.noSchedulesYet')}</p>}
       </div>
     </div>
   );

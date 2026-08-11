@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, connectServerSocketWithRetry } from '../api/client';
+import { t } from '../i18n';
 import type { PowerAction, ResourceStats, Server } from '../types';
 import { ServerCard } from './ServerCard';
+
+const POWER_LABEL_KEYS: Record<PowerAction, Parameters<typeof t>[0]> = {
+  start: 'serverView.start',
+  stop: 'serverView.stop',
+  restart: 'serverView.restart',
+  kill: 'serverView.kill',
+};
 
 interface Props {
   onManage: (uuid: string) => void;
@@ -111,28 +119,30 @@ export function ServerList({ onManage }: Props) {
     const failed = results.filter((r) => r.status === 'rejected').length;
     setBulkBusy(false);
     if (failed > 0) {
-      setBulkError(`${label}: ${uuids.length - failed} of ${uuids.length} succeeded, ${failed} failed.`);
+      setBulkError(
+        t('serverList.bulkResultError', { label, succeeded: uuids.length - failed, total: uuids.length, failed }),
+      );
     }
     setSelected(new Set());
   }
 
   const bulkPower = (action: PowerAction, confirmMsg?: string) =>
-    runBulk(action, (uuid) => api.power(uuid, action), confirmMsg);
+    runBulk(t(POWER_LABEL_KEYS[action]), (uuid) => api.power(uuid, action), confirmMsg);
 
   function bulkBackup() {
     const name = `bulk-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-    return runBulk('Backup', (uuid) => api.createServerBackup(uuid, name, []));
+    return runBulk(t('serverList.backup'), (uuid) => api.createServerBackup(uuid, name, []));
   }
 
   function bulkSuspend(suspend: boolean) {
     return runBulk(
-      suspend ? 'Suspend' : 'Unsuspend',
+      suspend ? t('serverView.suspend') : t('serverView.unsuspend'),
       (uuid) => (suspend ? api.suspendServer(uuid) : api.unsuspendServer(uuid)),
-      suspend ? `Suspend ${selected.size} server(s)? This stops them and blocks starting until unsuspended.` : undefined,
+      suspend ? t('serverList.confirmBulkSuspend', { count: selected.size }) : undefined,
     );
   }
 
-  if (loading) return <p className="srv-desc">Loading servers…</p>;
+  if (loading) return <p className="srv-desc">{t('serverList.loadingServers')}</p>;
   if (error) return <div className="login-error show">{error}</div>;
 
   return (
@@ -140,15 +150,15 @@ export function ServerList({ onManage }: Props) {
       <div className="dash-stats">
         <div className="stat-card">
           <div className="stat-card-val">{stats.total}</div>
-          <div className="stat-card-lbl">Servers</div>
+          <div className="stat-card-lbl">{t('serverList.statServers')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-val">{stats.online}</div>
-          <div className="stat-card-lbl">Online</div>
+          <div className="stat-card-lbl">{t('serverList.statOnline')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-card-val">{stats.offline}</div>
-          <div className="stat-card-lbl">Offline</div>
+          <div className="stat-card-lbl">{t('serverList.statOffline')}</div>
         </div>
       </div>
 
@@ -157,13 +167,13 @@ export function ServerList({ onManage }: Props) {
           <span className="search-icon">⌕</span>
           <input
             type="text"
-            placeholder="Search servers…"
+            placeholder={t('serverList.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
         <button className="btn-sm" onClick={toggleSelectMode}>
-          {selectMode ? 'Cancel selection' : 'Select servers'}
+          {selectMode ? t('serverList.cancelSelection') : t('serverList.selectServers')}
         </button>
       </div>
 
@@ -171,30 +181,30 @@ export function ServerList({ onManage }: Props) {
 
       {selectMode && selected.size > 0 && (
         <div className="dash-toolbar" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <span className="srv-desc">{selected.size} selected</span>
+          <span className="srv-desc">{t('serverList.selectedCount', { count: selected.size })}</span>
           <button className="btn-sm" disabled={bulkBusy} onClick={() => bulkPower('start')}>
-            Start
+            {t('serverView.start')}
           </button>
           <button className="btn-sm" disabled={bulkBusy} onClick={() => bulkPower('stop')}>
-            Stop
+            {t('serverView.stop')}
           </button>
           <button
             className="btn-sm"
             disabled={bulkBusy}
-            onClick={() => bulkPower('restart', `Restart ${selected.size} server(s)?`)}
+            onClick={() => bulkPower('restart', t('serverList.confirmRestart', { count: selected.size }))}
           >
-            Restart
+            {t('serverView.restart')}
           </button>
           <button className="btn-sm" disabled={bulkBusy} onClick={bulkBackup}>
-            Backup
+            {t('serverList.backup')}
           </button>
           {isAdmin && (
             <>
               <button className="btn-sm" disabled={bulkBusy} onClick={() => bulkSuspend(true)}>
-                Suspend
+                {t('serverView.suspend')}
               </button>
               <button className="btn-sm" disabled={bulkBusy} onClick={() => bulkSuspend(false)}>
-                Unsuspend
+                {t('serverView.unsuspend')}
               </button>
             </>
           )}
@@ -214,7 +224,7 @@ export function ServerList({ onManage }: Props) {
             onToggleSelect={toggleSelected}
           />
         ))}
-        {filtered.length === 0 && <p className="srv-desc">No servers match your search.</p>}
+        {filtered.length === 0 && <p className="srv-desc">{t('serverList.noServersMatch')}</p>}
       </div>
     </div>
   );

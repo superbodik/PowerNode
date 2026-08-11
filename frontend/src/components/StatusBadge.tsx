@@ -1,13 +1,14 @@
+import { t } from '../i18n';
 import type { ServerStatus } from '../types';
 
-const LABELS: Record<ServerStatus, string> = {
-  running: 'Online',
-  offline: 'Offline',
-  starting: 'Starting',
-  stopping: 'Stopping',
-  installing: 'Installing',
-  install_failed: 'Install failed',
-  suspended: 'Suspended',
+const LABEL_KEYS: Record<ServerStatus, Parameters<typeof t>[0]> = {
+  running: 'status.running',
+  offline: 'status.offline',
+  starting: 'status.starting',
+  stopping: 'status.stopping',
+  installing: 'status.installing',
+  install_failed: 'status.install_failed',
+  suspended: 'status.suspended',
 };
 
 const BADGE_CLASS: Partial<Record<ServerStatus, string>> = {
@@ -22,7 +23,7 @@ export function StatusBadge({ status }: { status: ServerStatus }) {
   return (
     <div className={`status-badge ${variant}`}>
       <span className="dot" />
-      {LABELS[status]}
+      {t(LABEL_KEYS[status])}
     </div>
   );
 }
