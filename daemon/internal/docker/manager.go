@@ -89,14 +89,23 @@ func (m *Manager) CreateContainer(ctx context.Context, spec CreateSpec) (string,
 		return "", fmt.Errorf("invalid port bindings: %w", err)
 	}
 
-	var cmd []string
+	// A startup command runs as a shell script regardless of what the base
+	// image's own ENTRYPOINT is — some images (nginx) wrap an arbitrary CMD
+	// in a smart entrypoint script that execs it as-is, but that's a
+	// convention, not a guarantee. Images with a rigid ENTRYPOINT (a single
+	// binary, no shell) would otherwise receive our script as literal
+	// arguments to that binary instead of running it. Explicitly overriding
+	// Entrypoint makes this predictable for every image.
+	var entrypoint, cmd []string
 	if spec.StartupCommand != "" {
-		cmd = []string{"/bin/sh", "-c", spec.StartupCommand}
+		entrypoint = []string{"/bin/sh", "-c"}
+		cmd = []string{spec.StartupCommand}
 	}
 
 	containerName := "srv-" + spec.ServerUUID.String()
 	created, err := m.cli.ContainerCreate(ctx, &container.Config{
 		Image:        spec.DockerImage,
+		Entrypoint:   entrypoint,
 		Cmd:          cmd,
 		Env:          env,
 		ExposedPorts: exposedPorts,
