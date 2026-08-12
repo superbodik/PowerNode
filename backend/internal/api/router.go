@@ -117,6 +117,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/auth/twitch/callback", twitchHandler.Callback)
 		r.Post("/twitch/eventsub", twitchHandler.EventSubWebhook)
 		r.Get("/widgets/subs/{token}", twitchHandler.WidgetPage)
+		r.Get("/widgets/chat/{login}", twitchHandler.ChatWidgetPage)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(30 * time.Second))

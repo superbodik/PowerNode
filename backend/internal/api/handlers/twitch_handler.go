@@ -11,6 +11,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,25 +27,49 @@ import (
 
 // eventSubType describes one EventSub subscription to register: its name,
 // the version Twitch expects for that name (they're not all "1" --
-// channel.follow is versioned "2"), and whether its condition needs
-// moderator_user_id alongside broadcaster_user_id (channel.follow does;
-// the subscribe/gift types don't).
+// channel.follow is versioned "2"), and how to build its condition from the
+// connected user's own Twitch id. Twitch doesn't use the same condition
+// shape across types: channel.subscribe/gift key on broadcaster_user_id,
+// channel.follow additionally needs moderator_user_id, and channel.raid
+// uses to_broadcaster_user_id instead of broadcaster_user_id entirely (to
+// select *incoming* raids rather than ones this channel started).
 type eventSubType struct {
-	Name             string
-	Version          string
-	NeedsModeratorID bool
+	Name           string
+	Version        string
+	BuildCondition func(twitchUserID string) map[string]string
+}
+
+func sameIDCondition(twitchUserID string) map[string]string {
+	return map[string]string{"broadcaster_user_id": twitchUserID}
 }
 
 // subscriptionEventTypes are the EventSub types registered when a user
-// enables the alert widget. channel.subscribe covers direct paid subs
-// (is_gift is ignored there to avoid double-alerting a gifted sub --
-// channel.subscription.gift carries the richer "gifted N subs" payload).
-// channel.follow covers free follows -- a distinct Twitch concept from a
-// paid subscription, added per explicit request to alert on both.
+// enables the alert widget.
+//   - channel.subscribe covers direct paid subs (is_gift is ignored there
+//     to avoid double-alerting a gifted sub -- channel.subscription.gift
+//     carries the richer "gifted N subs" payload).
+//   - channel.follow covers free follows -- a distinct Twitch concept from
+//     a paid subscription.
+//   - channel.raid covers incoming raids.
+//
+// All added per explicit request to alert on more than just paid subs.
 var subscriptionEventTypes = []eventSubType{
-	{Name: "channel.subscribe", Version: "1"},
-	{Name: "channel.subscription.gift", Version: "1"},
-	{Name: "channel.follow", Version: "2", NeedsModeratorID: true},
+	{Name: "channel.subscribe", Version: "1", BuildCondition: sameIDCondition},
+	{Name: "channel.subscription.gift", Version: "1", BuildCondition: sameIDCondition},
+	{
+		Name:    "channel.follow",
+		Version: "2",
+		BuildCondition: func(twitchUserID string) map[string]string {
+			return map[string]string{"broadcaster_user_id": twitchUserID, "moderator_user_id": twitchUserID}
+		},
+	},
+	{
+		Name:    "channel.raid",
+		Version: "1",
+		BuildCondition: func(twitchUserID string) map[string]string {
+			return map[string]string{"to_broadcaster_user_id": twitchUserID}
+		},
+	},
 }
 
 type TwitchHandler struct {
@@ -189,6 +214,10 @@ type twitchStatusResponse struct {
 	TwitchLogin        string `json:"twitch_login,omitempty"`
 	HasSubscriptions   bool   `json:"has_subscriptions_scope"`
 	SubscriptionWidget string `json:"subscription_widget_url,omitempty"`
+	// ChatWidget only needs the base connect (a known login), not the
+	// extended upgrade -- chat is public, there's no elevated scope to gate
+	// it behind.
+	ChatWidget string `json:"chat_widget_url,omitempty"`
 }
 
 func (h *TwitchHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -207,6 +236,7 @@ func (h *TwitchHandler) Status(w http.ResponseWriter, r *http.Request) {
 		resp.Connected = true
 		resp.TwitchLogin = login
 		resp.HasSubscriptions = hasScope(scopes, "channel:read:subscriptions")
+		resp.ChatWidget = h.chatWidgetURL(login)
 	} else if err != pgx.ErrNoRows {
 		http.Error(w, "failed to load twitch status", http.StatusInternalServerError)
 		return
@@ -274,12 +304,9 @@ func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Reque
 			continue
 		}
 
-		condition := map[string]string{"broadcaster_user_id": twitchUserID}
-		if eventType.NeedsModeratorID {
-			condition["moderator_user_id"] = twitchUserID
-		}
-
-		subID, err := h.Client.CreateEventSubSubscription(r.Context(), appToken, eventType.Name, eventType.Version, condition, callbackURL, h.EventSubSecret)
+		subID, err := h.Client.CreateEventSubSubscription(
+			r.Context(), appToken, eventType.Name, eventType.Version, eventType.BuildCondition(twitchUserID), callbackURL, h.EventSubSecret,
+		)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to register %s with twitch: %v", eventType.Name, err), http.StatusBadGateway)
 			return
@@ -362,6 +389,12 @@ func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
 			"type":      "follow",
 			"user_name": "TestFollower",
+		})
+	case "raid":
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "raid",
+			"user_name": "TestRaider",
+			"viewers":   42,
 		})
 	default:
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
@@ -554,11 +587,13 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 			Type string `json:"type"`
 		} `json:"subscription"`
 		Event struct {
-			UserName    string `json:"user_name"`
-			Tier        string `json:"tier"`
-			IsGift      bool   `json:"is_gift"`
-			Total       int    `json:"total"`
-			IsAnonymous bool   `json:"is_anonymous"`
+			UserName            string `json:"user_name"`
+			Tier                string `json:"tier"`
+			IsGift              bool   `json:"is_gift"`
+			Total               int    `json:"total"`
+			IsAnonymous         bool   `json:"is_anonymous"`
+			FromBroadcasterName string `json:"from_broadcaster_user_name"`
+			Viewers             int    `json:"viewers"`
 		} `json:"event"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -606,6 +641,12 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 			"type":      "follow",
 			"user_name": payload.Event.UserName,
 		})
+	case "channel.raid":
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "raid",
+			"user_name": payload.Event.FromBroadcasterName,
+			"viewers":   payload.Event.Viewers,
+		})
 	}
 }
 
@@ -623,6 +664,45 @@ func (h *TwitchHandler) WidgetPage(w http.ResponseWriter, r *http.Request) {
 func (h *TwitchHandler) widgetURL(token string) string {
 	base := h.PublicURL
 	return base + "/api/v1/widgets/subs/" + token
+}
+
+// ChatWidgetPage serves a page embedding Twitch's own chat widget for a
+// channel, for use as an OBS Browser Source. Public and keyed by the
+// channel login rather than a secret token, unlike the alert widget --
+// chat is public information (anyone can already open twitch.tv/<login>
+// and watch it), there's nothing here to gate.
+func (h *TwitchHandler) ChatWidgetPage(w http.ResponseWriter, r *http.Request) {
+	login := chi.URLParam(r, "login")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, chatWidgetPageHTML(login, h.chatEmbedParent()))
+}
+
+func (h *TwitchHandler) chatWidgetURL(login string) string {
+	return h.PublicURL + "/api/v1/widgets/chat/" + url.PathEscape(login)
+}
+
+// chatEmbedParent returns just the host part of PublicURL -- Twitch's chat
+// embed requires a "parent" query param matching the domain the iframe is
+// actually served from (this panel's own domain, since the widget page
+// itself is what OBS loads and what embeds the Twitch iframe), or Twitch
+// refuses to render it.
+func (h *TwitchHandler) chatEmbedParent() string {
+	u, err := url.Parse(h.PublicURL)
+	if err != nil || u.Hostname() == "" {
+		return "localhost"
+	}
+	return u.Hostname()
+}
+
+func chatWidgetPageHTML(login, parent string) string {
+	src := "https://www.twitch.tv/embed/" + url.QueryEscape(login) + "/chat?parent=" + url.QueryEscape(parent) + "&darkpopout"
+	return `<!doctype html>
+<html><head><meta charset="utf-8"><title>PowerNode Twitch chat</title>
+<style>html, body, iframe { margin: 0; padding: 0; border: 0; width: 100%; height: 100%; overflow: hidden; }</style>
+</head>
+<body>
+  <iframe src="` + html.EscapeString(src) + `" height="100%" width="100%"></iframe>
+</body></html>`
 }
 
 func widgetPageHTML(token string) string {
@@ -669,6 +749,8 @@ func widgetPageHTML(token string) string {
             showAlert(data.user_name, 'gifted ' + data.count + ' sub' + (data.count === 1 ? '' : 's') + '!');
           } else if (data.type === 'follow') {
             showAlert(data.user_name, 'just followed!');
+          } else if (data.type === 'raid') {
+            showAlert(data.user_name, 'raided with ' + data.viewers + ' viewer' + (data.viewers === 1 ? '' : 's') + '!');
           }
         } catch (e) { /* ignore malformed messages */ }
       };
