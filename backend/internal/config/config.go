@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -51,31 +52,44 @@ type Config struct {
 	// alongside the other secrets -- unlike the client ID/secret, this one
 	// isn't something an admin registers anywhere, it's purely ours.
 	TwitchEventSubSecret string
+
+	// Stripe Connect powers donations: streamers connect their own Stripe
+	// Express account (Stripe handles onboarding/KYC entirely, we never
+	// touch it), viewers pay via a platform-created Checkout Session, funds
+	// go straight to the streamer's account minus DonationPlatformFeeBps.
+	// Unset by default -- same opt-in shape as Twitch/SMTP above. An admin
+	// registers a Stripe account and pastes these in.
+	StripeSecretKey        string
+	StripeWebhookSecret    string
+	DonationPlatformFeeBps int
 }
 
 func Load() Config {
 	cfg := Config{
-		HTTPAddr:             getEnv("PANEL_HTTP_ADDR", ":8080"),
-		DatabaseURL:          getEnv("PANEL_DATABASE_URL", "postgres://panel:panel@localhost:5432/panel?sslmode=disable"),
-		RedisAddr:            getEnv("PANEL_REDIS_ADDR", "localhost:6379"),
-		RedisPassword:        getEnv("PANEL_REDIS_PASSWORD", ""),
-		AllowedOrigins:       splitCSV(getEnv("PANEL_ALLOWED_ORIGINS", "http://localhost:5173")),
-		JWTSecret:            os.Getenv("PANEL_JWT_SECRET"),
-		AccessTokenTTL:       15 * time.Minute,
-		RefreshTokenTTL:      30 * 24 * time.Hour,
-		EncryptionKey:        os.Getenv("PANEL_ENCRYPTION_KEY"),
-		SourceDir:            getEnv("PANEL_SOURCE_DIR", ""),
-		RepoSlug:             getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
-		RequireAdmin2FA:      getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
-		SMTPHost:             getEnv("PANEL_SMTP_HOST", ""),
-		SMTPPort:             getEnv("PANEL_SMTP_PORT", "587"),
-		SMTPUsername:         getEnv("PANEL_SMTP_USERNAME", ""),
-		SMTPPassword:         getEnv("PANEL_SMTP_PASSWORD", ""),
-		SMTPFrom:             getEnv("PANEL_SMTP_FROM", ""),
-		PublicURL:            strings.TrimSuffix(getEnv("PANEL_PUBLIC_URL", ""), "/"),
-		TwitchClientID:       getEnv("PANEL_TWITCH_CLIENT_ID", ""),
-		TwitchClientSecret:   getEnv("PANEL_TWITCH_CLIENT_SECRET", ""),
-		TwitchEventSubSecret: getEnv("PANEL_TWITCH_EVENTSUB_SECRET", ""),
+		HTTPAddr:               getEnv("PANEL_HTTP_ADDR", ":8080"),
+		DatabaseURL:            getEnv("PANEL_DATABASE_URL", "postgres://panel:panel@localhost:5432/panel?sslmode=disable"),
+		RedisAddr:              getEnv("PANEL_REDIS_ADDR", "localhost:6379"),
+		RedisPassword:          getEnv("PANEL_REDIS_PASSWORD", ""),
+		AllowedOrigins:         splitCSV(getEnv("PANEL_ALLOWED_ORIGINS", "http://localhost:5173")),
+		JWTSecret:              os.Getenv("PANEL_JWT_SECRET"),
+		AccessTokenTTL:         15 * time.Minute,
+		RefreshTokenTTL:        30 * 24 * time.Hour,
+		EncryptionKey:          os.Getenv("PANEL_ENCRYPTION_KEY"),
+		SourceDir:              getEnv("PANEL_SOURCE_DIR", ""),
+		RepoSlug:               getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
+		RequireAdmin2FA:        getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
+		SMTPHost:               getEnv("PANEL_SMTP_HOST", ""),
+		SMTPPort:               getEnv("PANEL_SMTP_PORT", "587"),
+		SMTPUsername:           getEnv("PANEL_SMTP_USERNAME", ""),
+		SMTPPassword:           getEnv("PANEL_SMTP_PASSWORD", ""),
+		SMTPFrom:               getEnv("PANEL_SMTP_FROM", ""),
+		PublicURL:              strings.TrimSuffix(getEnv("PANEL_PUBLIC_URL", ""), "/"),
+		TwitchClientID:         getEnv("PANEL_TWITCH_CLIENT_ID", ""),
+		TwitchClientSecret:     getEnv("PANEL_TWITCH_CLIENT_SECRET", ""),
+		TwitchEventSubSecret:   getEnv("PANEL_TWITCH_EVENTSUB_SECRET", ""),
+		StripeSecretKey:        getEnv("PANEL_STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:    getEnv("PANEL_STRIPE_WEBHOOK_SECRET", ""),
+		DonationPlatformFeeBps: parseIntEnv("PANEL_DONATION_FEE_BPS", 500), // 500bps = 5%
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {
@@ -93,6 +107,18 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func parseIntEnv(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
 }
 
 func splitCSV(v string) []string {

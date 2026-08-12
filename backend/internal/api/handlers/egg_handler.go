@@ -22,12 +22,12 @@ type eggVariableSummary struct {
 }
 
 type eggSummary struct {
-	ID             int                  `json:"id"`
-	Category       string               `json:"category"`
-	Name           string               `json:"name"`
-	Description    string               `json:"description"`
-	DockerImage    string               `json:"docker_image"`
-	StartupCommand string               `json:"startup_command"`
+	ID             int    `json:"id"`
+	Category       string `json:"category"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	DockerImage    string `json:"docker_image"`
+	StartupCommand string `json:"startup_command"`
 	// Enabled eggs are the default catalog available to everyone. A
 	// disabled egg still exists (and its variables/servers keep working)
 	// but is only surfaced through the Plugins page, which can flip this

@@ -40,6 +40,14 @@ type Dependencies struct {
 	TwitchClient         *twitch.Client
 	TwitchEventSubSecret string
 	PublicURL            string
+	// StripeEnabled reflects whether PANEL_STRIPE_SECRET_KEY is set --
+	// stripe.Key itself is set globally in cmd/panel/main.go (the SDK's
+	// classic package-level client style keys off a package var, not an
+	// instance), this just tells the handler whether to treat itself as
+	// configured.
+	StripeEnabled          bool
+	StripeWebhookSecret    string
+	DonationPlatformFeeBps int
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -109,6 +117,9 @@ func NewRouter(deps Dependencies) http.Handler {
 		EventSubSecret: deps.TwitchEventSubSecret,
 		PublicURL:      deps.PublicURL,
 	}
+	stripeHandler := handlers.NewStripeHandler(
+		deps.DB, deps.Hub, deps.PublicURL, deps.StripeWebhookSecret, deps.StripeEnabled, deps.DonationPlatformFeeBps,
+	)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -118,6 +129,11 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Post("/twitch/eventsub", twitchHandler.EventSubWebhook)
 		r.Get("/widgets/subs/{token}", twitchHandler.WidgetPage)
 		r.Get("/widgets/chat/{login}", twitchHandler.ChatWidgetPage)
+		r.Get("/integrations/stripe/connect/return", stripeHandler.ConnectReturn)
+		r.Post("/webhooks/stripe", stripeHandler.Webhook)
+		r.Get("/donate/{username}", stripeHandler.DonatePage)
+		r.Get("/donate/{username}/thanks", stripeHandler.DonateThanksPage)
+		r.Post("/donate/{username}/checkout", stripeHandler.CreateCheckout)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(30 * time.Second))
@@ -208,6 +224,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/integrations/twitch/stream-key", twitchHandler.GetStreamKey)
 			r.Post("/integrations/twitch/subscriptions/test", twitchHandler.SendTestAlert)
 			r.Delete("/integrations/twitch", twitchHandler.Disconnect)
+
+			r.Get("/integrations/stripe/status", stripeHandler.Status)
+			r.Post("/integrations/stripe/connect/start", stripeHandler.ConnectStart)
+			r.Delete("/integrations/stripe", stripeHandler.Disconnect)
 		})
 
 		r.Group(func(r chi.Router) {

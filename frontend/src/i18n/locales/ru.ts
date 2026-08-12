@@ -659,8 +659,24 @@ export const ru: Dict = {
   'streamers.testAlertSub': 'Тест: подписка',
   'streamers.testAlertGift': 'Тест: подарок',
   'streamers.testAlertFollow': 'Тест: фолловер',
+  'streamers.testAlertRaid': 'Тест: рейд',
+  'streamers.chatWidgetUrlLabel': 'Ссылка чата для Browser Source',
+  'streamers.chatWidgetUrlHint': 'Добавьте как источник Browser Source в OBS, чтобы показать чат Twitch на стриме.',
   'streamers.twitchJustConnected': 'Twitch-аккаунт подключён.',
   'streamers.twitchConnectError': 'Не удалось подключить Twitch — попробуйте ещё раз.',
+
+  'streamers.donationsTile': 'Донаты',
+  'streamers.stripeConnectHint':
+    'Подключи свой аккаунт Stripe — всю проверку личности и данные банка Stripe обрабатывает сам, мы их вообще не видим. Донаты идут напрямую тебе, минус небольшая комиссия платформы.',
+  'streamers.stripeConnect': 'Подключить Stripe',
+  'streamers.stripeFinishOnboarding': 'Завершить настройку',
+  'streamers.stripeDisconnect': 'Отключить',
+  'streamers.stripeReady': 'Готово принимать донаты.',
+  'streamers.stripeOnboardingIncomplete':
+    'Аккаунт Stripe создан, но настройка не завершена — нажми ниже, чтобы продолжить.',
+  'streamers.donationPageUrlLabel': 'Твоя страница для донатов',
+  'streamers.testAlertDonation': 'Тест: донат',
+  'streamers.stripeJustConnected': 'Аккаунт Stripe подключён.',
   'streamers.guideTile': 'Как стримить через PowerNode',
   'streamers.guideP1':
     '1. Создайте сервер на базе egg "RTMP Relay (offload stream encoding)", укажите Relay secret и свой Twitch stream key.',

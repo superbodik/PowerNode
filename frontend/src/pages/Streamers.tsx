@@ -19,6 +19,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [twitchNotice, setTwitchNotice] = useState<'connected' | 'error' | null>(null);
+  const [stripeNotice, setStripeNotice] = useState<'success' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,10 +53,21 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
   // a refresh doesn't re-show a stale toast.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const result = params.get('twitch');
-    if (result === 'connected' || result === 'error') {
-      setTwitchNotice(result);
+    const twitchResult = params.get('twitch');
+    const stripeResult = params.get('stripe');
+    if (twitchResult === 'connected' || twitchResult === 'error') {
+      setTwitchNotice(twitchResult);
       params.delete('twitch');
+    }
+    if (stripeResult === 'success') {
+      setStripeNotice('success');
+      params.delete('stripe');
+    } else if (stripeResult) {
+      // 'refresh' (onboarding link expired mid-flow) needs no toast -- the
+      // tile just re-shows the connect button since nothing changed.
+      params.delete('stripe');
+    }
+    if (twitchResult || stripeResult) {
       const rest = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
     }
@@ -77,6 +89,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
         </div>
 
         <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
+        <StripeTile notice={stripeNotice} onDismissNotice={() => setStripeNotice(null)} />
       </div>
 
       <GuidePanel title={t('streamers.guideTile')}>
@@ -211,6 +224,7 @@ interface TwitchStatus {
   twitch_login?: string;
   has_subscriptions_scope: boolean;
   subscription_widget_url?: string;
+  chat_widget_url?: string;
 }
 
 function TwitchTile({
@@ -270,7 +284,7 @@ function TwitchTile({
     }
   }
 
-  async function sendTestAlert(kind: 'sub' | 'gift' | 'follow') {
+  async function sendTestAlert(kind: 'sub' | 'gift' | 'follow' | 'raid') {
     setBusy(true);
     setError(null);
     try {
@@ -321,6 +335,21 @@ function TwitchTile({
             {t('streamers.twitchConnectedAs', { login: status.twitch_login ?? '' })}
           </p>
 
+          {status.chat_widget_url && (
+            <div className="sfield" style={{ marginBottom: 10 }}>
+              <label>{t('streamers.chatWidgetUrlLabel')}</label>
+              <div className="api-item">
+                <span className="api-key">{status.chat_widget_url}</span>
+                <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(status.chat_widget_url ?? '')}>
+                  {t('common.copy')}
+                </button>
+              </div>
+              <span className="srv-desc" style={{ fontSize: 10 }}>
+                {t('streamers.chatWidgetUrlHint')}
+              </span>
+            </div>
+          )}
+
           {status.subscription_widget_url ? (
             <div className="sfield" style={{ marginBottom: 10 }}>
               <label>{t('streamers.widgetUrlLabel')}</label>
@@ -345,6 +374,9 @@ function TwitchTile({
                 </button>
                 <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('follow')}>
                   {t('streamers.testAlertFollow')}
+                </button>
+                <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('raid')}>
+                  {t('streamers.testAlertRaid')}
                 </button>
               </div>
             </div>
@@ -381,6 +413,134 @@ function TwitchTile({
           </p>
           <button className="btn-sm" disabled={busy} onClick={connect}>
             {t('streamers.twitchConnect')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+interface StripeStatus {
+  connected: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  details_submitted: boolean;
+  donation_page_url?: string;
+}
+
+function StripeTile({
+  notice,
+  onDismissNotice,
+}: {
+  notice: 'success' | null;
+  onDismissNotice: () => void;
+}) {
+  const [status, setStatus] = useState<StripeStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api
+      .getStripeStatus()
+      .then(setStatus)
+      .catch(() =>
+        setStatus({ connected: false, charges_enabled: false, payouts_enabled: false, details_submitted: false }),
+      );
+  }
+
+  useEffect(refresh, [notice]);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startStripeConnect();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function sendTestAlert() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.sendTwitchTestAlert('donation');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectStripe();
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">{t('streamers.donationsTile')}</div>
+
+      {notice === 'success' && (
+        <p className="srv-desc" style={{ color: 'var(--green, #5fe69a)', marginBottom: 10 }} onClick={onDismissNotice}>
+          {t('streamers.stripeJustConnected')}
+        </p>
+      )}
+      {error && <p className="login-error show" style={{ marginBottom: 10 }}>{error}</p>}
+
+      {status === null ? (
+        <p className="srv-desc">{t('common.loading')}</p>
+      ) : status.connected ? (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {status.charges_enabled ? t('streamers.stripeReady') : t('streamers.stripeOnboardingIncomplete')}
+          </p>
+
+          {status.donation_page_url && (
+            <div className="sfield" style={{ marginBottom: 10 }}>
+              <label>{t('streamers.donationPageUrlLabel')}</label>
+              <div className="api-item">
+                <span className="api-key">{status.donation_page_url}</span>
+                <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(status.donation_page_url ?? '')}>
+                  {t('common.copy')}
+                </button>
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <button className="btn-sm" disabled={busy} onClick={sendTestAlert}>
+                  {t('streamers.testAlertDonation')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="settings-foot" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!status.charges_enabled && (
+              <button className="btn-sm" disabled={busy} onClick={connect}>
+                {t('streamers.stripeFinishOnboarding')}
+              </button>
+            )}
+            <button className="btn-sm" disabled={busy} onClick={disconnect}>
+              {t('streamers.stripeDisconnect')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.stripeConnectHint')}
+          </p>
+          <button className="btn-sm" disabled={busy} onClick={connect}>
+            {t('streamers.stripeConnect')}
           </button>
         </>
       )}

@@ -396,6 +396,14 @@ func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
 			"user_name": "TestRaider",
 			"viewers":   42,
 		})
+	case "donation":
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "donation",
+			"user_name": "TestDonor",
+			"message":   "Love the stream!",
+			"amount":    500,
+			"currency":  "usd",
+		})
 	default:
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
 			"type":      "sub",
@@ -751,6 +759,9 @@ func widgetPageHTML(token string) string {
             showAlert(data.user_name, 'just followed!');
           } else if (data.type === 'raid') {
             showAlert(data.user_name, 'raided with ' + data.viewers + ' viewer' + (data.viewers === 1 ? '' : 's') + '!');
+          } else if (data.type === 'donation') {
+            var amt = (data.amount / 100).toFixed(2) + ' ' + (data.currency || '').toUpperCase();
+            showAlert(data.user_name, 'donated ' + amt + (data.message ? ': ' + data.message : '') + '!');
           }
         } catch (e) { /* ignore malformed messages */ }
       };

@@ -214,19 +214,30 @@ systemctl restart wingsd</code></pre>
 
       <section class="docs-section" id="donations">
         <h2>Accepting donations</h2>
-        <p class="docs-lede">PowerNode doesn't process payments itself, and that's deliberate — here's
-        what to use instead, and why.</p>
+        <p class="docs-lede">PowerNode has a built-in donation flow via Stripe Connect — non-custodial,
+        so the panel never holds or touches your money. Third-party donation services still work fine
+        too if you'd rather use one of those.</p>
 
-        <p>Handling card payments directly means PCI-DSS compliance, chargeback disputes, tax
-        reporting, and fraud liability — an entire regulated business on its own, completely
-        separate from hosting game/app servers. Every established streaming platform (Twitch, YouTube)
-        and every dedicated donation tool (Boosty, DonationAlerts, Streamlabs, StreamElements) already
-        carries that burden for you and has done so for years. Bolting a custom payment flow onto a
-        hosting panel would mean re-solving all of that from scratch, for a worse and less trusted
-        result than services built for exactly this. Use one of them instead — it takes minutes to set
-        up and viewers already recognize and trust the flow.</p>
+        <h3>Built-in: Stripe Connect</h3>
+        <p>On the <strong>Streamers</strong> page, the <strong>Donations</strong> tile walks you through
+        connecting your own Stripe account. Stripe hosts the entire onboarding/identity-verification
+        flow itself — the panel never sees your bank details or ID, and never holds donor funds even
+        for an instant. Every donation goes straight to your Stripe account via a direct transfer, minus
+        a small platform fee, the moment it's paid.</p>
+        <p>Once connected, you get a public donation page (<code>/api/v1/donate/&lt;your-username&gt;</code>)
+        to share with viewers, and donations pop up as alerts in the <strong>same</strong> OBS Browser
+        Source you already use for sub/follow/raid alerts — no second widget to add.</p>
+        <p>This requires the panel admin to have set <code>PANEL_STRIPE_SECRET_KEY</code> and
+        <code>PANEL_STRIPE_WEBHOOK_SECRET</code> in <code>/etc/panel/panel.env</code> first (from a
+        Stripe account at <a href="https://dashboard.stripe.com" target="_blank" rel="noopener">dashboard.stripe.com</a> —
+        the secret key under Developers → API keys, the webhook secret from a webhook endpoint pointed
+        at <code>https://your-panel/api/v1/webhooks/stripe</code> listening for
+        <code>checkout.session.completed</code>). If the Donations tile says the integration isn't
+        configured, that's what's missing.</p>
 
-        <h3>Pick a donation service</h3>
+        <h3>Or: a third-party donation service</h3>
+        <p>Still a fine choice, especially if your audience already knows one of these from other
+        streamers:</p>
         <ul>
           <li><strong>Boosty</strong> — popular with RU-speaking audiences, supports one-off donations
           and paid subscriptions/tiers, has its own alert widget.</li>
@@ -235,22 +246,10 @@ systemctl restart wingsd</code></pre>
           <li><strong>Streamlabs / StreamElements</strong> — full streaming toolkits (alerts, chatbot,
           overlays) with donations built in; heavier to set up but useful if you want the whole
           package, not just donations.</li>
-          <li><strong>A plain Stripe or PayPal Payment Link</strong> — simplest option if you just want
-          a "support me" link in your stream description with no alert widget at all.</li>
         </ul>
-
-        <h3>Wire alerts into OBS</h3>
-        <p>Every option above except a plain payment link gives you a unique alert-widget URL from its
-        own dashboard (usually under something like Widgets → Alerts). In OBS:</p>
-        <ol>
-          <li>Sources → <strong>+</strong> → <strong>Browser</strong></li>
-          <li>Paste the widget URL from the donation service</li>
-          <li>Set Width/Height to match your overlay (1920×1080 is a safe default, then resize the
-          source on your canvas)</li>
-        </ol>
-        <p>The donation service pushes the alert into that browser source in real time when someone
-        donates — nothing in PowerNode is involved in this part at all, it's purely OBS talking to
-        the donation service directly.</p>
+        <p>Every option above gives you a unique alert-widget URL from its own dashboard (usually under
+        something like Widgets → Alerts) — add it as its own Browser Source in OBS the same way. The
+        donation service pushes the alert in real time; nothing in PowerNode is involved in that part.</p>
 
         <div class="callout">
           <div class="callout-label">Where this connects to the RTMP relay</div>

@@ -408,6 +408,7 @@ export const api = {
       twitch_login?: string;
       has_subscriptions_scope: boolean;
       subscription_widget_url?: string;
+      chat_widget_url?: string;
     }>('/integrations/twitch/status'),
 
   startTwitchConnect: () =>
@@ -421,13 +422,27 @@ export const api = {
 
   getTwitchStreamKey: () => request<{ stream_key: string }>('/integrations/twitch/stream-key'),
 
-  sendTwitchTestAlert: (kind: 'sub' | 'gift' | 'follow') =>
+  sendTwitchTestAlert: (kind: 'sub' | 'gift' | 'follow' | 'raid' | 'donation') =>
     request<void>('/integrations/twitch/subscriptions/test', {
       method: 'POST',
       body: JSON.stringify({ kind }),
     }),
 
   disconnectTwitch: () => request<void>('/integrations/twitch', { method: 'DELETE' }),
+
+  getStripeStatus: () =>
+    request<{
+      connected: boolean;
+      charges_enabled: boolean;
+      payouts_enabled: boolean;
+      details_submitted: boolean;
+      donation_page_url?: string;
+    }>('/integrations/stripe/status'),
+
+  startStripeConnect: () =>
+    request<{ authorize_url: string }>('/integrations/stripe/connect/start', { method: 'POST' }),
+
+  disconnectStripe: () => request<void>('/integrations/stripe', { method: 'DELETE' }),
 
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),

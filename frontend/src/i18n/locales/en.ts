@@ -657,8 +657,24 @@ export const en = {
   'streamers.testAlertSub': 'Test: sub alert',
   'streamers.testAlertGift': 'Test: gift alert',
   'streamers.testAlertFollow': 'Test: follow alert',
+  'streamers.testAlertRaid': 'Test: raid alert',
+  'streamers.chatWidgetUrlLabel': 'Chat Browser Source URL',
+  'streamers.chatWidgetUrlHint': 'Add this as a Browser Source in OBS to show your Twitch chat on-stream.',
   'streamers.twitchJustConnected': 'Twitch account connected.',
   'streamers.twitchConnectError': 'Could not connect Twitch — try again.',
+
+  'streamers.donationsTile': 'Donations',
+  'streamers.stripeConnectHint':
+    'Connect your own Stripe account — Stripe handles onboarding and identity verification entirely, we never see your bank details. Donations go straight to your account, minus a small platform fee.',
+  'streamers.stripeConnect': 'Connect Stripe',
+  'streamers.stripeFinishOnboarding': 'Finish onboarding',
+  'streamers.stripeDisconnect': 'Disconnect',
+  'streamers.stripeReady': 'Ready to receive donations.',
+  'streamers.stripeOnboardingIncomplete':
+    'Stripe account created, but onboarding isn\'t finished yet — click below to continue.',
+  'streamers.donationPageUrlLabel': 'Your donation page',
+  'streamers.testAlertDonation': 'Test: donation alert',
+  'streamers.stripeJustConnected': 'Stripe account connected.',
   'streamers.guideTile': 'How to stream through PowerNode',
   'streamers.guideP1':
     '1. Create a server using the "RTMP Relay (offload stream encoding)" egg, set a Relay secret and your Twitch stream key.',

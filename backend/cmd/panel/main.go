@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
+	stripe "github.com/stripe/stripe-go/v81"
 
 	"github.com/yourorg/panel/internal/api"
 	"github.com/yourorg/panel/internal/auth"
@@ -118,23 +119,31 @@ func main() {
 		log.Printf("twitch integration enabled (redirect: %s)", twitchRedirectURI)
 	}
 
+	if cfg.StripeSecretKey != "" {
+		stripe.Key = cfg.StripeSecretKey
+		log.Printf("stripe donations enabled (platform fee: %d bps)", cfg.DonationPlatformFeeBps)
+	}
+
 	router := api.NewRouter(api.Dependencies{
-		DB:                   pool,
-		Token:                tokenManager,
-		Hub:                  hub,
-		NodeClient:           resolveNodeClient,
-		EncryptionKey:        cfg.EncryptionKey,
-		Limiter:              limiter,
-		Version:              version,
-		Commit:               commit,
-		BuildDate:            buildDate,
-		SourceDir:            cfg.SourceDir,
-		RepoSlug:             cfg.RepoSlug,
-		AllowedOrigins:       cfg.AllowedOrigins,
-		RequireAdmin2FA:      cfg.RequireAdmin2FA,
-		TwitchClient:         twitchClient,
-		TwitchEventSubSecret: cfg.TwitchEventSubSecret,
-		PublicURL:            cfg.PublicURL,
+		DB:                     pool,
+		Token:                  tokenManager,
+		Hub:                    hub,
+		NodeClient:             resolveNodeClient,
+		EncryptionKey:          cfg.EncryptionKey,
+		Limiter:                limiter,
+		Version:                version,
+		Commit:                 commit,
+		BuildDate:              buildDate,
+		SourceDir:              cfg.SourceDir,
+		RepoSlug:               cfg.RepoSlug,
+		AllowedOrigins:         cfg.AllowedOrigins,
+		RequireAdmin2FA:        cfg.RequireAdmin2FA,
+		TwitchClient:           twitchClient,
+		TwitchEventSubSecret:   cfg.TwitchEventSubSecret,
+		PublicURL:              cfg.PublicURL,
+		StripeEnabled:          cfg.StripeSecretKey != "",
+		StripeWebhookSecret:    cfg.StripeWebhookSecret,
+		DonationPlatformFeeBps: cfg.DonationPlatformFeeBps,
 	})
 
 	srv := &http.Server{
