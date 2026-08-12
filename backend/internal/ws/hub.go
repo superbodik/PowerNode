@@ -173,29 +173,48 @@ func (h *Hub) subscribeConsole(serverUUID uuid.UUID, conn *websocket.Conn) error
 	if h.consoleRooms[serverUUID] == nil {
 		h.consoleRooms[serverUUID] = make(map[*websocket.Conn]struct{})
 	}
-	firstSubscriber := len(h.consoleRooms[serverUUID]) == 0
 	h.consoleRooms[serverUUID][conn] = struct{}{}
+	// Gate the dial on session liveness, not on being the first browser
+	// subscriber: an existing tab keeps its consoleRooms entry even after
+	// the daemon connection behind it has died (e.g. wingsd restarted), so
+	// gating on subscriber count alone would never redial for as long as
+	// any tab stays open.
+	needsDial := h.consoleSessions[serverUUID] == nil
 	h.mu.Unlock()
 
-	if !firstSubscriber || h.DialConsole == nil {
+	if !needsDial || h.DialConsole == nil {
 		return nil
 	}
 
+	return h.dialConsoleSession(serverUUID, conn)
+}
+
+// dialConsoleSession dials the daemon and installs the resulting session,
+// backing out of the racing dial if another goroutine already won.
+func (h *Hub) dialConsoleSession(serverUUID uuid.UUID, conn *websocket.Conn) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	daemonConn, err := h.DialConsole(ctx, serverUUID)
 	if err != nil {
 		cancel()
-		h.mu.Lock()
-		delete(h.consoleRooms[serverUUID], conn)
-		if len(h.consoleRooms[serverUUID]) == 0 {
-			delete(h.consoleRooms, serverUUID)
+		if conn != nil {
+			h.mu.Lock()
+			delete(h.consoleRooms[serverUUID], conn)
+			if len(h.consoleRooms[serverUUID]) == 0 {
+				delete(h.consoleRooms, serverUUID)
+			}
+			h.mu.Unlock()
 		}
-		h.mu.Unlock()
 		return err
 	}
 
-	session := &consoleSession{conn: daemonConn, cancel: cancel}
 	h.mu.Lock()
+	if h.consoleSessions[serverUUID] != nil {
+		h.mu.Unlock()
+		cancel()
+		daemonConn.Close()
+		return nil
+	}
+	session := &consoleSession{conn: daemonConn, cancel: cancel}
 	h.consoleSessions[serverUUID] = session
 	h.mu.Unlock()
 
@@ -227,10 +246,56 @@ func (h *Hub) pumpConsole(ctx context.Context, serverUUID uuid.UUID, session *co
 		}
 		_, msg, err := session.conn.ReadMessage()
 		if err != nil {
+			h.handleConsoleDisconnect(serverUUID, session)
 			return
 		}
 		h.broadcastConsole(serverUUID, msg)
 	}
+}
+
+// handleConsoleDisconnect drops a dead daemon session and, if browser tabs
+// are still watching this server's console, redials in the background so
+// they recover on their own instead of staying stuck listening to a pipe
+// nobody's feeding anymore.
+func (h *Hub) handleConsoleDisconnect(serverUUID uuid.UUID, dead *consoleSession) {
+	h.mu.Lock()
+	if h.consoleSessions[serverUUID] == dead {
+		delete(h.consoleSessions, serverUUID)
+	}
+	hasWatchers := len(h.consoleRooms[serverUUID]) > 0
+	h.mu.Unlock()
+
+	if !hasWatchers || h.DialConsole == nil {
+		return
+	}
+
+	h.broadcastConsole(serverUUID, []byte("[console] lost connection to node daemon, reconnecting..."))
+	go h.redialConsole(serverUUID)
+}
+
+// redialConsole retries the daemon dial with backoff as long as at least one
+// browser tab is still watching. Bails out early if another goroutine (a
+// fresh subscribeConsole call) already re-established a session.
+func (h *Hub) redialConsole(serverUUID uuid.UUID) {
+	for attempt := 0; attempt < 5; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		}
+
+		h.mu.Lock()
+		stillWatched := len(h.consoleRooms[serverUUID]) > 0
+		alreadyConnected := h.consoleSessions[serverUUID] != nil
+		h.mu.Unlock()
+		if !stillWatched || alreadyConnected {
+			return
+		}
+
+		if err := h.dialConsoleSession(serverUUID, nil); err == nil {
+			h.broadcastConsole(serverUUID, []byte("[console] reconnected"))
+			return
+		}
+	}
+	h.broadcastConsole(serverUUID, []byte("[console] could not reconnect to node daemon — try reopening this tab"))
 }
 
 func (h *Hub) pollStats(ctx context.Context, serverUUID uuid.UUID) {
