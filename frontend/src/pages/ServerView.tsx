@@ -91,6 +91,7 @@ export function ServerView({ uuid, onBack }: Props) {
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const prevNetSampleRef = useRef<{ rx: number; at: number } | null>(null);
+  const smoothedKbpsRef = useRef<number | null>(null);
 
   function refreshServer() {
     api
@@ -122,15 +123,25 @@ export function ServerView({ uuid, onBack }: Props) {
     const deltaBytes = live.network_rx - prev.rx;
     const deltaSeconds = (now - prev.at) / 1000;
     if (deltaBytes < 0 || deltaSeconds <= 0) {
+      smoothedKbpsRef.current = null;
       setInboundKbps(0);
       setSignalLive(false);
       setLiveSince(null);
       return;
     }
 
-    const kbps = Math.round((deltaBytes * 8) / 1000 / deltaSeconds);
-    setInboundKbps(kbps);
-    const isLive = kbps > 5 && live.state === 'running';
+    // Docker hands back cumulative byte counters in bursts rather than a
+    // perfectly even drip, so a raw two-sample delta over a ~2s window is
+    // naturally noisy even when the actual stream is rock steady. Smooth it
+    // with an EMA instead of showing every jitter as a swing.
+    const rawKbps = (deltaBytes * 8) / 1000 / deltaSeconds;
+    const isLive = rawKbps > 5 && live.state === 'running';
+    smoothedKbpsRef.current = !isLive
+      ? null
+      : smoothedKbpsRef.current == null
+        ? rawKbps
+        : smoothedKbpsRef.current * 0.6 + rawKbps * 0.4;
+    setInboundKbps(Math.round(smoothedKbpsRef.current ?? 0));
     setSignalLive(isLive);
     setLiveSince((prevSince) => (isLive ? (prevSince ?? now) : null));
   }, [live]);
