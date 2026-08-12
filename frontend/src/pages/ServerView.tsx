@@ -10,6 +10,8 @@ import { GuidePanel } from '../components/GuidePanel';
 import { PortManager } from '../components/PortManager';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { SubuserManager } from '../components/SubuserManager';
+import { useStreamSignal } from '../hooks/useStreamSignal';
+import { obsServerUrlFor, relaySecretOf } from '../utils/streaming';
 import type { Egg, PowerAction, ResourceStats, Server } from '../types';
 
 interface Props {
@@ -85,13 +87,8 @@ export function ServerView({ uuid, onBack }: Props) {
     environment: {} as Record<string, string>,
   });
   const [eggs, setEggs] = useState<Egg[]>([]);
-  const [inboundKbps, setInboundKbps] = useState(0);
-  const [signalLive, setSignalLive] = useState(false);
-  const [liveSince, setLiveSince] = useState<number | null>(null);
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
-  const prevNetSampleRef = useRef<{ rx: number; at: number } | null>(null);
-  const smoothedKbpsRef = useRef<number | null>(null);
 
   function refreshServer() {
     api
@@ -108,43 +105,7 @@ export function ServerView({ uuid, onBack }: Props) {
 
   useEffect(() => connectServerSocketWithRetry<ResourceStats>(uuid, setLive), [uuid]);
 
-  // Derives a "receiving a stream right now" signal purely from the
-  // container's own inbound network byte counter (already pushed every ~2s
-  // over the stats socket) — no mediamtx-specific API call needed. A small
-  // kbps floor filters out RTMP's idle keepalive traffic so a connected-but-
-  // silent OBS doesn't read as "live".
-  useEffect(() => {
-    if (!live) return;
-    const now = Date.now();
-    const prev = prevNetSampleRef.current;
-    prevNetSampleRef.current = { rx: live.network_rx, at: now };
-    if (!prev) return;
-
-    const deltaBytes = live.network_rx - prev.rx;
-    const deltaSeconds = (now - prev.at) / 1000;
-    if (deltaBytes < 0 || deltaSeconds <= 0) {
-      smoothedKbpsRef.current = null;
-      setInboundKbps(0);
-      setSignalLive(false);
-      setLiveSince(null);
-      return;
-    }
-
-    // Docker hands back cumulative byte counters in bursts rather than a
-    // perfectly even drip, so a raw two-sample delta over a ~2s window is
-    // naturally noisy even when the actual stream is rock steady. Smooth it
-    // with an EMA instead of showing every jitter as a swing.
-    const rawKbps = (deltaBytes * 8) / 1000 / deltaSeconds;
-    const isLive = rawKbps > 5 && live.state === 'running';
-    smoothedKbpsRef.current = !isLive
-      ? null
-      : smoothedKbpsRef.current == null
-        ? rawKbps
-        : smoothedKbpsRef.current * 0.6 + rawKbps * 0.4;
-    setInboundKbps(Math.round(smoothedKbpsRef.current ?? 0));
-    setSignalLive(isLive);
-    setLiveSince((prevSince) => (isLive ? (prevSince ?? now) : null));
-  }, [live]);
+  const { inboundKbps, signalLive, liveSince } = useStreamSignal(uuid);
 
   useEffect(() => {
     if (tab !== 'console') return;
@@ -253,11 +214,8 @@ export function ServerView({ uuid, onBack }: Props) {
 
   const eggVariables = server ? (eggs.find((e) => e.id === server.egg_id)?.variables ?? []) : [];
   const streamingEgg = server ? eggs.find((e) => e.id === server.egg_id)?.category === 'streaming' : false;
-  const relaySecret = server?.environment?.RELAY_SECRET;
-  const obsServerUrl =
-    server?.primary_address && relaySecret
-      ? `rtmp://${server.primary_address.split(':')[0]}:${server.environment?.RTMP_PORT || '1935'}`
-      : null;
+  const relaySecret = relaySecretOf(server);
+  const obsServerUrl = obsServerUrlFor(server);
 
   if (error) return <div className="login-error show">{error}</div>;
   if (!server) return <p className="srv-desc">{t('common.loading')}</p>;

@@ -16,6 +16,7 @@ export const en = {
   'nav.overview': 'Overview',
   'nav.admin': 'Admin',
   'nav.servers': 'Servers',
+  'nav.streamers': 'For Streamers',
   'nav.dashboard': 'Dashboard',
   'nav.nodes': 'Nodes',
   'nav.users': 'Users',
@@ -605,4 +606,21 @@ export const en = {
   'twofaGate.hint': 'Admin accounts on this panel must have two-factor authentication enabled before continuing.',
   'twofaGate.setUp': 'Set up 2FA',
   'twofaGate.verifyAndContinue': 'Verify & continue',
+
+  'streamers.title': 'For Streamers',
+  'streamers.subtitle': 'Everything for streaming in one place — servers, OBS credentials, and guides.',
+  'streamers.createTile': '+ New streaming server',
+  'streamers.createTileHint': 'Create a server pre-configured with the RTMP Relay egg — a couple of clicks.',
+  'streamers.servicesTile': 'Connect services (soon)',
+  'streamers.servicesTileHint':
+    'Twitch sign-in for subscription notifications needs a separate piece of install-level configuration first — in progress.',
+  'streamers.guideTile': 'How to stream through PowerNode',
+  'streamers.guideP1':
+    '1. Create a server using the "RTMP Relay (offload stream encoding)" egg, set a Relay secret and your Twitch stream key.',
+  'streamers.guideP2':
+    '2. On the Network tab, add a port matching RTMP_PORT (1935 by default).',
+  'streamers.guideP3':
+    '3. Copy the Server and Stream Key below (or from the server\'s Overview tab) into OBS → Settings → Stream, Service = Custom. Use a hardware encoder in OBS (NVENC/AMF/QuickSync) — the heavy Twitch-facing encode already happens on the server.',
+  'streamers.noServers': 'No streaming servers yet — create your first one with the tile above.',
+  'streamers.openServer': 'Open server',
 };

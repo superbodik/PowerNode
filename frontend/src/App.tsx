@@ -8,8 +8,12 @@ import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
 import { ServerView } from './pages/ServerView';
 import { Settings } from './pages/Settings';
+import { Streamers } from './pages/Streamers';
 import { Users } from './pages/Users';
+import { PRESET_EGG_KEY } from './components/CreateServerForm';
 import { TwoFactorGate } from './components/TwoFactorGate';
+
+const RTMP_RELAY_EGG_NAME = 'RTMP Relay (offload stream encoding)';
 
 interface StoredUser {
   id: number;
@@ -17,9 +21,9 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'nodes' | 'settings' | 'activity' | 'account' | 'users';
+type View = 'servers' | 'streamers' | 'nodes' | 'settings' | 'activity' | 'account' | 'users';
 
-const VIEWS: View[] = ['servers', 'nodes', 'settings', 'activity', 'account', 'users'];
+const VIEWS: View[] = ['servers', 'streamers', 'nodes', 'settings', 'activity', 'account', 'users'];
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -96,6 +100,11 @@ export function App() {
     navigate({ view, activeServer: uuid });
   }
 
+  function handleCreateStreaming() {
+    sessionStorage.setItem(PRESET_EGG_KEY, RTMP_RELAY_EGG_NAME);
+    goTo('servers');
+  }
+
   function closeServer() {
     navigate({ view, activeServer: null });
   }
@@ -140,7 +149,9 @@ export function App() {
                     ? t('nav.account')
                     : view === 'users'
                       ? t('nav.users')
-                      : t('nav.dashboard')}
+                      : view === 'streamers'
+                        ? t('nav.streamers')
+                        : t('nav.dashboard')}
           </span>
           {activeServer && (
             <>
@@ -177,6 +188,12 @@ export function App() {
               onClick={() => goTo('servers')}
             >
               <span className="nav-icon">▦</span> {t('nav.servers')}
+            </div>
+            <div
+              className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
+              onClick={() => goTo('streamers')}
+            >
+              <span className="nav-icon">▶</span> {t('nav.streamers')}
             </div>
           </div>
           <div className="nav-section">
@@ -222,6 +239,8 @@ export function App() {
         <main className="main">
           {activeServer ? (
             <ServerView uuid={activeServer} onBack={closeServer} />
+          ) : view === 'streamers' ? (
+            <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
           ) : view === 'nodes' ? (
             <Nodes />
           ) : view === 'users' ? (

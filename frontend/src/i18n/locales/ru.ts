@@ -18,6 +18,7 @@ export const ru: Dict = {
   'nav.overview': 'Обзор',
   'nav.admin': 'Администрирование',
   'nav.servers': 'Серверы',
+  'nav.streamers': 'Стримерам',
   'nav.dashboard': 'Панель',
   'nav.nodes': 'Ноды',
   'nav.users': 'Пользователи',
@@ -607,4 +608,22 @@ export const ru: Dict = {
   'twofaGate.hint': 'Перед продолжением у администраторских аккаунтов в этой панели должна быть включена двухфакторная аутентификация.',
   'twofaGate.setUp': 'Настроить 2FA',
   'twofaGate.verifyAndContinue': 'Подтвердить и продолжить',
+
+  'streamers.title': 'Стримерам',
+  'streamers.subtitle': 'Всё для стрима в одном месте — серверы, реквизиты для OBS и гайды.',
+  'streamers.createTile': '+ Новый стриминговый сервер',
+  'streamers.createTileHint': 'Создать сервер с предустановленным RTMP Relay egg — за пару кликов.',
+  'streamers.servicesTile': 'Подключение сервисов (скоро)',
+  'streamers.servicesTileHint':
+    'Twitch-авторизация для уведомлений о подписках потребует отдельной настройки на уровне установки панели — в разработке.',
+  'streamers.guideTile': 'Как стримить через PowerNode',
+  'streamers.guideP1':
+    '1. Создайте сервер на базе egg "RTMP Relay (offload stream encoding)", укажите Relay secret и свой Twitch stream key.',
+  'streamers.guideP2':
+    '2. На вкладке Network добавьте порт, совпадающий с RTMP_PORT (по умолчанию 1935).',
+  'streamers.guideP3':
+    '3. Скопируйте Server и Stream Key ниже (или с Overview сервера) в OBS → Settings → Stream, Service = Custom. Кодируйте в OBS аппаратно (NVENC/AMF/QuickSync) — тяжёлое кодирование под Twitch делает уже сервер.',
+  'streamers.noServers':
+    'Стриминговых серверов пока нет — создайте первый через плитку выше.',
+  'streamers.openServer': 'Открыть сервер',
 };

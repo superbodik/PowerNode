@@ -7,8 +7,11 @@ interface Props {
   onCreated: () => void;
 }
 
+export const PRESET_EGG_KEY = 'pn_preset_egg_name';
+
 export function CreateServerForm({ onCreated }: Props) {
-  const [open, setOpen] = useState(false);
+  const [pendingPresetEgg] = useState(() => sessionStorage.getItem(PRESET_EGG_KEY));
+  const [open, setOpen] = useState(() => pendingPresetEgg != null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [eggs, setEggs] = useState<Egg[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
@@ -32,6 +35,17 @@ export function CreateServerForm({ onCreated }: Props) {
     api.listNodes().then(setNodes).catch(() => {});
     api.listEggs().then(setEggs).catch(() => {});
   }, [open]);
+
+  // Lets another page (the Streamers hub) open this form pre-selected to a
+  // specific egg without the two pages needing to share any React state —
+  // it just drops a name in sessionStorage before navigating here.
+  useEffect(() => {
+    if (!pendingPresetEgg || eggs.length === 0) return;
+    const egg = eggs.find((e) => e.name === pendingPresetEgg);
+    if (egg) selectEgg(egg.id);
+    sessionStorage.removeItem(PRESET_EGG_KEY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eggs, pendingPresetEgg]);
 
   useEffect(() => {
     if (!form.node_id) {
