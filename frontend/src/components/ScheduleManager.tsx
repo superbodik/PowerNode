@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { Schedule, ScheduleTask } from '../types';
 
@@ -119,6 +120,12 @@ export function ScheduleManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.schedules.title')}>
+        <p>{t('guide.schedules.p1')}</p>
+        <p>{t('guide.schedules.p2')}</p>
+        <p>{t('guide.schedules.p3')}</p>
+        <p>{t('guide.schedules.p4')}</p>
+      </GuidePanel>
       {error && (
         <div className="login-error show" style={{ marginBottom: 12 }}>
           {error}

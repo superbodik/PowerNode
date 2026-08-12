@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { Subuser } from '../types';
 import { SUBUSER_PERMISSIONS } from '../types';
@@ -85,6 +86,12 @@ export function SubuserManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.sharing.title')}>
+        <p>{t('guide.sharing.p1')}</p>
+        <p>{t('guide.sharing.p2')}</p>
+        <p>{t('guide.sharing.p3')}</p>
+        <p>{t('guide.sharing.p4')}</p>
+      </GuidePanel>
       {error && (
         <div className="login-error show" style={{ marginBottom: 12 }}>
           {error}

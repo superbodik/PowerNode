@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, FileConflictError } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { FileEntry } from '../types';
 
@@ -218,6 +219,12 @@ export function FileManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.files.title')}>
+        <p>{t('guide.files.p1')}</p>
+        <p>{t('guide.files.p2')}</p>
+        <p>{t('guide.files.p3')}</p>
+        <p>{t('guide.files.p4')}</p>
+      </GuidePanel>
       <div className="files-toolbar">
         <div className="files-path">
           <span className="path-seg" onClick={() => setPath('/')}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { DatabaseHost, ServerDatabase } from '../types';
 
@@ -76,6 +77,12 @@ export function DatabaseManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.databases.title')}>
+        <p>{t('guide.databases.p1')}</p>
+        <p>{t('guide.databases.p2')}</p>
+        <p>{t('guide.databases.p3')}</p>
+        <p>{t('guide.databases.p4')}</p>
+      </GuidePanel>
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       {hosts.length === 0 ? (

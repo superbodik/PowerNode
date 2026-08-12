@@ -6,6 +6,7 @@ import { BackupManager } from '../components/BackupManager';
 import { DatabaseManager } from '../components/DatabaseManager';
 import { DomainManager } from '../components/DomainManager';
 import { FileManager } from '../components/FileManager';
+import { GuidePanel } from '../components/GuidePanel';
 import { PortManager } from '../components/PortManager';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { SubuserManager } from '../components/SubuserManager';
@@ -296,6 +297,13 @@ export function ServerView({ uuid, onBack }: Props) {
           </div>
 
           <div className={`tab-panel ${tab === 'overview' ? 'active' : ''}`}>
+            <GuidePanel title={t('guide.overview.title')}>
+              <p>{t('guide.overview.p1')}</p>
+              <p>{t('guide.overview.p2')}</p>
+              <p>{t('guide.overview.p3')}</p>
+              <p>{t('guide.overview.p4', { username: loadUsername(), 'server-id': server.uuid_short })}</p>
+              <p>{t('guide.overview.p5')}</p>
+            </GuidePanel>
             <div className="settings-card">
               <div className="settings-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {t('serverView.serverInfo')}
@@ -469,6 +477,11 @@ export function ServerView({ uuid, onBack }: Props) {
           </div>
 
           <div className={`tab-panel ${tab === 'console' ? 'active' : ''}`}>
+            <GuidePanel title={t('guide.console.title')}>
+              <p>{t('guide.console.p1')}</p>
+              <p>{t('guide.console.p2')}</p>
+              <p>{t('guide.console.p3')}</p>
+            </GuidePanel>
             <div className="console-wrap">
               <div className="console-bar">
                 <span className="console-dot r" />

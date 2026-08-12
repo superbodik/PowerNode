@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { ServerAllocation } from '../types';
 
@@ -80,6 +81,11 @@ export function PortManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.network.title')}>
+        <p>{t('guide.network.p1')}</p>
+        <p>{t('guide.network.p2')}</p>
+        <p>{t('guide.network.p3')}</p>
+      </GuidePanel>
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>

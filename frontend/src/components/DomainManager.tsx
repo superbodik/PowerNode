@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { GuidePanel } from './GuidePanel';
 import { t } from '../i18n';
 import type { ServerAllocation, ServerDomain } from '../types';
 
@@ -84,6 +85,12 @@ export function DomainManager({ uuid }: Props) {
 
   return (
     <div>
+      <GuidePanel title={t('guide.domains.title')}>
+        <p>{t('guide.domains.p1')}</p>
+        <p>{t('guide.domains.p2')}</p>
+        <p>{t('guide.domains.p3')}</p>
+        <p>{t('guide.domains.p4')}</p>
+      </GuidePanel>
       {error && <div className="login-error show" style={{ marginBottom: 12 }}>{error}</div>}
 
       <div className="settings-card" style={{ marginBottom: 20 }}>
