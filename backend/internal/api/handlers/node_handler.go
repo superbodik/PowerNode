@@ -34,6 +34,7 @@ type createNodeRequest struct {
 	DiskMB             int64  `json:"disk_mb"`
 	DiskOverallocate   int    `json:"disk_overallocate"`
 	IsPublic           *bool  `json:"is_public"`
+	IsPluginHost       bool   `json:"is_plugin_host"`
 }
 
 type createNodeResponse struct {
@@ -78,12 +79,12 @@ func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	err = h.DB.QueryRow(r.Context(), `
 		INSERT INTO nodes (name, location_id, fqdn, scheme, daemon_port,
 		                    daemon_token_hash, daemon_token_encrypted, memory_mb, memory_overallocate,
-		                    disk_mb, disk_overallocate, is_public)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		                    disk_mb, disk_overallocate, is_public, is_plugin_host)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		RETURNING id`,
 		req.Name, req.LocationID, req.FQDN, req.Scheme, req.DaemonPort,
 		tokenHash, tokenEncrypted, req.MemoryMB, req.MemoryOverallocate,
-		req.DiskMB, req.DiskOverallocate, isPublic,
+		req.DiskMB, req.DiskOverallocate, isPublic, req.IsPluginHost,
 	).Scan(&id)
 	if err != nil {
 		http.Error(w, "failed to create node", http.StatusInternalServerError)
@@ -113,7 +114,7 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT id, name, fqdn, scheme, daemon_port, memory_mb, memory_overallocate,
 		       disk_mb, disk_overallocate, is_public, maintenance_mode, last_seen_at, agent_version,
-		       total_cpu_cores
+		       total_cpu_cores, is_plugin_host
 		FROM nodes`
 	if !claims.IsAdmin {
 		query += ` WHERE is_public = true`
@@ -142,6 +143,7 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 		LastSeenAt         *string `json:"last_seen_at"`
 		AgentVersion       *string `json:"agent_version"`
 		TotalCPUCores      *int    `json:"total_cpu_cores,omitempty"`
+		IsPluginHost       bool    `json:"is_plugin_host"`
 	}
 
 	nodes := make([]nodeSummary, 0)
@@ -149,7 +151,8 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 		var n nodeSummary
 		if err := rows.Scan(&n.ID, &n.Name, &n.FQDN, &n.Scheme, &n.DaemonPort,
 			&n.MemoryMB, &n.MemoryOverallocate, &n.DiskMB, &n.DiskOverallocate,
-			&n.IsPublic, &n.MaintenanceMode, &n.LastSeenAt, &n.AgentVersion, &n.TotalCPUCores); err != nil {
+			&n.IsPublic, &n.MaintenanceMode, &n.LastSeenAt, &n.AgentVersion, &n.TotalCPUCores,
+			&n.IsPluginHost); err != nil {
 			http.Error(w, "failed to read nodes", http.StatusInternalServerError)
 			return
 		}
@@ -170,6 +173,7 @@ type updateNodeRequest struct {
 	DiskOverallocate   int    `json:"disk_overallocate"`
 	IsPublic           bool   `json:"is_public"`
 	MaintenanceMode    bool   `json:"maintenance_mode"`
+	IsPluginHost       bool   `json:"is_plugin_host"`
 }
 
 func (h *NodeHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -189,13 +193,32 @@ func (h *NodeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.DB.Exec(r.Context(), `
+	tx, err := h.DB.Begin(r.Context())
+	if err != nil {
+		http.Error(w, "failed to update node", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	// Only one node can be the plugin host at a time -- plugins install
+	// against "the" designated node, so a second one would make that
+	// ambiguous. Clearing the flag elsewhere first keeps it exclusive
+	// without a separate unique-partial-index migration.
+	if req.IsPluginHost {
+		if _, err := tx.Exec(r.Context(), `UPDATE nodes SET is_plugin_host = false WHERE id != $1`, id); err != nil {
+			http.Error(w, "failed to update node", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	tag, err := tx.Exec(r.Context(), `
 		UPDATE nodes SET name = $1, fqdn = $2, scheme = $3, daemon_port = $4,
 		                 memory_mb = $5, memory_overallocate = $6, disk_mb = $7,
-		                 disk_overallocate = $8, is_public = $9, maintenance_mode = $10
-		WHERE id = $11`,
+		                 disk_overallocate = $8, is_public = $9, maintenance_mode = $10,
+		                 is_plugin_host = $11
+		WHERE id = $12`,
 		req.Name, req.FQDN, req.Scheme, req.DaemonPort, req.MemoryMB, req.MemoryOverallocate,
-		req.DiskMB, req.DiskOverallocate, req.IsPublic, req.MaintenanceMode, id,
+		req.DiskMB, req.DiskOverallocate, req.IsPublic, req.MaintenanceMode, req.IsPluginHost, id,
 	)
 	if err != nil {
 		http.Error(w, "failed to update node", http.StatusInternalServerError)
@@ -203,6 +226,10 @@ func (h *NodeHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag.RowsAffected() == 0 {
 		http.Error(w, "node not found", http.StatusNotFound)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, "failed to update node", http.StatusInternalServerError)
 		return
 	}
 

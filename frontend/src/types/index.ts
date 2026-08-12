@@ -75,6 +75,9 @@ export interface Node {
   // Self-reported by wingsd on each health check -- null until the node's
   // first check-in, not an admin-set allocatable capacity like memory_mb.
   total_cpu_cores?: number | null;
+  // Exclusive across nodes -- the panel installs plugin eggs onto whichever
+  // node has this set, see Plugins.tsx.
+  is_plugin_host: boolean;
 }
 
 export interface NodeStatus {
@@ -104,6 +107,7 @@ export interface CreateNodeRequest {
   disk_mb: number;
   disk_overallocate?: number;
   is_public?: boolean;
+  is_plugin_host?: boolean;
 }
 
 export interface UpdateNodeRequest {
@@ -117,6 +121,7 @@ export interface UpdateNodeRequest {
   disk_overallocate: number;
   is_public: boolean;
   maintenance_mode: boolean;
+  is_plugin_host: boolean;
 }
 
 export interface CreateNodeResponse {

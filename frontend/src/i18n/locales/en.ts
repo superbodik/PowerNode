@@ -22,6 +22,7 @@ export const en = {
   'nav.streamers': 'For Streamers',
   'nav.dashboard': 'Dashboard',
   'nav.nodes': 'Nodes',
+  'nav.plugins': 'Plugins',
   'nav.users': 'Users',
   'nav.activity': 'Activity',
   'nav.account': 'Account',
@@ -99,6 +100,8 @@ export const en = {
   'nodes.diskOverallocate': 'Disk overallocate (%)',
   'nodes.publicToggleLabel': 'Public (visible to all users when creating a server)',
   'nodes.maintenanceToggleLabel': 'Maintenance mode (blocks new servers)',
+  'nodes.pluginHostToggleLabel': 'Plugin host (panel plugins install here)',
+  'nodes.pluginHostBadge': 'Plugin host',
   'nodes.generating': 'Generating…',
   'nodes.regenerateToken': 'Regenerate token',
   'nodes.deleteNode': 'Delete node',
@@ -131,6 +134,18 @@ export const en = {
   'nodes.addDbHost': 'Add database host',
   'nodes.colAdminUser': 'Admin user',
   'nodes.noDbHostsYet': 'No database hosts registered yet.',
+
+  'plugins.title': 'Plugins',
+  'plugins.subtitle': 'Install optional panel features on the designated plugin host node.',
+  'plugins.noHostWarning':
+    'No node is set as the plugin host yet. Go to Nodes, edit a node, and enable "Plugin host" -- ideally a private node, since installing here should stay admin-only.',
+  'plugins.noneYet': 'No plugins available yet -- check back after the next panel update.',
+  'plugins.installed': 'Installed',
+  'plugins.install': 'Install',
+  'plugins.installing': 'Installing…',
+  'plugins.uninstall': 'Uninstall',
+  'plugins.manage': 'Manage',
+  'plugins.confirmUninstall': 'Uninstall "{name}"? This removes its container and data.',
 
   // pages/Users.tsx
   'users.title': 'Users',

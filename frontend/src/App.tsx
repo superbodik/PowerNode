@@ -6,6 +6,7 @@ import { Activity } from './pages/Activity';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
+import { Plugins } from './pages/Plugins';
 import { ServerView } from './pages/ServerView';
 import { Settings } from './pages/Settings';
 import { Streamers } from './pages/Streamers';
@@ -22,9 +23,9 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'streamers' | 'nodes' | 'settings' | 'activity' | 'account' | 'users';
+type View = 'servers' | 'streamers' | 'nodes' | 'plugins' | 'settings' | 'activity' | 'account' | 'users';
 
-const VIEWS: View[] = ['servers', 'streamers', 'nodes', 'settings', 'activity', 'account', 'users'];
+const VIEWS: View[] = ['servers', 'streamers', 'nodes', 'plugins', 'settings', 'activity', 'account', 'users'];
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -142,7 +143,9 @@ export function App() {
           <span className={activeServer ? '' : 'bc-cur'} onClick={() => goTo('servers')}>
             {view === 'nodes'
               ? t('nav.nodes')
-              : view === 'settings'
+              : view === 'plugins'
+                ? t('nav.plugins')
+                : view === 'settings'
                 ? t('nav.settings')
                 : view === 'activity'
                   ? t('nav.activity')
@@ -200,6 +203,12 @@ export function App() {
               <span className="nav-icon">◆</span> {t('nav.nodes')}
             </div>
             <div
+              className={`nav-item ${view === 'plugins' ? 'active' : ''}`}
+              onClick={() => goTo('plugins')}
+            >
+              <span className="nav-icon">⚡</span> {t('nav.plugins')}
+            </div>
+            <div
               className={`nav-item ${view === 'users' ? 'active' : ''}`}
               onClick={() => goTo('users')}
             >
@@ -248,6 +257,8 @@ export function App() {
               <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
             ) : view === 'nodes' ? (
               <Nodes />
+            ) : view === 'plugins' ? (
+              <Plugins onManage={openServer} />
             ) : view === 'users' ? (
               <Users />
             ) : view === 'settings' ? (

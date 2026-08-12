@@ -98,6 +98,7 @@ export function Nodes() {
     disk_overallocate: 0,
     is_public: true,
     maintenance_mode: false,
+    is_plugin_host: false,
   });
   const [savingNodeId, setSavingNodeId] = useState<number | null>(null);
   const [regeneratingNodeId, setRegeneratingNodeId] = useState<number | null>(null);
@@ -121,6 +122,7 @@ export function Nodes() {
       disk_overallocate: node.disk_overallocate,
       is_public: node.is_public,
       maintenance_mode: node.maintenance_mode,
+      is_plugin_host: node.is_plugin_host,
     });
   }
 
@@ -436,6 +438,11 @@ export function Nodes() {
                         {t('nodes.maintenance')}
                       </span>
                     )}
+                    {node.is_plugin_host && (
+                      <span style={{ fontSize: 10, color: 'var(--pink-b)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px' }}>
+                        {t('nodes.pluginHostBadge')}
+                      </span>
+                    )}
                   </span>
                   <span className="db-pw">
                     {node.scheme}://{node.fqdn}:{node.daemon_port}
@@ -584,6 +591,15 @@ export function Nodes() {
                           <div className="toggle-knob" />
                         </div>
                         {t('nodes.maintenanceToggleLabel')}
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <div
+                          className={`toggle-sw ${editForm.is_plugin_host ? 'on' : ''}`}
+                          onClick={() => setEditForm((f) => ({ ...f, is_plugin_host: !f.is_plugin_host }))}
+                        >
+                          <div className="toggle-knob" />
+                        </div>
+                        {t('nodes.pluginHostToggleLabel')}
                       </label>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

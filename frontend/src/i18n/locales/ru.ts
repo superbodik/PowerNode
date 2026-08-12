@@ -24,6 +24,7 @@ export const ru: Dict = {
   'nav.streamers': 'Стримерам',
   'nav.dashboard': 'Панель',
   'nav.nodes': 'Ноды',
+  'nav.plugins': 'Плагины',
   'nav.users': 'Пользователи',
   'nav.activity': 'Активность',
   'nav.account': 'Аккаунт',
@@ -101,6 +102,8 @@ export const ru: Dict = {
   'nodes.diskOverallocate': 'Переподписка диска (%)',
   'nodes.publicToggleLabel': 'Публичная (видна всем пользователям при создании сервера)',
   'nodes.maintenanceToggleLabel': 'Режим обслуживания (блокирует создание новых серверов)',
+  'nodes.pluginHostToggleLabel': 'Узел для плагинов (сюда устанавливаются плагины панели)',
+  'nodes.pluginHostBadge': 'Узел плагинов',
   'nodes.generating': 'Генерация…',
   'nodes.regenerateToken': 'Перегенерировать токен',
   'nodes.deleteNode': 'Удалить ноду',
@@ -133,6 +136,18 @@ export const ru: Dict = {
   'nodes.addDbHost': 'Добавить хост БД',
   'nodes.colAdminUser': 'Администратор',
   'nodes.noDbHostsYet': 'Хосты баз данных пока не зарегистрированы.',
+
+  'plugins.title': 'Плагины',
+  'plugins.subtitle': 'Установка опциональных функций панели на выделенный узел для плагинов.',
+  'plugins.noHostWarning':
+    'Ни одна нода не отмечена как узел для плагинов. Зайди в Ноды, отредактируй нужную ноду и включи "Узел для плагинов" -- лучше сделать её приватной, чтобы установка плагинов оставалась доступна только админам.',
+  'plugins.noneYet': 'Плагинов пока нет -- загляни сюда после следующего обновления панели.',
+  'plugins.installed': 'Установлен',
+  'plugins.install': 'Установить',
+  'plugins.installing': 'Установка…',
+  'plugins.uninstall': 'Удалить',
+  'plugins.manage': 'Управлять',
+  'plugins.confirmUninstall': 'Удалить "{name}"? Это удалит контейнер и данные.',
 
   // pages/Users.tsx
   'users.title': 'Пользователи',
