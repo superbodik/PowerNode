@@ -632,6 +632,8 @@ export const ru: Dict = {
   'streamers.widgetUrlLabel': 'Ссылка для Browser Source в OBS',
   'streamers.widgetUrlHint':
     'Добавьте как источник Browser Source в OBS — при новой подписке или донат-сабе прямо в сцене появится алерт.',
+  'streamers.testAlertSub': 'Тест: подписка',
+  'streamers.testAlertGift': 'Тест: подарок',
   'streamers.twitchJustConnected': 'Twitch-аккаунт подключён.',
   'streamers.twitchConnectError': 'Не удалось подключить Twitch — попробуйте ещё раз.',
   'streamers.guideTile': 'Как стримить через PowerNode',

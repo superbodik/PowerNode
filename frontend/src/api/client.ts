@@ -418,6 +418,12 @@ export const api = {
 
   getTwitchStreamKey: () => request<{ stream_key: string }>('/integrations/twitch/stream-key'),
 
+  sendTwitchTestAlert: (kind: 'sub' | 'gift') =>
+    request<void>('/integrations/twitch/subscriptions/test', {
+      method: 'POST',
+      body: JSON.stringify({ kind }),
+    }),
+
   disconnectTwitch: () => request<void>('/integrations/twitch', { method: 'DELETE' }),
 
   listFiles: (uuid: string, path: string) =>

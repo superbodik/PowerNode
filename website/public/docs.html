@@ -305,7 +305,10 @@ PANEL_TWITCH_CLIENT_SECRET=your-client-secret</code></pre>
         registers with Twitch's EventSub so it pushes new subs and gifted subs to the panel in real
         time, and hands back a Browser Source URL. In OBS: Sources → <strong>+</strong> →
         <strong>Browser</strong>, paste the URL. It's transparent and shows nothing until an actual
-        event arrives.</p>
+        event arrives. Use the <strong>Test: sub alert</strong> / <strong>Test: gift alert</strong>
+        buttons next to the URL to check it looks right in your scene without waiting for a real
+        subscription — they push a fake event through the same delivery path, no Twitch API call
+        involved.</p>
 
         <div class="callout">
           <div class="callout-label">Subscription widget needs a real HTTPS domain</div>

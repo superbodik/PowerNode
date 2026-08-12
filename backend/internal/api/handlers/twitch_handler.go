@@ -297,6 +297,54 @@ func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]string{"subscription_widget_url": h.widgetURL(widgetToken)})
 }
 
+type testAlertRequest struct {
+	Kind string `json:"kind"`
+}
+
+// SendTestAlert pushes a fake event through the exact same WS broadcast
+// path a real EventSub notification would use, so the OBS Browser Source
+// can be checked without waiting for an actual subscription. Never touches
+// Twitch's API -- it's purely internal, gated only on the widget already
+// existing.
+func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req testAlertRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	var widgetToken string
+	err := h.DB.QueryRow(r.Context(),
+		`SELECT token FROM twitch_widget_tokens WHERE user_id = $1`, claims.UserID,
+	).Scan(&widgetToken)
+	if err == pgx.ErrNoRows {
+		http.Error(w, "create the subscription widget first", http.StatusBadRequest)
+		return
+	} else if err != nil {
+		http.Error(w, "failed to load widget token", http.StatusInternalServerError)
+		return
+	}
+
+	if req.Kind == "gift" {
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "gift",
+			"user_name": "TestSubscriber",
+			"tier":      "1000",
+			"count":     5,
+		})
+	} else {
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "sub",
+			"user_name": "TestSubscriber",
+			"tier":      "1000",
+		})
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // GetStreamKey fetches the connected broadcaster's own RTMP stream key, so
 // the create-server form can fill in TWITCH_KEY without the user copying it
 // from Twitch's dashboard by hand. Requires channel:read:stream_key,

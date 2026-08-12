@@ -270,6 +270,18 @@ function TwitchTile({
     }
   }
 
+  async function sendTestAlert(kind: 'sub' | 'gift') {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.sendTwitchTestAlert(kind);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function disconnect() {
     setBusy(true);
     setError(null);
@@ -324,6 +336,14 @@ function TwitchTile({
               <span className="srv-desc" style={{ fontSize: 10 }}>
                 {t('streamers.widgetUrlHint')}
               </span>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('sub')}>
+                  {t('streamers.testAlertSub')}
+                </button>
+                <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('gift')}>
+                  {t('streamers.testAlertGift')}
+                </button>
+              </div>
             </div>
           ) : status.has_subscriptions_scope ? (
             <p className="srv-desc" style={{ marginBottom: 10 }}>
