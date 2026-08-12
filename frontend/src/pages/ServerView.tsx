@@ -205,7 +205,7 @@ export function ServerView({ uuid, onBack }: Props) {
   const relaySecret = server?.environment?.RELAY_SECRET;
   const obsServerUrl =
     server?.primary_address && relaySecret
-      ? `rtmp://${server.primary_address.split(':')[0]}:${server.environment?.RTMP_PORT || '1935'}/${relaySecret}`
+      ? `rtmp://${server.primary_address.split(':')[0]}:${server.environment?.RTMP_PORT || '1935'}`
       : null;
 
   if (error) return <div className="login-error show">{error}</div>;
@@ -508,8 +508,8 @@ export function ServerView({ uuid, onBack }: Props) {
                     <div className="sfield">
                       <label>{t('serverView.obsStreamKey')}</label>
                       <div className="api-item">
-                        <span className="api-key">live</span>
-                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText('live')}>
+                        <span className="api-key">{relaySecret}</span>
+                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(relaySecret ?? '')}>
                           {t('common.copy')}
                         </button>
                       </div>
