@@ -253,7 +253,7 @@ body::before {
 .sidebar::-webkit-scrollbar { width: 3px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--pink-d); border-radius: 2px; }
 
-.nav-section { margin-bottom: 6px; }
+.nav-section { margin-bottom: 26px; }
 .nav-section-label {
   font-size: 8.5px; letter-spacing: .1em;
   text-transform: uppercase; color: var(--muted);

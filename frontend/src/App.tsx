@@ -191,15 +191,6 @@ export function App() {
             </div>
           </div>
           <div className="nav-section">
-            <div className="nav-section-label">{t('nav.streaming')}</div>
-            <div
-              className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
-              onClick={() => goTo('streamers')}
-            >
-              <span className="nav-icon">▶</span> {t('nav.streamers')}
-            </div>
-          </div>
-          <div className="nav-section">
             <div className="nav-section-label">{t('nav.admin')}</div>
             <div
               className={`nav-item ${view === 'nodes' ? 'active' : ''}`}
@@ -224,6 +215,15 @@ export function App() {
               onClick={() => goTo('account')}
             >
               <span className="nav-icon">◈</span> {t('nav.account')}
+            </div>
+          </div>
+          <div className="nav-section">
+            <div className="nav-section-label">{t('nav.streaming')}</div>
+            <div
+              className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
+              onClick={() => goTo('streamers')}
+            >
+              <span className="nav-icon">▶</span> {t('nav.streamers')}
             </div>
           </div>
           <div className="sidebar-footer">
