@@ -399,10 +399,22 @@ export const api = {
     }),
 
   getTwitchStatus: () =>
-    request<{ enabled: boolean; connected: boolean; twitch_login?: string }>('/integrations/twitch/status'),
+    request<{
+      enabled: boolean;
+      connected: boolean;
+      twitch_login?: string;
+      has_subscriptions_scope: boolean;
+      subscription_widget_url?: string;
+    }>('/integrations/twitch/status'),
 
   startTwitchConnect: () =>
     request<{ authorize_url: string }>('/integrations/twitch/start', { method: 'POST' }),
+
+  startTwitchSubscriptions: () =>
+    request<{ authorize_url: string }>('/integrations/twitch/start-subscriptions', { method: 'POST' }),
+
+  enableTwitchSubscriptions: () =>
+    request<{ subscription_widget_url: string }>('/integrations/twitch/subscriptions/enable', { method: 'POST' }),
 
   disconnectTwitch: () => request<void>('/integrations/twitch', { method: 'DELETE' }),
 

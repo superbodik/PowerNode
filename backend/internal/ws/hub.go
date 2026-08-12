@@ -44,6 +44,11 @@ type Hub struct {
 	consoleRooms    map[uuid.UUID]map[*websocket.Conn]struct{}
 	consoleSessions map[uuid.UUID]*consoleSession
 
+	// widgetRooms fans out to OBS Browser Source connections (subscription
+	// alerts, and anything else later) -- keyed by an opaque per-user token
+	// rather than a server UUID, since a widget isn't tied to any one server.
+	widgetRooms map[string]map[*websocket.Conn]struct{}
+
 	FetchStats    func(ctx context.Context, serverUUID uuid.UUID) (*models.ResourceStats, error)
 	DialConsole   func(ctx context.Context, serverUUID uuid.UUID) (*websocket.Conn, error)
 	PersistStatus func(ctx context.Context, serverUUID uuid.UUID, state models.ServerStatus)
@@ -55,6 +60,7 @@ func NewHub() *Hub {
 		pollers:         make(map[uuid.UUID]context.CancelFunc),
 		consoleRooms:    make(map[uuid.UUID]map[*websocket.Conn]struct{}),
 		consoleSessions: make(map[uuid.UUID]*consoleSession),
+		widgetRooms:     make(map[string]map[*websocket.Conn]struct{}),
 	}
 }
 
@@ -109,6 +115,58 @@ func (h *Hub) ServeConsoleSocket(w http.ResponseWriter, r *http.Request, serverU
 		session.writeMu.Unlock()
 		if writeErr != nil {
 			log.Printf("console write to daemon failed: %v", writeErr)
+		}
+	}
+}
+
+// ServeWidgetSocket is a pure fan-out subscription -- no daemon dial-through,
+// no polling, just "hold this connection open and forward whatever
+// BroadcastWidget sends for this token." The read loop only exists to
+// detect the connection closing; the widget page never sends anything.
+func (h *Hub) ServeWidgetSocket(w http.ResponseWriter, r *http.Request, token string) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("widget ws upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
+	conn.SetReadLimit(1024)
+
+	h.mu.Lock()
+	if h.widgetRooms[token] == nil {
+		h.widgetRooms[token] = make(map[*websocket.Conn]struct{})
+	}
+	h.widgetRooms[token][conn] = struct{}{}
+	h.mu.Unlock()
+
+	defer func() {
+		h.mu.Lock()
+		delete(h.widgetRooms[token], conn)
+		if len(h.widgetRooms[token]) == 0 {
+			delete(h.widgetRooms, token)
+		}
+		h.mu.Unlock()
+	}()
+
+	for {
+		if _, _, err := conn.ReadMessage(); err != nil {
+			return
+		}
+	}
+}
+
+func (h *Hub) BroadcastWidget(token string, payload any) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("widget broadcast marshal failed: %v", err)
+		return
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for conn := range h.widgetRooms[token] {
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			log.Printf("widget ws write failed: %v", err)
 		}
 	}
 }

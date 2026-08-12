@@ -24,20 +24,22 @@ import (
 )
 
 type Dependencies struct {
-	DB              *pgxpool.Pool
-	Token           *auth.TokenManager
-	Hub             *ws.Hub
-	NodeClient      func(nodeID int64) (*daemonclient.Client, error)
-	EncryptionKey   string
-	Limiter         *ratelimit.Limiter
-	Version         string
-	Commit          string
-	BuildDate       string
-	SourceDir       string
-	RepoSlug        string
-	AllowedOrigins  []string
-	RequireAdmin2FA bool
-	TwitchClient    *twitch.Client
+	DB                   *pgxpool.Pool
+	Token                *auth.TokenManager
+	Hub                  *ws.Hub
+	NodeClient           func(nodeID int64) (*daemonclient.Client, error)
+	EncryptionKey        string
+	Limiter              *ratelimit.Limiter
+	Version              string
+	Commit               string
+	BuildDate            string
+	SourceDir            string
+	RepoSlug             string
+	AllowedOrigins       []string
+	RequireAdmin2FA      bool
+	TwitchClient         *twitch.Client
+	TwitchEventSubSecret string
+	PublicURL            string
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -99,13 +101,22 @@ func NewRouter(deps Dependencies) http.Handler {
 	serverAllocationHandler := &handlers.ServerAllocationHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
 	sshKeyHandler := &handlers.SSHKeyHandler{DB: deps.DB}
 	sftpAuthHandler := &handlers.SFTPAuthHandler{DB: deps.DB, Subusers: subusers, EncryptionKey: deps.EncryptionKey}
-	twitchHandler := &handlers.TwitchHandler{DB: deps.DB, Client: deps.TwitchClient, EncryptionKey: deps.EncryptionKey}
+	twitchHandler := &handlers.TwitchHandler{
+		DB:             deps.DB,
+		Client:         deps.TwitchClient,
+		Hub:            deps.Hub,
+		EncryptionKey:  deps.EncryptionKey,
+		EventSubSecret: deps.TwitchEventSubSecret,
+		PublicURL:      deps.PublicURL,
+	}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/internal/sftp/authenticate", sftpAuthHandler.Authenticate)
 		r.Get("/auth/twitch/callback", twitchHandler.Callback)
+		r.Post("/twitch/eventsub", twitchHandler.EventSubWebhook)
+		r.Get("/widgets/subs/{token}", twitchHandler.WidgetPage)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(30 * time.Second))
@@ -190,6 +201,8 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Get("/integrations/twitch/status", twitchHandler.Status)
 			r.Post("/integrations/twitch/start", twitchHandler.Start)
+			r.Post("/integrations/twitch/start-subscriptions", twitchHandler.StartSubscriptions)
+			r.Post("/integrations/twitch/subscriptions/enable", twitchHandler.EnableSubscriptions)
 			r.Delete("/integrations/twitch", twitchHandler.Disconnect)
 		})
 
@@ -246,6 +259,13 @@ func NewRouter(deps Dependencies) http.Handler {
 			return
 		}
 		deps.Hub.ServeConsoleSocket(w, r, id)
+	})
+
+	// Public: OBS Browser Source has no PowerNode session to authenticate
+	// with, so the token in the URL is the only gate here -- same model as
+	// the widget HTML page it's embedded in.
+	r.Get("/ws/widgets/{token}", func(w http.ResponseWriter, r *http.Request) {
+		deps.Hub.ServeWidgetSocket(w, r, chi.URLParam(r, "token"))
 	})
 
 	return r

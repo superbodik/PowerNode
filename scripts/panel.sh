@@ -96,10 +96,11 @@ write_panel_env() {
 		return
 	fi
 
-	local db_password jwt_secret encryption_key
+	local db_password jwt_secret encryption_key eventsub_secret
 	db_password=$(random_secret 24)
 	jwt_secret=$(random_secret 32)
 	encryption_key=$(random_secret 16)
+	eventsub_secret=$(random_secret 16)
 
 	provision_database "$db_password"
 
@@ -109,10 +110,25 @@ write_panel_env() {
 	PANEL_REDIS_ADDR=127.0.0.1:6379
 	PANEL_JWT_SECRET=${jwt_secret}
 	PANEL_ENCRYPTION_KEY=${encryption_key}
+	PANEL_TWITCH_EVENTSUB_SECRET=${eventsub_secret}
 	PANEL_SOURCE_DIR=${PROJECT_ROOT}
 	EOF
 	chmod 600 "$PANEL_ENV_FILE"
 	log_ok "Wrote $PANEL_ENV_FILE (mode 600)"
+}
+
+# Twitch EventSub requires a signing secret to verify webhook deliveries.
+# Fresh installs get one from write_panel_env above; existing installs
+# updating past this point need it backfilled the same way
+# backfill_panel_public_url handles PANEL_PUBLIC_URL.
+backfill_twitch_eventsub_secret() {
+	local env_file="${PANEL_ENV_FILE:-/etc/panel/panel.env}"
+	[[ -f "$env_file" ]] || return
+	if grep -q '^PANEL_TWITCH_EVENTSUB_SECRET=' "$env_file"; then
+		return
+	fi
+	echo "PANEL_TWITCH_EVENTSUB_SECRET=$(random_secret 16)" >>"$env_file"
+	log_ok "Generated Twitch EventSub webhook secret"
 }
 
 write_panel_service() {

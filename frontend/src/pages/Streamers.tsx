@@ -205,6 +205,14 @@ function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: s
   );
 }
 
+interface TwitchStatus {
+  enabled: boolean;
+  connected: boolean;
+  twitch_login?: string;
+  has_subscriptions_scope: boolean;
+  subscription_widget_url?: string;
+}
+
 function TwitchTile({
   notice,
   onDismissNotice,
@@ -212,7 +220,7 @@ function TwitchTile({
   notice: 'connected' | 'error' | null;
   onDismissNotice: () => void;
 }) {
-  const [status, setStatus] = useState<{ enabled: boolean; connected: boolean; twitch_login?: string } | null>(null);
+  const [status, setStatus] = useState<TwitchStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -220,7 +228,7 @@ function TwitchTile({
     api
       .getTwitchStatus()
       .then(setStatus)
-      .catch(() => setStatus({ enabled: false, connected: false }));
+      .catch(() => setStatus({ enabled: false, connected: false, has_subscriptions_scope: false }));
   }
 
   useEffect(refresh, [notice]);
@@ -233,6 +241,31 @@ function TwitchTile({
       window.location.href = authorize_url;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function upgradeForSubscriptions() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startTwitchSubscriptions();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function enableWidget() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.enableTwitchSubscriptions();
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setBusy(false);
     }
   }
@@ -275,7 +308,44 @@ function TwitchTile({
           <p className="srv-desc" style={{ marginBottom: 10 }}>
             {t('streamers.twitchConnectedAs', { login: status.twitch_login ?? '' })}
           </p>
-          <div className="settings-foot">
+
+          {status.subscription_widget_url ? (
+            <div className="sfield" style={{ marginBottom: 10 }}>
+              <label>{t('streamers.widgetUrlLabel')}</label>
+              <div className="api-item">
+                <span className="api-key">{status.subscription_widget_url}</span>
+                <button
+                  className="btn-sm"
+                  onClick={() => navigator.clipboard?.writeText(status.subscription_widget_url ?? '')}
+                >
+                  {t('common.copy')}
+                </button>
+              </div>
+              <span className="srv-desc" style={{ fontSize: 10 }}>
+                {t('streamers.widgetUrlHint')}
+              </span>
+            </div>
+          ) : status.has_subscriptions_scope ? (
+            <p className="srv-desc" style={{ marginBottom: 10 }}>
+              {t('streamers.widgetReadyHint')}
+            </p>
+          ) : (
+            <p className="srv-desc" style={{ marginBottom: 10 }}>
+              {t('streamers.subsUpgradeHint')}
+            </p>
+          )}
+
+          <div className="settings-foot" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!status.has_subscriptions_scope && (
+              <button className="btn-sm" disabled={busy} onClick={upgradeForSubscriptions}>
+                {t('streamers.subsUpgrade')}
+              </button>
+            )}
+            {status.has_subscriptions_scope && !status.subscription_widget_url && (
+              <button className="btn-sm" disabled={busy} onClick={enableWidget}>
+                {t('streamers.widgetEnable')}
+              </button>
+            )}
             <button className="btn-sm" disabled={busy} onClick={disconnect}>
               {t('streamers.twitchDisconnect')}
             </button>

@@ -622,6 +622,14 @@ export const ru: Dict = {
   'streamers.twitchConnect': 'Подключить Twitch',
   'streamers.twitchConnectedAs': 'Подключено: {login}',
   'streamers.twitchDisconnect': 'Отключить',
+  'streamers.subsUpgradeHint':
+    'Чтобы получать алерты о подписках в OBS, нужно один раз заново авторизоваться с доступом к списку подписчиков.',
+  'streamers.subsUpgrade': 'Разрешить доступ к подпискам',
+  'streamers.widgetReadyHint': 'Доступ разрешён — осталось создать виджет для OBS.',
+  'streamers.widgetEnable': 'Создать виджет',
+  'streamers.widgetUrlLabel': 'Ссылка для Browser Source в OBS',
+  'streamers.widgetUrlHint':
+    'Добавьте как источник Browser Source в OBS — при новой подписке или донат-сабе прямо в сцене появится алерт.',
   'streamers.twitchJustConnected': 'Twitch-аккаунт подключён.',
   'streamers.twitchConnectError': 'Не удалось подключить Twitch — попробуйте ещё раз.',
   'streamers.guideTile': 'Как стримить через PowerNode',

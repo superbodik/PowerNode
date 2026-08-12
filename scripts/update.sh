@@ -18,6 +18,7 @@ run_update() {
 	if [[ -x "${PANEL_INSTALL_DIR:-/opt/panel}/panel" ]]; then
 		patch_panel_source_dir
 		backfill_panel_public_url
+		backfill_twitch_eventsub_secret
 		apply_migrations_from_env
 		build_panel_binaries
 		systemctl restart panel
