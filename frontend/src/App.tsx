@@ -11,6 +11,7 @@ import { Settings } from './pages/Settings';
 import { Streamers } from './pages/Streamers';
 import { Users } from './pages/Users';
 import { PRESET_EGG_KEY } from './components/CreateServerForm';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { TwoFactorGate } from './components/TwoFactorGate';
 
 const RTMP_RELAY_EGG_NAME = 'RTMP Relay (offload stream encoding)';
@@ -240,23 +241,25 @@ export function App() {
         </aside>
 
         <main className="main">
-          {activeServer ? (
-            <ServerView uuid={activeServer} onBack={closeServer} />
-          ) : view === 'streamers' ? (
-            <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
-          ) : view === 'nodes' ? (
-            <Nodes />
-          ) : view === 'users' ? (
-            <Users />
-          ) : view === 'settings' ? (
-            <Settings />
-          ) : view === 'activity' ? (
-            <Activity />
-          ) : view === 'account' ? (
-            <Account />
-          ) : (
-            <Dashboard onManage={openServer} />
-          )}
+          <ErrorBoundary key={`${view}-${activeServer ?? ''}`}>
+            {activeServer ? (
+              <ServerView uuid={activeServer} onBack={closeServer} />
+            ) : view === 'streamers' ? (
+              <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
+            ) : view === 'nodes' ? (
+              <Nodes />
+            ) : view === 'users' ? (
+              <Users />
+            ) : view === 'settings' ? (
+              <Settings />
+            ) : view === 'activity' ? (
+              <Activity />
+            ) : view === 'account' ? (
+              <Account />
+            ) : (
+              <Dashboard onManage={openServer} />
+            )}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

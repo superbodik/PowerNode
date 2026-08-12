@@ -13,6 +13,8 @@ export const en = {
 
   // App.tsx — topbar/sidebar
   'app.toggleNav': 'Toggle navigation',
+  'app.somethingBroke': 'Something broke while rendering this page.',
+  'app.reload': 'Reload',
   'nav.overview': 'Overview',
   'nav.streaming': 'Streaming',
   'nav.admin': 'Admin',

@@ -25,7 +25,11 @@ function storageKey(uuid: string): string {
 function loadLastSession(uuid: string): StreamSessionSummary | null {
   try {
     const raw = localStorage.getItem(storageKey(uuid));
-    return raw ? (JSON.parse(raw) as StreamSessionSummary) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StreamSessionSummary;
+    // Entries saved before `samples` existed won't have it -- default it
+    // rather than let every consumer remember to null-check.
+    return { ...parsed, samples: Array.isArray(parsed.samples) ? parsed.samples : [] };
   } catch {
     return null;
   }

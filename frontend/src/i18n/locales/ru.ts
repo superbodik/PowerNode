@@ -15,6 +15,8 @@ export const ru: Dict = {
 
   // App.tsx — topbar/sidebar
   'app.toggleNav': 'Переключить навигацию',
+  'app.somethingBroke': 'Что-то сломалось при отображении этой страницы.',
+  'app.reload': 'Перезагрузить',
   'nav.overview': 'Обзор',
   'nav.streaming': 'Стриминг',
   'nav.admin': 'Администрирование',

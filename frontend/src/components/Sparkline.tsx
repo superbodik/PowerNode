@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 
 interface Props {
-  values: number[];
+  // Optional/nullable because callers may hand back a summary parsed
+  // straight from localStorage -- an entry saved before this field existed
+  // simply won't have it, so this can't assume the array is always there.
+  values: number[] | undefined | null;
   color?: string;
   height?: number;
   unit?: string;
@@ -16,25 +19,26 @@ const PAD_Y = 5;
 // so the exact value at any point is still reachable, not just eyeballed.
 export function Sparkline({ values, color = 'var(--pink-b)', height = 44, unit = 'kbps' }: Props) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const safeValues = values ?? [];
 
   const { linePath, areaPath, points, min, max } = useMemo(() => {
-    if (values.length < 2) {
+    if (safeValues.length < 2) {
       return { linePath: '', areaPath: '', points: [] as { x: number; y: number }[], min: 0, max: 0 };
     }
-    const lo = Math.min(...values);
-    const hi = Math.max(...values);
+    const lo = Math.min(...safeValues);
+    const hi = Math.max(...safeValues);
     const span = hi - lo || 1;
     const usableHeight = height - PAD_Y * 2;
-    const pts = values.map((v, i) => ({
-      x: (i / (values.length - 1)) * VIEW_WIDTH,
+    const pts = safeValues.map((v, i) => ({
+      x: (i / (safeValues.length - 1)) * VIEW_WIDTH,
       y: PAD_Y + usableHeight - ((v - lo) / span) * usableHeight,
     }));
     const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
     const area = `${line} L${pts[pts.length - 1].x.toFixed(2)},${height} L0,${height} Z`;
     return { linePath: line, areaPath: area, points: pts, min: lo, max: hi };
-  }, [values, height]);
+  }, [safeValues, height]);
 
-  if (values.length < 2) {
+  if (safeValues.length < 2) {
     return null;
   }
 
@@ -74,7 +78,7 @@ export function Sparkline({ values, color = 'var(--pink-b)', height = 44, unit =
           className="sparkline-tooltip"
           style={{ left: `${(hoverIndex / (points.length - 1)) * 100}%` }}
         >
-          {Math.round(values[hoverIndex])} {unit}
+          {Math.round(safeValues[hoverIndex])} {unit}
         </div>
       )}
       <div className="sparkline-range">
