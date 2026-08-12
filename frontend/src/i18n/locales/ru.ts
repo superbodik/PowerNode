@@ -634,7 +634,9 @@ export const ru: Dict = {
   'streamers.noServers':
     'Стриминговых серверов пока нет — создайте первый через плитку выше.',
   'streamers.openServer': 'Открыть сервер',
-  'streamers.statsNow': '{kbps} kbps (пик {peak}, средний {avg})',
-  'streamers.statsLast':
-    'Последняя трансляция {ago} назад — {duration}, пик {peak} kbps, средний {avg} kbps',
+  'streamers.kpiNow': 'Сейчас',
+  'streamers.kpiPeak': 'Пик',
+  'streamers.kpiAvg': 'Средний',
+  'streamers.kpiDuration': 'Длительность',
+  'streamers.lastStreamAgo': 'Последняя трансляция {ago} назад',
 };

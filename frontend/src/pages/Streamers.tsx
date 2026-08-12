@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { t } from '../i18n';
 import { GuidePanel } from '../components/GuidePanel';
+import { Sparkline } from '../components/Sparkline';
 import { useStreamSignal } from '../hooks/useStreamSignal';
 import { useStreamSessionStats } from '../hooks/useStreamSessionStats';
 import { formatDuration, formatRelativeTime } from '../utils/format';
@@ -103,7 +104,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
 
 function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: string) => void }) {
   const { signalLive, inboundKbps, liveSince } = useStreamSignal(server.uuid);
-  const { lastSession, currentPeakKbps, currentAvgKbps } = useStreamSessionStats(
+  const { lastSession, currentPeakKbps, currentSamples } = useStreamSessionStats(
     server.uuid,
     signalLive,
     liveSince,
@@ -126,20 +127,45 @@ function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: s
       </div>
 
       {signalLive ? (
-        <p className="srv-desc" style={{ marginBottom: 10 }}>
-          {t('streamers.statsNow', { kbps: inboundKbps, peak: currentPeakKbps, avg: currentAvgKbps })}
-          {liveSince ? ` · ${formatDuration((Date.now() - liveSince) / 1000)}` : ''}
-        </p>
+        <div style={{ marginBottom: 14 }}>
+          <div className="kpi-row">
+            <div className="kpi-tile">
+              <span className="kpi-value">{inboundKbps} <span className="kpi-unit">kbps</span></span>
+              <span className="kpi-label">{t('streamers.kpiNow')}</span>
+            </div>
+            <div className="kpi-tile">
+              <span className="kpi-value">{currentPeakKbps} <span className="kpi-unit">kbps</span></span>
+              <span className="kpi-label">{t('streamers.kpiPeak')}</span>
+            </div>
+            <div className="kpi-tile">
+              <span className="kpi-value">{liveSince ? formatDuration((Date.now() - liveSince) / 1000) : '—'}</span>
+              <span className="kpi-label">{t('streamers.kpiDuration')}</span>
+            </div>
+          </div>
+          <Sparkline values={currentSamples} color="var(--green)" />
+        </div>
       ) : (
         lastSession && (
-          <p className="srv-desc" style={{ marginBottom: 10 }}>
-            {t('streamers.statsLast', {
-              ago: formatRelativeTime(lastSession.endedAt),
-              duration: formatDuration((lastSession.endedAt - lastSession.startedAt) / 1000),
-              peak: lastSession.peakKbps,
-              avg: lastSession.avgKbps,
-            })}
-          </p>
+          <div style={{ marginBottom: 14 }}>
+            <p className="srv-desc" style={{ marginBottom: 8 }}>
+              {t('streamers.lastStreamAgo', { ago: formatRelativeTime(lastSession.endedAt) })}
+            </p>
+            <div className="kpi-row">
+              <div className="kpi-tile">
+                <span className="kpi-value">{formatDuration((lastSession.endedAt - lastSession.startedAt) / 1000)}</span>
+                <span className="kpi-label">{t('streamers.kpiDuration')}</span>
+              </div>
+              <div className="kpi-tile">
+                <span className="kpi-value">{lastSession.peakKbps} <span className="kpi-unit">kbps</span></span>
+                <span className="kpi-label">{t('streamers.kpiPeak')}</span>
+              </div>
+              <div className="kpi-tile">
+                <span className="kpi-value">{lastSession.avgKbps} <span className="kpi-unit">kbps</span></span>
+                <span className="kpi-label">{t('streamers.kpiAvg')}</span>
+              </div>
+            </div>
+            <Sparkline values={lastSession.samples} />
+          </div>
         )
       )}
 

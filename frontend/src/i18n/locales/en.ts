@@ -631,6 +631,9 @@ export const en = {
     '3. Copy the Server and Stream Key below (or from the server\'s Overview tab) into OBS → Settings → Stream, Service = Custom. Use a hardware encoder in OBS (NVENC/AMF/QuickSync) — the heavy Twitch-facing encode already happens on the server.',
   'streamers.noServers': 'No streaming servers yet — create your first one with the tile above.',
   'streamers.openServer': 'Open server',
-  'streamers.statsNow': '{kbps} kbps (peak {peak}, avg {avg})',
-  'streamers.statsLast': 'Last stream {ago} ago — {duration}, peak {peak} kbps, avg {avg} kbps',
+  'streamers.kpiNow': 'Now',
+  'streamers.kpiPeak': 'Peak',
+  'streamers.kpiAvg': 'Avg',
+  'streamers.kpiDuration': 'Duration',
+  'streamers.lastStreamAgo': 'Last stream {ago} ago',
 };

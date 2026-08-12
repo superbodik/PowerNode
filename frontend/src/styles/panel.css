@@ -791,6 +791,23 @@ body::before {
 .settings-card.tile-action { transition: border-color .2s, transform .2s; }
 .settings-card.tile-action:hover { border-color: var(--border-h); transform: translateY(-2px); }
 .settings-card-title { font-size: 12px; font-weight: 400; letter-spacing: .04em; margin-bottom: 18px; color: var(--pink-b); }
+
+.kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.kpi-tile { display: flex; flex-direction: column; gap: 2px; }
+.kpi-tile .kpi-value { font-size: 17px; color: var(--pink-b); }
+.kpi-tile .kpi-unit { font-size: 10px; color: var(--muted); }
+.kpi-tile .kpi-label { font-size: 9.5px; color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+
+.sparkline-tooltip {
+  position: absolute; top: -22px; transform: translateX(-50%);
+  background: rgba(20,16,20,.92); border: 1px solid var(--border-h);
+  border-radius: 6px; padding: 2px 7px; font-size: 10px; color: var(--pink-b);
+  white-space: nowrap; pointer-events: none;
+}
+.sparkline-range {
+  display: flex; justify-content: space-between;
+  font-size: 9px; color: var(--muted); margin-top: 3px;
+}
 .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .settings-grid .span2 { grid-column: span 2; }
 .sfield { display: flex; flex-direction: column; gap: 5px; }
