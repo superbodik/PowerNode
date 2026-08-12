@@ -112,7 +112,8 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT id, name, fqdn, scheme, daemon_port, memory_mb, memory_overallocate,
-		       disk_mb, disk_overallocate, is_public, maintenance_mode, last_seen_at, agent_version
+		       disk_mb, disk_overallocate, is_public, maintenance_mode, last_seen_at, agent_version,
+		       total_cpu_cores
 		FROM nodes`
 	if !claims.IsAdmin {
 		query += ` WHERE is_public = true`
@@ -140,6 +141,7 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 		MaintenanceMode    bool    `json:"maintenance_mode"`
 		LastSeenAt         *string `json:"last_seen_at"`
 		AgentVersion       *string `json:"agent_version"`
+		TotalCPUCores      *int    `json:"total_cpu_cores,omitempty"`
 	}
 
 	nodes := make([]nodeSummary, 0)
@@ -147,7 +149,7 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 		var n nodeSummary
 		if err := rows.Scan(&n.ID, &n.Name, &n.FQDN, &n.Scheme, &n.DaemonPort,
 			&n.MemoryMB, &n.MemoryOverallocate, &n.DiskMB, &n.DiskOverallocate,
-			&n.IsPublic, &n.MaintenanceMode, &n.LastSeenAt, &n.AgentVersion); err != nil {
+			&n.IsPublic, &n.MaintenanceMode, &n.LastSeenAt, &n.AgentVersion, &n.TotalCPUCores); err != nil {
 			http.Error(w, "failed to read nodes", http.StatusInternalServerError)
 			return
 		}
@@ -309,6 +311,7 @@ type nodeStatusResponse struct {
 	Online       bool   `json:"online"`
 	Error        string `json:"error,omitempty"`
 	AgentVersion string `json:"agent_version,omitempty"`
+	CPUCores     int    `json:"cpu_cores,omitempty"`
 }
 
 func (h *NodeHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -324,21 +327,28 @@ func (h *NodeHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	version, err := client.Ping(r.Context())
+	ping, err := client.Ping(r.Context())
 	if err != nil {
 		writeJSON(w, http.StatusOK, nodeStatusResponse{Online: false, Error: err.Error()})
 		return
 	}
 
-	if version != "" {
+	if ping.Version != "" {
 		if _, err := h.DB.Exec(r.Context(),
-			`UPDATE nodes SET agent_version = $1 WHERE id = $2`, version, nodeID,
+			`UPDATE nodes SET agent_version = $1 WHERE id = $2`, ping.Version, nodeID,
 		); err != nil {
 			log.Printf("nodes.status: failed to persist agent_version for node %d: %v", nodeID, err)
 		}
 	}
+	if ping.CPUCores > 0 {
+		if _, err := h.DB.Exec(r.Context(),
+			`UPDATE nodes SET total_cpu_cores = $1 WHERE id = $2`, ping.CPUCores, nodeID,
+		); err != nil {
+			log.Printf("nodes.status: failed to persist total_cpu_cores for node %d: %v", nodeID, err)
+		}
+	}
 
-	writeJSON(w, http.StatusOK, nodeStatusResponse{Online: true, AgentVersion: version})
+	writeJSON(w, http.StatusOK, nodeStatusResponse{Online: true, AgentVersion: ping.Version, CPUCores: ping.CPUCores})
 }
 
 func generateToken(n int) (string, error) {

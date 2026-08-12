@@ -623,7 +623,7 @@ export const en = {
   'streamers.twitchConnectedAs': 'Connected: {login}',
   'streamers.twitchDisconnect': 'Disconnect',
   'streamers.subsUpgradeHint':
-    'Subscription alerts in OBS and auto-filling your Twitch key when creating a streaming server both need a one-time reauthorization with broader access.',
+    'Subscription and follow alerts in OBS, plus auto-filling your Twitch key when creating a streaming server, all need a one-time reauthorization with broader access.',
   'streamers.subsUpgrade': 'Allow extended access',
   'streamers.widgetReadyHint': 'Access granted — create the OBS widget next.',
   'streamers.widgetEnable': 'Create widget',
@@ -632,6 +632,7 @@ export const en = {
     'Add this as a Browser Source in OBS — new subs and gifted subs will pop up right in your scene.',
   'streamers.testAlertSub': 'Test: sub alert',
   'streamers.testAlertGift': 'Test: gift alert',
+  'streamers.testAlertFollow': 'Test: follow alert',
   'streamers.twitchJustConnected': 'Twitch account connected.',
   'streamers.twitchConnectError': 'Could not connect Twitch — try again.',
   'streamers.guideTile': 'How to stream through PowerNode',

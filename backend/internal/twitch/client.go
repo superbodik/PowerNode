@@ -24,24 +24,23 @@ import (
 var ErrTokenExpired = errors.New("twitch access token expired")
 
 const (
-	authorizeURL    = "https://id.twitch.tv/oauth2/authorize"
-	tokenURL        = "https://id.twitch.tv/oauth2/token"
-	usersURL        = "https://api.twitch.tv/helix/users"
-	eventSubURL     = "https://api.twitch.tv/helix/eventsub/subscriptions"
-	eventSubVersion = "1"
+	authorizeURL = "https://id.twitch.tv/oauth2/authorize"
+	tokenURL     = "https://id.twitch.tv/oauth2/token"
+	usersURL     = "https://api.twitch.tv/helix/users"
+	eventSubURL  = "https://api.twitch.tv/helix/eventsub/subscriptions"
 )
 
 // Scope is the base "connect an account" scope: just enough to identify who
 // connected. ScopeExtended is requested by a separate, explicit upgrade
-// step (not bundled into the base connect flow) since it grants two
-// meaningfully bigger things than proving identity: reading the
-// broadcaster's subscriber list (subscription-alert widget) and reading
-// their stream key (auto-filling TWITCH_KEY when creating a relay server).
-// Both are bundled into one upgrade rather than two separate consent
-// screens since they're the same tier of access.
+// step (not bundled into the base connect flow) since it grants meaningfully
+// bigger things than proving identity: reading the broadcaster's subscriber
+// list and followers (alert widget), and reading their stream key
+// (auto-filling TWITCH_KEY when creating a relay server). All bundled into
+// one upgrade rather than several separate consent screens since they're
+// the same tier of access.
 const (
 	Scope         = "user:read:email"
-	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key"
+	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key moderator:read:followers"
 )
 
 type Client struct {
@@ -329,11 +328,11 @@ type eventSubCreateResponse struct {
 // subscription for a broadcaster and returns Twitch's ID for it (needed
 // later to delete it on disconnect). appToken must come from
 // AppAccessToken, not a user token -- see its doc comment.
-func (c *Client) CreateEventSubSubscription(ctx context.Context, appToken, eventType, broadcasterUserID, callbackURL, secret string) (string, error) {
+func (c *Client) CreateEventSubSubscription(ctx context.Context, appToken, eventType, version string, condition map[string]string, callbackURL, secret string) (string, error) {
 	body := eventSubCreateRequest{
 		Type:      eventType,
-		Version:   eventSubVersion,
-		Condition: map[string]string{"broadcaster_user_id": broadcasterUserID},
+		Version:   version,
+		Condition: condition,
 		Transport: eventSubTransport{Method: "webhook", Callback: callbackURL, Secret: secret},
 	}
 	payload, err := json.Marshal(body)

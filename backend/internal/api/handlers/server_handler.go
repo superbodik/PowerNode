@@ -92,7 +92,12 @@ type createServerRequest struct {
 	MemoryMB       int64             `json:"memory_mb"`
 	SwapMB         int64             `json:"swap_mb"`
 	DiskMB         int64             `json:"disk_mb"`
-	AllocationID   *int64            `json:"allocation_id"`
+	// CPUPercent is Docker CFS-quota style: 100 = one full core. Nil means
+	// unlimited (the container can burst across every core on the node),
+	// same as it's always meant on the daemon side -- this field just never
+	// had a way in until now.
+	CPUPercent   *int   `json:"cpu_percent"`
+	AllocationID *int64 `json:"allocation_id"`
 }
 
 func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -157,10 +162,11 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var nodeMemoryMB, nodeDiskMB int64
 	var memoryOverallocate, diskOverallocate int
 	var isPublic, maintenanceMode bool
+	var totalCPUCores *int
 	if err := tx.QueryRow(ctx,
-		`SELECT memory_mb, memory_overallocate, disk_mb, disk_overallocate, is_public, maintenance_mode
+		`SELECT memory_mb, memory_overallocate, disk_mb, disk_overallocate, is_public, maintenance_mode, total_cpu_cores
 		 FROM nodes WHERE id = $1 FOR UPDATE`, req.NodeID,
-	).Scan(&nodeMemoryMB, &memoryOverallocate, &nodeDiskMB, &diskOverallocate, &isPublic, &maintenanceMode); err != nil {
+	).Scan(&nodeMemoryMB, &memoryOverallocate, &nodeDiskMB, &diskOverallocate, &isPublic, &maintenanceMode, &totalCPUCores); err != nil {
 		http.Error(w, "node not found", http.StatusNotFound)
 		return
 	}
@@ -173,10 +179,11 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var usedMemoryMB, usedDiskMB int64
+	var usedMemoryMB, usedDiskMB, usedCPUPercent int64
 	if err := tx.QueryRow(ctx,
-		`SELECT COALESCE(SUM(memory_mb), 0), COALESCE(SUM(disk_mb), 0) FROM servers WHERE node_id = $1`, req.NodeID,
-	).Scan(&usedMemoryMB, &usedDiskMB); err != nil {
+		`SELECT COALESCE(SUM(memory_mb), 0), COALESCE(SUM(disk_mb), 0), COALESCE(SUM(cpu_percent), 0)
+		 FROM servers WHERE node_id = $1`, req.NodeID,
+	).Scan(&usedMemoryMB, &usedDiskMB, &usedCPUPercent); err != nil {
 		http.Error(w, "failed to check node capacity", http.StatusInternalServerError)
 		return
 	}
@@ -191,6 +198,20 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("node does not have enough disk: %d MB used + %d MB requested exceeds %d MB capacity",
 			usedDiskMB, req.DiskMB, diskCapacity), http.StatusConflict)
 		return
+	}
+	// Only enforced once the node has actually self-reported a core count
+	// (total_cpu_cores is null until its first health check) -- and only
+	// when this request actually asks for a limit at all, since nil means
+	// "unlimited" and there's nothing to check capacity against. No
+	// overallocate factor here (unlike memory/disk): CPU has no equivalent
+	// admin-set oversell knob today, so it's a hard 1:1 cap against real cores.
+	if totalCPUCores != nil && req.CPUPercent != nil {
+		cpuCapacity := int64(*totalCPUCores) * 100
+		if usedCPUPercent+int64(*req.CPUPercent) > cpuCapacity {
+			http.Error(w, fmt.Sprintf("node does not have enough CPU: %d%% used + %d%% requested exceeds %d%% (%d cores) capacity",
+				usedCPUPercent, *req.CPUPercent, cpuCapacity, *totalCPUCores), http.StatusConflict)
+			return
+		}
 	}
 
 	if !claims.IsAdmin {
@@ -219,11 +240,11 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var serverID int64
 	err = tx.QueryRow(ctx, `
 		INSERT INTO servers (uuid, uuid_short, name, description, owner_id, node_id, egg_id,
-		                      docker_image, startup_command, environment, memory_mb, swap_mb, disk_mb, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'installing')
+		                      docker_image, startup_command, environment, memory_mb, swap_mb, disk_mb, cpu_percent, status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'installing')
 		RETURNING id`,
 		serverUUID, uuidShort, req.Name, req.Description, claims.UserID, req.NodeID, req.EggID,
-		req.DockerImage, req.StartupCommand, environmentJSON, req.MemoryMB, req.SwapMB, req.DiskMB,
+		req.DockerImage, req.StartupCommand, environmentJSON, req.MemoryMB, req.SwapMB, req.DiskMB, req.CPUPercent,
 	).Scan(&serverID)
 	if err != nil {
 		http.Error(w, "failed to create server", http.StatusInternalServerError)
@@ -256,6 +277,7 @@ func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SwapMB:         req.SwapMB,
 		DiskMB:         req.DiskMB,
 		IOWeight:       500,
+		CPUPercent:     derefInt(req.CPUPercent),
 		PortBindings:   portBindings,
 	})
 	if err != nil || !daemonResp.Success {
@@ -368,6 +390,9 @@ type updateServerRequest struct {
 	MemoryMB       int64             `json:"memory_mb"`
 	SwapMB         int64             `json:"swap_mb"`
 	DiskMB         int64             `json:"disk_mb"`
+	// CPUPercent: see createServerRequest's doc comment -- same 100=one-core
+	// convention, nil = unlimited.
+	CPUPercent *int `json:"cpu_percent"`
 }
 
 // Update lets the owner (or an admin) rename a server, resize it, or change
@@ -451,18 +476,20 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var nodeMemoryMB, nodeDiskMB int64
 	var memoryOverallocate, diskOverallocate int
+	var totalCPUCores *int
 	if err := tx.QueryRow(ctx,
-		`SELECT memory_mb, memory_overallocate, disk_mb, disk_overallocate FROM nodes WHERE id = $1 FOR UPDATE`, nodeID,
-	).Scan(&nodeMemoryMB, &memoryOverallocate, &nodeDiskMB, &diskOverallocate); err != nil {
+		`SELECT memory_mb, memory_overallocate, disk_mb, disk_overallocate, total_cpu_cores FROM nodes WHERE id = $1 FOR UPDATE`, nodeID,
+	).Scan(&nodeMemoryMB, &memoryOverallocate, &nodeDiskMB, &diskOverallocate, &totalCPUCores); err != nil {
 		http.Error(w, "failed to check node capacity", http.StatusInternalServerError)
 		return
 	}
 
-	var usedMemoryMB, usedDiskMB int64
+	var usedMemoryMB, usedDiskMB, usedCPUPercent int64
 	if err := tx.QueryRow(ctx,
-		`SELECT COALESCE(SUM(memory_mb), 0), COALESCE(SUM(disk_mb), 0) FROM servers WHERE node_id = $1 AND id != $2`,
+		`SELECT COALESCE(SUM(memory_mb), 0), COALESCE(SUM(disk_mb), 0), COALESCE(SUM(cpu_percent), 0)
+		 FROM servers WHERE node_id = $1 AND id != $2`,
 		nodeID, serverID,
-	).Scan(&usedMemoryMB, &usedDiskMB); err != nil {
+	).Scan(&usedMemoryMB, &usedDiskMB, &usedCPUPercent); err != nil {
 		http.Error(w, "failed to check node capacity", http.StatusInternalServerError)
 		return
 	}
@@ -478,13 +505,21 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 			usedDiskMB, req.DiskMB, diskCapacity), http.StatusConflict)
 		return
 	}
+	if totalCPUCores != nil && req.CPUPercent != nil {
+		cpuCapacity := int64(*totalCPUCores) * 100
+		if usedCPUPercent+int64(*req.CPUPercent) > cpuCapacity {
+			http.Error(w, fmt.Sprintf("node does not have enough CPU: %d%% used by other servers + %d%% requested exceeds %d%% (%d cores) capacity",
+				usedCPUPercent, *req.CPUPercent, cpuCapacity, *totalCPUCores), http.StatusConflict)
+			return
+		}
+	}
 
 	if _, err := tx.Exec(ctx, `
 		UPDATE servers SET name = $1, description = $2, docker_image = $3, startup_command = $4,
-		                    environment = $5, memory_mb = $6, swap_mb = $7, disk_mb = $8, updated_at = now()
-		WHERE id = $9`,
+		                    environment = $5, memory_mb = $6, swap_mb = $7, disk_mb = $8, cpu_percent = $9, updated_at = now()
+		WHERE id = $10`,
 		req.Name, req.Description, req.DockerImage, req.StartupCommand,
-		newEnvironmentJSON, req.MemoryMB, req.SwapMB, req.DiskMB, serverID,
+		newEnvironmentJSON, req.MemoryMB, req.SwapMB, req.DiskMB, req.CPUPercent, serverID,
 	); err != nil {
 		http.Error(w, "failed to update server", http.StatusInternalServerError)
 		return
@@ -501,10 +536,11 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	needsRebuild := req.DockerImage != oldDockerImage || req.StartupCommand != oldStartupCommand ||
-		req.MemoryMB != oldMemoryMB || req.SwapMB != oldSwapMB || !maps.Equal(oldEnvironment, environment)
+		req.MemoryMB != oldMemoryMB || req.SwapMB != oldSwapMB || !maps.Equal(oldEnvironment, environment) ||
+		derefInt(req.CPUPercent) != derefInt(cpuPercent)
 	if needsRebuild {
 		if err := h.rebuildServerContainer(ctx, serverID, nodeID, id, req.DockerImage, req.StartupCommand,
-			req.MemoryMB, req.SwapMB, environment, ioWeight, cpuPercent); err != nil {
+			req.MemoryMB, req.SwapMB, environment, ioWeight, req.CPUPercent); err != nil {
 			http.Error(w, "server updated but failed to apply the change to the running container: "+err.Error(), http.StatusBadGateway)
 			return
 		}

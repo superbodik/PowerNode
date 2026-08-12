@@ -24,11 +24,28 @@ import (
 	"github.com/yourorg/panel/internal/ws"
 )
 
+// eventSubType describes one EventSub subscription to register: its name,
+// the version Twitch expects for that name (they're not all "1" --
+// channel.follow is versioned "2"), and whether its condition needs
+// moderator_user_id alongside broadcaster_user_id (channel.follow does;
+// the subscribe/gift types don't).
+type eventSubType struct {
+	Name             string
+	Version          string
+	NeedsModeratorID bool
+}
+
 // subscriptionEventTypes are the EventSub types registered when a user
-// enables the subscription-alert widget. channel.subscribe covers direct
-// subs (is_gift is ignored there to avoid double-alerting a gifted sub --
+// enables the alert widget. channel.subscribe covers direct paid subs
+// (is_gift is ignored there to avoid double-alerting a gifted sub --
 // channel.subscription.gift carries the richer "gifted N subs" payload).
-var subscriptionEventTypes = []string{"channel.subscribe", "channel.subscription.gift"}
+// channel.follow covers free follows -- a distinct Twitch concept from a
+// paid subscription, added per explicit request to alert on both.
+var subscriptionEventTypes = []eventSubType{
+	{Name: "channel.subscribe", Version: "1"},
+	{Name: "channel.subscription.gift", Version: "1"},
+	{Name: "channel.follow", Version: "2", NeedsModeratorID: true},
+}
 
 type TwitchHandler struct {
 	DB             *pgxpool.Pool
@@ -251,15 +268,20 @@ func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Reque
 		var exists bool
 		_ = h.DB.QueryRow(r.Context(),
 			`SELECT true FROM twitch_eventsub_subscriptions WHERE user_id = $1 AND event_type = $2 AND status = 'enabled'`,
-			claims.UserID, eventType,
+			claims.UserID, eventType.Name,
 		).Scan(&exists)
 		if exists {
 			continue
 		}
 
-		subID, err := h.Client.CreateEventSubSubscription(r.Context(), appToken, eventType, twitchUserID, callbackURL, h.EventSubSecret)
+		condition := map[string]string{"broadcaster_user_id": twitchUserID}
+		if eventType.NeedsModeratorID {
+			condition["moderator_user_id"] = twitchUserID
+		}
+
+		subID, err := h.Client.CreateEventSubSubscription(r.Context(), appToken, eventType.Name, eventType.Version, condition, callbackURL, h.EventSubSecret)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to register %s with twitch: %v", eventType, err), http.StatusBadGateway)
+			http.Error(w, fmt.Sprintf("failed to register %s with twitch: %v", eventType.Name, err), http.StatusBadGateway)
 			return
 		}
 		if _, err := h.DB.Exec(r.Context(), `
@@ -268,7 +290,7 @@ func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Reque
 			ON CONFLICT (user_id, event_type) DO UPDATE SET
 				twitch_subscription_id = EXCLUDED.twitch_subscription_id,
 				status = 'enabled'`,
-			claims.UserID, eventType, subID,
+			claims.UserID, eventType.Name, subID,
 		); err != nil {
 			http.Error(w, "failed to save eventsub subscription", http.StatusInternalServerError)
 			return
@@ -328,14 +350,20 @@ func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Kind == "gift" {
+	switch req.Kind {
+	case "gift":
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
 			"type":      "gift",
 			"user_name": "TestSubscriber",
 			"tier":      "1000",
 			"count":     5,
 		})
-	} else {
+	case "follow":
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "follow",
+			"user_name": "TestFollower",
+		})
+	default:
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
 			"type":      "sub",
 			"user_name": "TestSubscriber",
@@ -573,6 +601,11 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 			"tier":      payload.Event.Tier,
 			"count":     payload.Event.Total,
 		})
+	case "channel.follow":
+		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+			"type":      "follow",
+			"user_name": payload.Event.UserName,
+		})
 	}
 }
 
@@ -634,6 +667,8 @@ func widgetPageHTML(token string) string {
             showAlert(data.user_name, 'just subscribed' + (data.tier ? ' (tier ' + (data.tier / 1000) + ')' : '') + '!');
           } else if (data.type === 'gift') {
             showAlert(data.user_name, 'gifted ' + data.count + ' sub' + (data.count === 1 ? '' : 's') + '!');
+          } else if (data.type === 'follow') {
+            showAlert(data.user_name, 'just followed!');
           }
         } catch (e) { /* ignore malformed messages */ }
       };

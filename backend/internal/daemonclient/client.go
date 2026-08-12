@@ -103,26 +103,32 @@ func (c *Client) SendCommand(ctx context.Context, serverUUID uuid.UUID, command 
 }
 
 type healthzResponse struct {
-	Status  string `json:"status"`
-	Version string `json:"version"`
+	Status   string `json:"status"`
+	Version  string `json:"version"`
+	CPUCores int    `json:"cpu_cores"`
 }
 
-func (c *Client) Ping(ctx context.Context) (string, error) {
+type PingResult struct {
+	Version  string
+	CPUCores int
+}
+
+func (c *Client) Ping(ctx context.Context) (PingResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/healthz", nil)
 	if err != nil {
-		return "", fmt.Errorf("build request: %w", err)
+		return PingResult{}, fmt.Errorf("build request: %w", err)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("call node daemon: %w", err)
+		return PingResult{}, fmt.Errorf("call node daemon: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("node daemon returned %d", resp.StatusCode)
+		return PingResult{}, fmt.Errorf("node daemon returned %d", resp.StatusCode)
 	}
 	var health healthzResponse
 	_ = json.NewDecoder(resp.Body).Decode(&health)
-	return health.Version, nil
+	return PingResult{Version: health.Version, CPUCores: health.CPUCores}, nil
 }
 
 type ResourceStats struct {

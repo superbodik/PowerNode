@@ -1,7 +1,9 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
+	"runtime"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -31,7 +33,14 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok","version":"` + version + `"}`))
+		// runtime.NumCPU() reads the host's real logical core count --
+		// wingsd runs directly on the host (not itself containerized), so
+		// this is the machine's actual capacity, not a cgroup-limited view.
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":    "ok",
+			"version":   version,
+			"cpu_cores": runtime.NumCPU(),
+		})
 	})
 
 	r.Group(func(r chi.Router) {

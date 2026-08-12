@@ -270,7 +270,7 @@ function TwitchTile({
     }
   }
 
-  async function sendTestAlert(kind: 'sub' | 'gift') {
+  async function sendTestAlert(kind: 'sub' | 'gift' | 'follow') {
     setBusy(true);
     setError(null);
     try {
@@ -336,12 +336,15 @@ function TwitchTile({
               <span className="srv-desc" style={{ fontSize: 10 }}>
                 {t('streamers.widgetUrlHint')}
               </span>
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
                 <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('sub')}>
                   {t('streamers.testAlertSub')}
                 </button>
                 <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('gift')}>
                   {t('streamers.testAlertGift')}
+                </button>
+                <button className="btn-sm" disabled={busy} onClick={() => sendTestAlert('follow')}>
+                  {t('streamers.testAlertFollow')}
                 </button>
               </div>
             </div>

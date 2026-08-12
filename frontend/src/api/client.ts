@@ -418,7 +418,7 @@ export const api = {
 
   getTwitchStreamKey: () => request<{ stream_key: string }>('/integrations/twitch/stream-key'),
 
-  sendTwitchTestAlert: (kind: 'sub' | 'gift') =>
+  sendTwitchTestAlert: (kind: 'sub' | 'gift' | 'follow') =>
     request<void>('/integrations/twitch/subscriptions/test', {
       method: 'POST',
       body: JSON.stringify({ kind }),
