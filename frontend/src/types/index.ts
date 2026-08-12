@@ -195,6 +195,7 @@ export interface UpdateServerRequest {
   description?: string;
   docker_image: string;
   startup_command: string;
+  environment: Record<string, string>;
   memory_mb: number;
   swap_mb: number;
   disk_mb: number;

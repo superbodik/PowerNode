@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"net/http"
 	"strconv"
 
@@ -308,9 +309,10 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var s models.Server
+	var environmentJSON []byte
 	err = h.DB.QueryRow(r.Context(), `
 		SELECT s.id, s.uuid, s.uuid_short, s.name, s.description, s.owner_id, s.node_id,
-		       s.egg_id, s.docker_image, s.startup_command, s.memory_mb, s.swap_mb,
+		       s.egg_id, s.docker_image, s.startup_command, s.environment, s.memory_mb, s.swap_mb,
 		       s.disk_mb, s.io_weight, s.cpu_percent, s.allocation_limit,
 		       s.database_limit, s.backup_limit, s.status, s.container_id,
 		       s.is_suspended, s.created_at, s.updated_at, n.name,
@@ -320,7 +322,7 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE s.uuid = $1`, id,
 	).Scan(
 		&s.ID, &s.UUID, &s.UUIDShort, &s.Name, &s.Description, &s.OwnerID,
-		&s.NodeID, &s.EggID, &s.DockerImage, &s.StartupCommand,
+		&s.NodeID, &s.EggID, &s.DockerImage, &s.StartupCommand, &environmentJSON,
 		&s.MemoryMB, &s.SwapMB, &s.DiskMB, &s.IOWeight, &s.CPUPercent,
 		&s.AllocationLimit, &s.DatabaseLimit, &s.BackupLimit,
 		&s.Status, &s.ContainerID, &s.IsSuspended, &s.CreatedAt, &s.UpdatedAt,
@@ -333,6 +335,10 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to load server", http.StatusInternalServerError)
 		return
 	}
+	if err := json.Unmarshal(environmentJSON, &s.Environment); err != nil {
+		http.Error(w, "failed to read server environment", http.StatusInternalServerError)
+		return
+	}
 
 	if !claims.IsAdmin && claims.UserID != s.OwnerID {
 		isSub, _ := h.Subusers.IsSubuser(r.Context(), claims.UserID, s.ID)
@@ -340,19 +346,28 @@ func (h *ServerHandler) Get(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+		// Subusers see everything else this endpoint already exposed
+		// (image, resources, ...) regardless of their specific
+		// permissions — that's an existing, coarser-grained design.
+		// Environment variables can hold real secrets (an egg's API key,
+		// a stream key), so unlike the rest of this response they're
+		// owner/admin only, full stop, with no permission code to grant
+		// a subuser read access to them individually.
+		s.Environment = nil
 	}
 
 	writeJSON(w, http.StatusOK, s)
 }
 
 type updateServerRequest struct {
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	DockerImage    string `json:"docker_image"`
-	StartupCommand string `json:"startup_command"`
-	MemoryMB       int64  `json:"memory_mb"`
-	SwapMB         int64  `json:"swap_mb"`
-	DiskMB         int64  `json:"disk_mb"`
+	Name           string            `json:"name"`
+	Description    string            `json:"description"`
+	DockerImage    string            `json:"docker_image"`
+	StartupCommand string            `json:"startup_command"`
+	Environment    map[string]string `json:"environment"`
+	MemoryMB       int64             `json:"memory_mb"`
+	SwapMB         int64             `json:"swap_mb"`
+	DiskMB         int64             `json:"disk_mb"`
 }
 
 // Update lets the owner (or an admin) rename a server, resize it, or change
@@ -397,21 +412,40 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 
 	var serverID, nodeID, ownerID, oldMemoryMB, oldSwapMB int64
+	var eggID int
 	var oldDockerImage, oldStartupCommand string
-	var environmentJSON []byte
+	var oldEnvironmentJSON []byte
 	var ioWeight int
 	var cpuPercent *int
 	if err := tx.QueryRow(ctx, `
-		SELECT id, node_id, owner_id, memory_mb, swap_mb, docker_image, startup_command,
+		SELECT id, node_id, owner_id, egg_id, memory_mb, swap_mb, docker_image, startup_command,
 		       environment, io_weight, cpu_percent
 		FROM servers WHERE uuid = $1 FOR UPDATE`, id,
-	).Scan(&serverID, &nodeID, &ownerID, &oldMemoryMB, &oldSwapMB, &oldDockerImage,
-		&oldStartupCommand, &environmentJSON, &ioWeight, &cpuPercent); err != nil {
+	).Scan(&serverID, &nodeID, &ownerID, &eggID, &oldMemoryMB, &oldSwapMB, &oldDockerImage,
+		&oldStartupCommand, &oldEnvironmentJSON, &ioWeight, &cpuPercent); err != nil {
 		http.Error(w, "server not found", http.StatusNotFound)
 		return
 	}
 	if !claims.IsAdmin && claims.UserID != ownerID {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	environment := req.Environment
+	if environment == nil {
+		environment = map[string]string{}
+	}
+	if err := h.applyAndValidateEggVariables(ctx, eggID, environment); err != nil {
+		status := http.StatusBadRequest
+		if _, ok := err.(*eggVariablesLoadError); ok {
+			status = http.StatusInternalServerError
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	newEnvironmentJSON, err := json.Marshal(environment)
+	if err != nil {
+		http.Error(w, "invalid environment", http.StatusBadRequest)
 		return
 	}
 
@@ -447,10 +481,10 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := tx.Exec(ctx, `
 		UPDATE servers SET name = $1, description = $2, docker_image = $3, startup_command = $4,
-		                    memory_mb = $5, swap_mb = $6, disk_mb = $7, updated_at = now()
-		WHERE id = $8`,
+		                    environment = $5, memory_mb = $6, swap_mb = $7, disk_mb = $8, updated_at = now()
+		WHERE id = $9`,
 		req.Name, req.Description, req.DockerImage, req.StartupCommand,
-		req.MemoryMB, req.SwapMB, req.DiskMB, serverID,
+		newEnvironmentJSON, req.MemoryMB, req.SwapMB, req.DiskMB, serverID,
 	); err != nil {
 		http.Error(w, "failed to update server", http.StatusInternalServerError)
 		return
@@ -461,11 +495,16 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var oldEnvironment map[string]string
+	if err := json.Unmarshal(oldEnvironmentJSON, &oldEnvironment); err != nil {
+		http.Error(w, "server updated but failed to read its previous environment", http.StatusInternalServerError)
+		return
+	}
 	needsRebuild := req.DockerImage != oldDockerImage || req.StartupCommand != oldStartupCommand ||
-		req.MemoryMB != oldMemoryMB || req.SwapMB != oldSwapMB
+		req.MemoryMB != oldMemoryMB || req.SwapMB != oldSwapMB || !maps.Equal(oldEnvironment, environment)
 	if needsRebuild {
 		if err := h.rebuildServerContainer(ctx, serverID, nodeID, id, req.DockerImage, req.StartupCommand,
-			req.MemoryMB, req.SwapMB, environmentJSON, ioWeight, cpuPercent); err != nil {
+			req.MemoryMB, req.SwapMB, environment, ioWeight, cpuPercent); err != nil {
 			http.Error(w, "server updated but failed to apply the change to the running container: "+err.Error(), http.StatusBadGateway)
 			return
 		}
@@ -489,12 +528,8 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 func (h *ServerHandler) rebuildServerContainer(
 	ctx context.Context, serverID, nodeID int64, serverUUID uuid.UUID,
 	dockerImage, startupCommand string, memoryMB, swapMB int64,
-	environmentJSON []byte, ioWeight int, cpuPercent *int,
+	environment map[string]string, ioWeight int, cpuPercent *int,
 ) error {
-	environment := map[string]string{}
-	if err := json.Unmarshal(environmentJSON, &environment); err != nil {
-		return fmt.Errorf("read server environment: %w", err)
-	}
 
 	rows, err := h.DB.Query(ctx, `SELECT port FROM allocations WHERE server_id = $1 ORDER BY id`, serverID)
 	if err != nil {

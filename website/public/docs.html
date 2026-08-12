@@ -50,6 +50,7 @@
       <a href="#install">Install &amp; update</a>
       <a href="#sftp">SFTP</a>
       <a href="#domains">Custom domains</a>
+      <a href="#streaming">Stream through PowerNode</a>
       <a href="#email">Email notifications</a>
       <a href="#install-errors">Install errors</a>
       <a href="#commands">Useful commands</a>
@@ -152,6 +153,61 @@ systemctl restart wingsd</code></pre>
           <li>Both the panel install and the per-server domains feature use the same certbot/nginx
           setup on the node, so the fix is the same either way.</li>
         </ul>
+      </section>
+
+      <section class="docs-section" id="streaming">
+        <h2>Stream through PowerNode (offload OBS encoding)</h2>
+        <p class="docs-lede">Point OBS at a server on your node instead of Twitch directly, and the
+        server does the heavy x264 encoding — your gaming PC just uploads a fat, cheap-to-encode
+        stream.</p>
+
+        <h3>1. Create the relay server</h3>
+        <p>Create a server using the <strong>RTMP Relay (offload stream encoding)</strong> egg. Set
+        two required variables when creating it:</p>
+        <ul>
+          <li><strong>Relay secret</strong> — a long random string you make up. This is the only
+          thing standing between "your relay" and "anyone's relay" — whoever has it can publish
+          through your server onto your Twitch channel, so treat it like a password.</li>
+          <li><strong>Twitch stream key</strong> — from Twitch's own dashboard:
+          <a href="https://dashboard.twitch.tv/settings/stream" target="_blank" rel="noopener">Creator Dashboard → Settings → Stream</a>.
+          Keep this private too — it's the real credential that lets anything publish to your
+          channel.</li>
+        </ul>
+        <p>Optional variables: <code>YOUTUBE_KEY</code> (simulcasts to YouTube at the same time, for
+        free — leave blank to skip it), <code>BITRATE_KBPS</code> (default 6000), <code>X264_PRESET</code>
+        (default <code>veryfast</code> — higher quality presets use more of the node's CPU per
+        stream), and <code>RTMP_PORT</code> (default 1935).</p>
+
+        <h3>2. Publish a port for it</h3>
+        <p>On the server's <strong>Network</strong> tab, add a port matching <code>RTMP_PORT</code>
+        (1935 unless you changed it) — without this, nothing outside the container can reach the
+        relay at all.</p>
+
+        <h3>3. Point OBS at it</h3>
+        <p>In OBS, <strong>Settings → Stream</strong>, set:</p>
+        <table>
+          <thead><tr><th>Field</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Service</td><td>Custom...</td></tr>
+            <tr><td>Server</td><td><code>rtmp://&lt;node's address&gt;:1935/&lt;your Relay secret&gt;</code></td></tr>
+            <tr><td>Stream Key</td><td><code>live</code> (literally the word "live" — the relay secret already went in the Server field above)</td></tr>
+          </tbody>
+        </table>
+        <p>In OBS's own output settings, set the <strong>encoder to whatever is cheapest for your
+        PC</strong> — hardware NVENC/AMF/QuickSync at a high bitrate (30–50 Mbps is typical for a
+        local relay hop) is the point of this whole setup, since the server re-encodes it properly
+        for Twitch afterward anyway. Hit Start Streaming in OBS, then <strong>Start</strong> the
+        relay server in the panel if it isn't already running — the stream goes live on Twitch once
+        both ends are up.</p>
+
+        <div class="callout">
+          <div class="callout-label">Nothing showing up on Twitch?</div>
+          Check the relay server's <strong>Console</strong> tab in the panel — nginx and ffmpeg both
+          log there. A "Connection refused" in OBS almost always means the Network tab port doesn't
+          match <code>RTMP_PORT</code>, or the server isn't started. A stream that connects in OBS
+          but never appears on Twitch almost always means <code>TWITCH_KEY</code> was mistyped —
+          edit it from the server's Overview tab and it takes effect on the next restart.
+        </div>
       </section>
 
       <section class="docs-section" id="email">

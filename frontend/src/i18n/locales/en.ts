@@ -284,7 +284,14 @@ export const en = {
   'serverView.description': 'Description (optional)',
   'serverView.saveChanges': 'Save changes',
   'serverView.editHint':
-    'Changing the image, startup command, or memory recreates the container — files and ports are kept, but it briefly restarts. Disk limit is a capacity number only, applied immediately with no restart.',
+    'Changing the image, startup command, memory, or any variable below recreates the container — files and ports are kept, but it briefly restarts. Disk limit is a capacity number only, applied immediately with no restart.',
+  'serverView.streamToObs': 'Stream to OBS',
+  'serverView.streamToObsHint':
+    'Paste these into OBS under Settings → Stream, with Service set to Custom. Keep them private — anyone with this Server value can publish through your relay onto your Twitch channel.',
+  'serverView.obsServer': 'Server',
+  'serverView.obsStreamKey': 'Stream Key',
+  'serverView.needsPort':
+    'Add a port on the Network tab matching RTMP_PORT before this is usable — OBS has nothing to connect to yet.',
 
   // guides
   'guide.overview.title': 'How this tab works',

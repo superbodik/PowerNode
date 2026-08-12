@@ -10,7 +10,7 @@ import { GuidePanel } from '../components/GuidePanel';
 import { PortManager } from '../components/PortManager';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { SubuserManager } from '../components/SubuserManager';
-import type { PowerAction, ResourceStats, Server } from '../types';
+import type { Egg, PowerAction, ResourceStats, Server } from '../types';
 
 interface Props {
   uuid: string;
@@ -74,7 +74,9 @@ export function ServerView({ uuid, onBack }: Props) {
     startup_command: '',
     memory_mb: 0,
     disk_mb: 0,
+    environment: {} as Record<string, string>,
   });
+  const [eggs, setEggs] = useState<Egg[]>([]);
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
 
@@ -86,6 +88,10 @@ export function ServerView({ uuid, onBack }: Props) {
   }
 
   useEffect(refreshServer, [uuid]);
+
+  useEffect(() => {
+    api.listEggs().then(setEggs).catch(() => {});
+  }, []);
 
   useEffect(() => connectServerSocketWithRetry<ResourceStats>(uuid, setLive), [uuid]);
 
@@ -172,6 +178,7 @@ export function ServerView({ uuid, onBack }: Props) {
       startup_command: server.startup_command,
       memory_mb: server.memory_mb,
       disk_mb: server.disk_mb,
+      environment: { ...(server.environment ?? {}) },
     });
     setInfoError(null);
     setEditingInfo(true);
@@ -192,6 +199,14 @@ export function ServerView({ uuid, onBack }: Props) {
       setSavingInfo(false);
     }
   }
+
+  const eggVariables = server ? (eggs.find((e) => e.id === server.egg_id)?.variables ?? []) : [];
+  const streamingEgg = server ? eggs.find((e) => e.id === server.egg_id)?.category === 'streaming' : false;
+  const relaySecret = server?.environment?.RELAY_SECRET;
+  const obsServerUrl =
+    server?.primary_address && relaySecret
+      ? `rtmp://${server.primary_address.split(':')[0]}:${server.environment?.RTMP_PORT || '1935'}/${relaySecret}`
+      : null;
 
   if (error) return <div className="login-error show">{error}</div>;
   if (!server) return <p className="srv-desc">{t('common.loading')}</p>;
@@ -372,6 +387,32 @@ export function ServerView({ uuid, onBack }: Props) {
                       />
                     </div>
                   </div>
+                  {eggVariables.length > 0 && (
+                    <div className="settings-grid" style={{ marginTop: 14 }}>
+                      {eggVariables.map((v) => (
+                        <div className="sfield" key={v.env_variable}>
+                          <label htmlFor={`edit-env-${v.env_variable}`}>{v.name}</label>
+                          <input
+                            id={`edit-env-${v.env_variable}`}
+                            value={infoForm.environment[v.env_variable] ?? ''}
+                            onChange={(e) =>
+                              setInfoForm((f) => ({
+                                ...f,
+                                environment: { ...f.environment, [v.env_variable]: e.target.value },
+                              }))
+                            }
+                            disabled={!v.is_editable}
+                            required={v.rules.split('|').includes('required')}
+                          />
+                          {v.rules && (
+                            <span className="srv-desc" style={{ fontSize: 10 }}>
+                              {v.rules}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {infoError && <div className="login-error show" style={{ marginTop: 12 }}>{infoError}</div>}
                   <p className="srv-desc" style={{ marginTop: 8 }}>
                     {t('serverView.editHint')}
@@ -446,6 +487,39 @@ export function ServerView({ uuid, onBack }: Props) {
                 </div>
               </div>
             </div>
+
+            {streamingEgg && relaySecret && (
+              <div className="settings-card" style={{ marginTop: 20 }}>
+                <div className="settings-card-title">{t('serverView.streamToObs')}</div>
+                <p className="srv-desc" style={{ marginBottom: 12 }}>
+                  {t('serverView.streamToObsHint')}
+                </p>
+                {server.primary_address ? (
+                  <>
+                    <div className="sfield" style={{ marginBottom: 10 }}>
+                      <label>{t('serverView.obsServer')}</label>
+                      <div className="api-item">
+                        <span className="api-key">{obsServerUrl}</span>
+                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(obsServerUrl ?? '')}>
+                          {t('common.copy')}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="sfield">
+                      <label>{t('serverView.obsStreamKey')}</label>
+                      <div className="api-item">
+                        <span className="api-key">live</span>
+                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText('live')}>
+                          {t('common.copy')}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="srv-desc">{t('serverView.needsPort')}</p>
+                )}
+              </div>
+            )}
 
             <div className="danger-card" style={{ marginTop: 20 }}>
               <div className="danger-row">
