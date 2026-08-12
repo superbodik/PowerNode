@@ -14,6 +14,7 @@ export const en = {
   // App.tsx — topbar/sidebar
   'app.toggleNav': 'Toggle navigation',
   'nav.overview': 'Overview',
+  'nav.streaming': 'Streaming',
   'nav.admin': 'Admin',
   'nav.servers': 'Servers',
   'nav.streamers': 'For Streamers',
@@ -623,4 +624,6 @@ export const en = {
     '3. Copy the Server and Stream Key below (or from the server\'s Overview tab) into OBS → Settings → Stream, Service = Custom. Use a hardware encoder in OBS (NVENC/AMF/QuickSync) — the heavy Twitch-facing encode already happens on the server.',
   'streamers.noServers': 'No streaming servers yet — create your first one with the tile above.',
   'streamers.openServer': 'Open server',
+  'streamers.statsNow': '{kbps} kbps (peak {peak}, avg {avg})',
+  'streamers.statsLast': 'Last stream {ago} ago — {duration}, peak {peak} kbps, avg {avg} kbps',
 };

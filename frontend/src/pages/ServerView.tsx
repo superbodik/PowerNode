@@ -11,6 +11,7 @@ import { PortManager } from '../components/PortManager';
 import { ScheduleManager } from '../components/ScheduleManager';
 import { SubuserManager } from '../components/SubuserManager';
 import { useStreamSignal } from '../hooks/useStreamSignal';
+import { formatDuration } from '../utils/format';
 import { obsServerUrlFor, relaySecretOf } from '../utils/streaming';
 import type { Egg, PowerAction, ResourceStats, Server } from '../types';
 
@@ -43,14 +44,6 @@ function formatBytes(bytes: number): string {
   if (!bytes) return '0 MB';
   const mb = bytes / (1024 * 1024);
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
-}
-
-function formatDuration(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = Math.floor(totalSeconds % 60);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
 function loadUsername(): string {

@@ -16,6 +16,7 @@ export const ru: Dict = {
   // App.tsx — topbar/sidebar
   'app.toggleNav': 'Переключить навигацию',
   'nav.overview': 'Обзор',
+  'nav.streaming': 'Стриминг',
   'nav.admin': 'Администрирование',
   'nav.servers': 'Серверы',
   'nav.streamers': 'Стримерам',
@@ -626,4 +627,7 @@ export const ru: Dict = {
   'streamers.noServers':
     'Стриминговых серверов пока нет — создайте первый через плитку выше.',
   'streamers.openServer': 'Открыть сервер',
+  'streamers.statsNow': '{kbps} kbps (пик {peak}, средний {avg})',
+  'streamers.statsLast':
+    'Последняя трансляция {ago} назад — {duration}, пик {peak} kbps, средний {avg} kbps',
 };

@@ -3,6 +3,8 @@ import { api } from '../api/client';
 import { t } from '../i18n';
 import { GuidePanel } from '../components/GuidePanel';
 import { useStreamSignal } from '../hooks/useStreamSignal';
+import { useStreamSessionStats } from '../hooks/useStreamSessionStats';
+import { formatDuration, formatRelativeTime } from '../utils/format';
 import { obsServerUrlFor, relaySecretOf } from '../utils/streaming';
 import type { Server } from '../types';
 
@@ -87,7 +89,13 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
 }
 
 function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: string) => void }) {
-  const { signalLive, inboundKbps } = useStreamSignal(server.uuid);
+  const { signalLive, inboundKbps, liveSince } = useStreamSignal(server.uuid);
+  const { lastSession, currentPeakKbps, currentAvgKbps } = useStreamSessionStats(
+    server.uuid,
+    signalLive,
+    liveSince,
+    inboundKbps,
+  );
   const secret = relaySecretOf(server);
   const serverUrl = obsServerUrlFor(server);
 
@@ -104,10 +112,22 @@ function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: s
         </div>
       </div>
 
-      {signalLive && (
+      {signalLive ? (
         <p className="srv-desc" style={{ marginBottom: 10 }}>
-          {inboundKbps} kbps
+          {t('streamers.statsNow', { kbps: inboundKbps, peak: currentPeakKbps, avg: currentAvgKbps })}
+          {liveSince ? ` · ${formatDuration((Date.now() - liveSince) / 1000)}` : ''}
         </p>
+      ) : (
+        lastSession && (
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.statsLast', {
+              ago: formatRelativeTime(lastSession.endedAt),
+              duration: formatDuration((lastSession.endedAt - lastSession.startedAt) / 1000),
+              peak: lastSession.peakKbps,
+              avg: lastSession.avgKbps,
+            })}
+          </p>
+        )
       )}
 
       {serverUrl && secret ? (
@@ -137,9 +157,11 @@ function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: s
         </p>
       )}
 
-      <button className="btn-sm" onClick={() => onManage(server.uuid)}>
-        {t('streamers.openServer')}
-      </button>
+      <div className="settings-foot">
+        <button className="btn-sm" onClick={() => onManage(server.uuid)}>
+          {t('streamers.openServer')}
+        </button>
+      </div>
     </div>
   );
 }

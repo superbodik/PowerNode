@@ -460,7 +460,10 @@ body::before {
 /* Server cards grid */
 .servers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  /* auto-fit (not auto-fill) collapses tracks nobody's using instead of
+     reserving their width as dead space -- matters a lot on grids that
+     often hold just one or two cards (e.g. the Streamers hub). */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 12px;
 }
 

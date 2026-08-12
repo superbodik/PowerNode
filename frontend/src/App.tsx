@@ -189,6 +189,9 @@ export function App() {
             >
               <span className="nav-icon">▦</span> {t('nav.servers')}
             </div>
+          </div>
+          <div className="nav-section">
+            <div className="nav-section-label">{t('nav.streaming')}</div>
             <div
               className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
               onClick={() => goTo('streamers')}
