@@ -290,25 +290,30 @@ PANEL_TWITCH_CLIENT_SECRET=your-client-secret</code></pre>
         tokens are stored encrypted the same way every other secret in the panel is (SMTP
         passwords, database host credentials, node tokens).</p>
 
-        <h3>Subscription alerts for OBS</h3>
-        <p>Once connected, a second, separate step gets you a live subscriber-alert overlay:</p>
-        <ol>
-          <li>Click <strong>Allow subscription access</strong> — a one-time reauthorization granting
-          <code>channel:read:subscriptions</code> (the base connect above only asks for enough to
-          identify who you are, not to read your subscriber list — this is a deliberately separate,
-          visible consent step).</li>
-          <li>Click <strong>Create widget</strong> — registers with Twitch's EventSub so it pushes new
-          subs and gifted subs to the panel in real time, and hands back a Browser Source URL.</li>
-          <li>In OBS: Sources → <strong>+</strong> → <strong>Browser</strong>, paste the URL. It's
-          transparent and shows nothing until an actual event arrives.</li>
-        </ol>
+        <h3>Extended access: subscription alerts + stream key auto-fill</h3>
+        <p>Once connected, a second, separate step (<strong>Allow extended access</strong>) requests
+        <code>channel:read:subscriptions</code> and <code>channel:read:stream_key</code> together — the
+        base connect above only asks for enough to identify who you are, not to read your subscriber
+        list or your stream key, so this is a deliberately separate, visible consent step. It unlocks
+        two things:</p>
+
+        <p><strong>Auto-filled Twitch key.</strong> After granting extended access, creating a new
+        server from the <strong>RTMP Relay</strong> egg pulls your Twitch stream key automatically —
+        no more copying it from Twitch's own dashboard by hand.</p>
+
+        <p><strong>Subscription alerts for OBS.</strong> Click <strong>Create widget</strong> —
+        registers with Twitch's EventSub so it pushes new subs and gifted subs to the panel in real
+        time, and hands back a Browser Source URL. In OBS: Sources → <strong>+</strong> →
+        <strong>Browser</strong>, paste the URL. It's transparent and shows nothing until an actual
+        event arrives.</p>
 
         <div class="callout">
-          <div class="callout-label">This needs a real HTTPS domain</div>
+          <div class="callout-label">Subscription widget needs a real HTTPS domain</div>
           Twitch's EventSub webhooks require a callback URL on port 443 with a valid certificate —
           they will not deliver to a plain HTTP or IP-address panel. If you skipped the domain/TLS
           step during install, <strong>Create widget</strong> will fail; run the installer's domain
-          setup (or update and re-run it) to get a certificate first.
+          setup (or update and re-run it) to get a certificate first. The stream-key auto-fill has no
+          such requirement — it works on any install with extended access granted.
         </div>
 
         <p class="docs-lede" style="margin-top: 16px;">Not built yet: stream title/category

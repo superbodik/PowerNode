@@ -201,8 +201,9 @@ func NewRouter(deps Dependencies) http.Handler {
 
 			r.Get("/integrations/twitch/status", twitchHandler.Status)
 			r.Post("/integrations/twitch/start", twitchHandler.Start)
-			r.Post("/integrations/twitch/start-subscriptions", twitchHandler.StartSubscriptions)
+			r.Post("/integrations/twitch/start-extended", twitchHandler.StartExtended)
 			r.Post("/integrations/twitch/subscriptions/enable", twitchHandler.EnableSubscriptions)
+			r.Get("/integrations/twitch/stream-key", twitchHandler.GetStreamKey)
 			r.Delete("/integrations/twitch", twitchHandler.Disconnect)
 		})
 

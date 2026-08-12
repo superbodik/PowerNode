@@ -410,11 +410,13 @@ export const api = {
   startTwitchConnect: () =>
     request<{ authorize_url: string }>('/integrations/twitch/start', { method: 'POST' }),
 
-  startTwitchSubscriptions: () =>
-    request<{ authorize_url: string }>('/integrations/twitch/start-subscriptions', { method: 'POST' }),
+  startTwitchExtended: () =>
+    request<{ authorize_url: string }>('/integrations/twitch/start-extended', { method: 'POST' }),
 
   enableTwitchSubscriptions: () =>
     request<{ subscription_widget_url: string }>('/integrations/twitch/subscriptions/enable', { method: 'POST' }),
+
+  getTwitchStreamKey: () => request<{ stream_key: string }>('/integrations/twitch/stream-key'),
 
   disconnectTwitch: () => request<void>('/integrations/twitch', { method: 'DELETE' }),
 

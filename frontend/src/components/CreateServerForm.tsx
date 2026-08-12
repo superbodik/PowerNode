@@ -69,6 +69,18 @@ export function CreateServerForm({ onCreated }: Props) {
     setEnvironment(
       Object.fromEntries((egg?.variables ?? []).map((v) => [v.env_variable, v.default_value])),
     );
+
+    // If this egg wants a Twitch stream key and the user has linked Twitch
+    // with stream-key access, pull it automatically instead of making them
+    // copy it from Twitch's own dashboard. Silently leaves the field blank
+    // on any failure (not connected, scope not granted, API error) -- this
+    // is a convenience on top of manual entry, never a hard requirement.
+    if (egg?.variables.some((v) => v.env_variable === 'TWITCH_KEY')) {
+      api
+        .getTwitchStreamKey()
+        .then(({ stream_key }) => setEnvironment((env) => ({ ...env, TWITCH_KEY: stream_key })))
+        .catch(() => {});
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

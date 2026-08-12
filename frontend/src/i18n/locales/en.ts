@@ -623,8 +623,8 @@ export const en = {
   'streamers.twitchConnectedAs': 'Connected: {login}',
   'streamers.twitchDisconnect': 'Disconnect',
   'streamers.subsUpgradeHint':
-    'Getting subscription alerts in OBS needs a one-time reauthorization with access to your subscriber list.',
-  'streamers.subsUpgrade': 'Allow subscription access',
+    'Subscription alerts in OBS and auto-filling your Twitch key when creating a streaming server both need a one-time reauthorization with broader access.',
+  'streamers.subsUpgrade': 'Allow extended access',
   'streamers.widgetReadyHint': 'Access granted — create the OBS widget next.',
   'streamers.widgetEnable': 'Create widget',
   'streamers.widgetUrlLabel': 'OBS Browser Source URL',

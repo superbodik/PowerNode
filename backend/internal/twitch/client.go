@@ -9,6 +9,7 @@ package twitch
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -16,6 +17,11 @@ import (
 	"sync"
 	"time"
 )
+
+// ErrTokenExpired signals a caller should refresh the user access token
+// (via RefreshUserToken) and retry, rather than treating the request as a
+// hard failure.
+var ErrTokenExpired = errors.New("twitch access token expired")
 
 const (
 	authorizeURL    = "https://id.twitch.tv/oauth2/authorize"
@@ -26,14 +32,16 @@ const (
 )
 
 // Scope is the base "connect an account" scope: just enough to identify who
-// connected. ScopeSubscriptions is requested by a separate, explicit
-// upgrade step (not bundled into the base connect flow) since it lets the
-// app read the broadcaster's subscriber list -- a meaningfully bigger ask
-// than proving identity, and users should see that distinction rather than
-// consent to it as a side effect of just linking an account.
+// connected. ScopeExtended is requested by a separate, explicit upgrade
+// step (not bundled into the base connect flow) since it grants two
+// meaningfully bigger things than proving identity: reading the
+// broadcaster's subscriber list (subscription-alert widget) and reading
+// their stream key (auto-filling TWITCH_KEY when creating a relay server).
+// Both are bundled into one upgrade rather than two separate consent
+// screens since they're the same tier of access.
 const (
-	Scope              = "user:read:email"
-	ScopeSubscriptions = "user:read:email channel:read:subscriptions"
+	Scope         = "user:read:email"
+	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key"
 )
 
 type Client struct {
@@ -79,12 +87,12 @@ func (c *Client) AuthorizeURL(state string) string {
 	return c.authorizeURL(state, Scope)
 }
 
-// AuthorizeSubscriptionsURL requests the broader scope needed for
-// subscription-alert EventSub subscriptions. Kept as an explicit separate
-// entry point rather than folded into AuthorizeURL -- see the Scope doc
-// comment.
-func (c *Client) AuthorizeSubscriptionsURL(state string) string {
-	return c.authorizeURL(state, ScopeSubscriptions)
+// AuthorizeExtendedURL requests the broader scope needed for
+// subscription-alert EventSub subscriptions and stream-key auto-fill.
+// Kept as an explicit separate entry point rather than folded into
+// AuthorizeURL -- see the Scope doc comment.
+func (c *Client) AuthorizeExtendedURL(state string) string {
+	return c.authorizeURL(state, ScopeExtended)
 }
 
 type Tokens struct {
@@ -172,6 +180,81 @@ func (c *Client) FetchUser(ctx context.Context, accessToken string) (*User, erro
 	}
 	u := ur.Data[0]
 	return &User{ID: u.ID, Login: u.Login, DisplayName: u.DisplayName}, nil
+}
+
+// RefreshUserToken exchanges a refresh token for a fresh access/refresh
+// token pair. User access tokens are short-lived (~4 hours); callers that
+// keep using a stored connection (e.g. fetching the stream key on demand,
+// possibly long after the account was connected) need this rather than
+// assuming the originally-stored access token is still valid.
+func (c *Client) RefreshUserToken(ctx context.Context, refreshToken string) (*Tokens, error) {
+	form := url.Values{
+		"client_id":     {c.ClientID},
+		"client_secret": {c.ClientSecret},
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("call twitch refresh-token endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("twitch refresh-token request returned %d", resp.StatusCode)
+	}
+
+	var tr tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
+		return nil, fmt.Errorf("decode twitch refresh-token response: %w", err)
+	}
+	return &Tokens{AccessToken: tr.AccessToken, RefreshToken: tr.RefreshToken, Scopes: tr.Scope}, nil
+}
+
+type streamKeyResponse struct {
+	Data []struct {
+		StreamKey string `json:"stream_key"`
+	} `json:"data"`
+}
+
+// GetStreamKey fetches the broadcaster's own RTMP stream key. Requires a
+// USER access token carrying channel:read:stream_key -- unlike EventSub
+// subscription creation, this is not something an app token can do, since
+// the key is specific to whichever user consented to share it.
+func (c *Client) GetStreamKey(ctx context.Context, userAccessToken, broadcasterUserID string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		"https://api.twitch.tv/helix/streams/key?broadcaster_id="+url.QueryEscape(broadcasterUserID), nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+userAccessToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call twitch stream-key endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", ErrTokenExpired
+	}
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("twitch stream-key request returned %d", resp.StatusCode)
+	}
+
+	var sr streamKeyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
+		return "", fmt.Errorf("decode twitch stream-key response: %w", err)
+	}
+	if len(sr.Data) == 0 {
+		return "", fmt.Errorf("twitch stream-key request returned no data")
+	}
+	return sr.Data[0].StreamKey, nil
 }
 
 type appTokenResponse struct {

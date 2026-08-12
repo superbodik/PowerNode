@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -50,12 +51,12 @@ func (h *TwitchHandler) Start(w http.ResponseWriter, r *http.Request) {
 	h.start(w, r, h.Client.AuthorizeURL)
 }
 
-// StartSubscriptions is the same flow, requesting the broader
+// StartExtended is the same flow, requesting the broader
 // channel:read:subscriptions scope needed for the subscription-alert
 // widget. Kept as an explicit separate button/endpoint rather than folded
 // into the base connect flow -- see twitch.Scope's doc comment.
-func (h *TwitchHandler) StartSubscriptions(w http.ResponseWriter, r *http.Request) {
-	h.start(w, r, h.Client.AuthorizeSubscriptionsURL)
+func (h *TwitchHandler) StartExtended(w http.ResponseWriter, r *http.Request) {
+	h.start(w, r, h.Client.AuthorizeExtendedURL)
 }
 
 func (h *TwitchHandler) start(w http.ResponseWriter, r *http.Request, buildURL func(state string) string) {
@@ -207,7 +208,7 @@ func (h *TwitchHandler) Status(w http.ResponseWriter, r *http.Request) {
 // EnableSubscriptions registers the EventSub subscriptions (idempotently --
 // safe to call again) and mints a widget token if one doesn't exist yet.
 // Requires the connection to already carry channel:read:subscriptions,
-// obtained via StartSubscriptions/Callback first.
+// obtained via StartExtended/Callback first.
 func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Request) {
 	if !h.Client.Enabled() {
 		http.Error(w, "twitch integration is not configured on this panel", http.StatusServiceUnavailable)
@@ -294,6 +295,76 @@ func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Reque
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"subscription_widget_url": h.widgetURL(widgetToken)})
+}
+
+// GetStreamKey fetches the connected broadcaster's own RTMP stream key, so
+// the create-server form can fill in TWITCH_KEY without the user copying it
+// from Twitch's dashboard by hand. Requires channel:read:stream_key,
+// obtained via StartExtended/Callback -- the same upgrade as the
+// subscription-alert widget.
+func (h *TwitchHandler) GetStreamKey(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.FromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var twitchUserID, scopes, accessEnc, refreshEnc string
+	err := h.DB.QueryRow(r.Context(),
+		`SELECT twitch_user_id, scopes, access_token_encrypted, refresh_token_encrypted FROM twitch_connections WHERE user_id = $1`,
+		claims.UserID,
+	).Scan(&twitchUserID, &scopes, &accessEnc, &refreshEnc)
+	if err == pgx.ErrNoRows {
+		http.Error(w, "connect a twitch account first", http.StatusBadRequest)
+		return
+	} else if err != nil {
+		http.Error(w, "failed to load twitch connection", http.StatusInternalServerError)
+		return
+	}
+	if !hasScope(scopes, "channel:read:stream_key") {
+		http.Error(w, "reconnect twitch with stream key access first", http.StatusBadRequest)
+		return
+	}
+
+	accessToken, err := crypto.Decrypt(h.EncryptionKey, accessEnc)
+	if err != nil {
+		http.Error(w, "failed to decrypt stored token", http.StatusInternalServerError)
+		return
+	}
+
+	key, err := h.Client.GetStreamKey(r.Context(), accessToken, twitchUserID)
+	if errors.Is(err, twitch.ErrTokenExpired) {
+		refreshToken, derr := crypto.Decrypt(h.EncryptionKey, refreshEnc)
+		if derr != nil {
+			http.Error(w, "failed to decrypt stored token", http.StatusInternalServerError)
+			return
+		}
+		tokens, rerr := h.Client.RefreshUserToken(r.Context(), refreshToken)
+		if rerr != nil {
+			http.Error(w, "twitch session expired -- reconnect your account", http.StatusBadRequest)
+			return
+		}
+		newAccessEnc, aerr := crypto.Encrypt(h.EncryptionKey, tokens.AccessToken)
+		newRefreshEnc, rerr2 := crypto.Encrypt(h.EncryptionKey, tokens.RefreshToken)
+		if aerr != nil || rerr2 != nil {
+			http.Error(w, "failed to store refreshed token", http.StatusInternalServerError)
+			return
+		}
+		if _, err := h.DB.Exec(r.Context(),
+			`UPDATE twitch_connections SET access_token_encrypted = $1, refresh_token_encrypted = $2, updated_at = now() WHERE user_id = $3`,
+			newAccessEnc, newRefreshEnc, claims.UserID,
+		); err != nil {
+			http.Error(w, "failed to store refreshed token", http.StatusInternalServerError)
+			return
+		}
+		key, err = h.Client.GetStreamKey(r.Context(), tokens.AccessToken, twitchUserID)
+	}
+	if err != nil {
+		http.Error(w, "failed to fetch stream key from twitch", http.StatusBadGateway)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"stream_key": key})
 }
 
 func (h *TwitchHandler) Disconnect(w http.ResponseWriter, r *http.Request) {

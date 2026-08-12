@@ -249,7 +249,7 @@ function TwitchTile({
     setBusy(true);
     setError(null);
     try {
-      const { authorize_url } = await api.startTwitchSubscriptions();
+      const { authorize_url } = await api.startTwitchExtended();
       window.location.href = authorize_url;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
