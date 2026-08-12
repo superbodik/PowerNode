@@ -43,6 +43,7 @@ install_panel() {
 
 	prompt_domain
 	apply_domain_to_nginx
+	write_panel_public_url
 
 	systemctl daemon-reload
 	systemctl enable --now panel

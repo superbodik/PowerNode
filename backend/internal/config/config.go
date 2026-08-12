@@ -30,27 +30,45 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	SMTPFrom     string
+
+	// PublicURL is this panel's own publicly-reachable address (scheme +
+	// host), e.g. https://panel.example.com. Written by the installer once
+	// domain/TLS setup finishes. Needed for building OAuth redirect URIs
+	// (Twitch, and anything else later) that outside services redirect the
+	// user's browser back to — those can't be relative paths, since the
+	// redirect happens from twitch.tv, not from this app.
+	PublicURL string
+
+	// Twitch OAuth app credentials. Unset by default -- the integration is
+	// simply disabled until an admin registers an app at
+	// dev.twitch.tv/console and sets these, same opt-in shape as the SMTP
+	// settings above.
+	TwitchClientID     string
+	TwitchClientSecret string
 }
 
 func Load() Config {
 	cfg := Config{
-		HTTPAddr:        getEnv("PANEL_HTTP_ADDR", ":8080"),
-		DatabaseURL:     getEnv("PANEL_DATABASE_URL", "postgres://panel:panel@localhost:5432/panel?sslmode=disable"),
-		RedisAddr:       getEnv("PANEL_REDIS_ADDR", "localhost:6379"),
-		RedisPassword:   getEnv("PANEL_REDIS_PASSWORD", ""),
-		AllowedOrigins:  splitCSV(getEnv("PANEL_ALLOWED_ORIGINS", "http://localhost:5173")),
-		JWTSecret:       os.Getenv("PANEL_JWT_SECRET"),
-		AccessTokenTTL:  15 * time.Minute,
-		RefreshTokenTTL: 30 * 24 * time.Hour,
-		EncryptionKey:   os.Getenv("PANEL_ENCRYPTION_KEY"),
-		SourceDir:       getEnv("PANEL_SOURCE_DIR", ""),
-		RepoSlug:        getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
-		RequireAdmin2FA: getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
-		SMTPHost:        getEnv("PANEL_SMTP_HOST", ""),
-		SMTPPort:        getEnv("PANEL_SMTP_PORT", "587"),
-		SMTPUsername:    getEnv("PANEL_SMTP_USERNAME", ""),
-		SMTPPassword:    getEnv("PANEL_SMTP_PASSWORD", ""),
-		SMTPFrom:        getEnv("PANEL_SMTP_FROM", ""),
+		HTTPAddr:           getEnv("PANEL_HTTP_ADDR", ":8080"),
+		DatabaseURL:        getEnv("PANEL_DATABASE_URL", "postgres://panel:panel@localhost:5432/panel?sslmode=disable"),
+		RedisAddr:          getEnv("PANEL_REDIS_ADDR", "localhost:6379"),
+		RedisPassword:      getEnv("PANEL_REDIS_PASSWORD", ""),
+		AllowedOrigins:     splitCSV(getEnv("PANEL_ALLOWED_ORIGINS", "http://localhost:5173")),
+		JWTSecret:          os.Getenv("PANEL_JWT_SECRET"),
+		AccessTokenTTL:     15 * time.Minute,
+		RefreshTokenTTL:    30 * 24 * time.Hour,
+		EncryptionKey:      os.Getenv("PANEL_ENCRYPTION_KEY"),
+		SourceDir:          getEnv("PANEL_SOURCE_DIR", ""),
+		RepoSlug:           getEnv("PANEL_UPDATE_REPO", "superbodik/PowerNode"),
+		RequireAdmin2FA:    getEnv("PANEL_REQUIRE_ADMIN_2FA", "false") == "true",
+		SMTPHost:           getEnv("PANEL_SMTP_HOST", ""),
+		SMTPPort:           getEnv("PANEL_SMTP_PORT", "587"),
+		SMTPUsername:       getEnv("PANEL_SMTP_USERNAME", ""),
+		SMTPPassword:       getEnv("PANEL_SMTP_PASSWORD", ""),
+		SMTPFrom:           getEnv("PANEL_SMTP_FROM", ""),
+		PublicURL:          strings.TrimSuffix(getEnv("PANEL_PUBLIC_URL", ""), "/"),
+		TwitchClientID:     getEnv("PANEL_TWITCH_CLIENT_ID", ""),
+		TwitchClientSecret: getEnv("PANEL_TWITCH_CLIENT_SECRET", ""),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

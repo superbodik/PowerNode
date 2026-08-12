@@ -24,6 +24,7 @@ import (
 	"github.com/yourorg/panel/internal/models"
 	"github.com/yourorg/panel/internal/ratelimit"
 	"github.com/yourorg/panel/internal/scheduler"
+	"github.com/yourorg/panel/internal/twitch"
 	"github.com/yourorg/panel/internal/ws"
 )
 
@@ -108,6 +109,15 @@ func main() {
 	go scheduler.Run(pool, resolveNodeClient, mailer)
 	go domainretry.Run(pool, resolveNodeClient)
 
+	var twitchRedirectURI string
+	if cfg.PublicURL != "" {
+		twitchRedirectURI = cfg.PublicURL + "/api/v1/auth/twitch/callback"
+	}
+	twitchClient := twitch.New(cfg.TwitchClientID, cfg.TwitchClientSecret, twitchRedirectURI)
+	if twitchClient.Enabled() {
+		log.Printf("twitch integration enabled (redirect: %s)", twitchRedirectURI)
+	}
+
 	router := api.NewRouter(api.Dependencies{
 		DB:              pool,
 		Token:           tokenManager,
@@ -122,6 +132,7 @@ func main() {
 		RepoSlug:        cfg.RepoSlug,
 		AllowedOrigins:  cfg.AllowedOrigins,
 		RequireAdmin2FA: cfg.RequireAdmin2FA,
+		TwitchClient:    twitchClient,
 	})
 
 	srv := &http.Server{

@@ -52,6 +52,7 @@
       <a href="#domains">Custom domains</a>
       <a href="#streaming">Stream through PowerNode</a>
       <a href="#donations">Accepting donations</a>
+      <a href="#twitch">Connecting Twitch</a>
       <a href="#email">Email notifications</a>
       <a href="#install-errors">Install errors</a>
       <a href="#commands">Useful commands</a>
@@ -256,6 +257,44 @@ systemctl restart wingsd</code></pre>
           Nothing — they're independent. The <a href="#streaming">RTMP relay</a> only moves your video
           from OBS to Twitch through your own server; donation alerts are a separate OBS Browser Source
           layered on top of your scene, unrelated to how the stream itself gets encoded or delivered.
+        </div>
+      </section>
+
+      <section class="docs-section" id="twitch">
+        <h2>Connecting Twitch</h2>
+        <p class="docs-lede">Fully optional — off by default. Lets a user link their Twitch account from
+        the <strong>Стримерам</strong> / Streamers page, laying the groundwork for stream title
+        management and subscription/donation notifications later.</p>
+
+        <p>Twitch OAuth apps are tied to a specific redirect URL, and every self-hosted PowerNode
+        install has a different domain — so unlike a normal SaaS product, there's no single shared
+        app that works for everyone. Each install's admin registers their own:</p>
+
+        <ol>
+          <li>Go to <a href="https://dev.twitch.tv/console/apps" target="_blank" rel="noopener">the Twitch Developer Console</a>
+          and create a new application.</li>
+          <li>Set its <strong>OAuth Redirect URL</strong> to
+          <code>&lt;your panel's public URL&gt;/api/v1/auth/twitch/callback</code> — the installer already
+          recorded your panel's public URL as <code>PANEL_PUBLIC_URL</code> in
+          <code>/etc/panel/panel.env</code> during setup (or backfilled it on the next update if you
+          installed before this existed); use that exact value.</li>
+          <li>Copy the generated <strong>Client ID</strong> and <strong>Client Secret</strong>.</li>
+        </ol>
+
+        <p>Add them to <code>/etc/panel/panel.env</code> and restart the panel:</p>
+        <pre><code>PANEL_TWITCH_CLIENT_ID=your-client-id
+PANEL_TWITCH_CLIENT_SECRET=your-client-secret</code></pre>
+
+        <p>The "Connect Twitch" button on the Streamers page shows up as soon as these are set — no
+        restart needed on the frontend, just the panel service picking up the new env vars. Access
+        tokens are stored encrypted the same way every other secret in the panel is (SMTP
+        passwords, database host credentials, node tokens).</p>
+
+        <div class="callout">
+          <div class="callout-label">What this doesn't do yet</div>
+          Connecting an account only establishes identity for now (Twitch's <code>user:read:email</code>
+          scope) — it doesn't manage your stream title/category or post subscription alerts. Those
+          need broader scopes and dedicated UI, planned as follow-up work on top of this connection.
         </div>
       </section>
 

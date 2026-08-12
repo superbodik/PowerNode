@@ -614,9 +614,16 @@ export const ru: Dict = {
   'streamers.subtitle': 'Всё для стрима в одном месте — серверы, реквизиты для OBS и гайды.',
   'streamers.createTile': '+ Новый стриминговый сервер',
   'streamers.createTileHint': 'Создать сервер с предустановленным RTMP Relay egg — за пару кликов.',
-  'streamers.servicesTile': 'Подключение сервисов (скоро)',
-  'streamers.servicesTileHint':
-    'Twitch-авторизация для уведомлений о подписках потребует отдельной настройки на уровне установки панели — в разработке.',
+  'streamers.servicesTile': 'Подключение сервисов',
+  'streamers.twitchNotConfigured':
+    'Twitch-интеграция не настроена на этой панели — администратору нужно зарегистрировать приложение на dev.twitch.tv и указать PANEL_TWITCH_CLIENT_ID / PANEL_TWITCH_CLIENT_SECRET в panel.env.',
+  'streamers.twitchConnectHint':
+    'Привяжите аккаунт Twitch — понадобится дальше для уведомлений о подписках/донатах и управления названием стрима.',
+  'streamers.twitchConnect': 'Подключить Twitch',
+  'streamers.twitchConnectedAs': 'Подключено: {login}',
+  'streamers.twitchDisconnect': 'Отключить',
+  'streamers.twitchJustConnected': 'Twitch-аккаунт подключён.',
+  'streamers.twitchConnectError': 'Не удалось подключить Twitch — попробуйте ещё раз.',
   'streamers.guideTile': 'Как стримить через PowerNode',
   'streamers.guideP1':
     '1. Создайте сервер на базе egg "RTMP Relay (offload stream encoding)", укажите Relay secret и свой Twitch stream key.',

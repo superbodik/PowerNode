@@ -17,6 +17,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [twitchNotice, setTwitchNotice] = useState<'connected' | 'error' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +45,21 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
     };
   }, []);
 
+  // The OAuth round trip leaves the app entirely (redirects to twitch.tv and
+  // back), so the result comes back as a query param on this page rather
+  // than a normal API response. Show it once, then scrub it from the URL so
+  // a refresh doesn't re-show a stale toast.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const result = params.get('twitch');
+    if (result === 'connected' || result === 'error') {
+      setTwitchNotice(result);
+      params.delete('twitch');
+      const rest = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, []);
+
   return (
     <div className="view active">
       <div className="dash-head">
@@ -59,10 +75,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
           <p className="srv-desc">{t('streamers.createTileHint')}</p>
         </div>
 
-        <div className="settings-card tile-soon">
-          <div className="settings-card-title">{t('streamers.servicesTile')}</div>
-          <p className="srv-desc">{t('streamers.servicesTileHint')}</p>
-        </div>
+        <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
       </div>
 
       <GuidePanel title={t('streamers.guideTile')}>
@@ -162,6 +175,96 @@ function StreamerTile({ server, onManage }: { server: Server; onManage: (uuid: s
           {t('streamers.openServer')}
         </button>
       </div>
+    </div>
+  );
+}
+
+function TwitchTile({
+  notice,
+  onDismissNotice,
+}: {
+  notice: 'connected' | 'error' | null;
+  onDismissNotice: () => void;
+}) {
+  const [status, setStatus] = useState<{ enabled: boolean; connected: boolean; twitch_login?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api
+      .getTwitchStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ enabled: false, connected: false }));
+  }
+
+  useEffect(refresh, [notice]);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startTwitchConnect();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectTwitch();
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">{t('streamers.servicesTile')}</div>
+
+      {notice === 'connected' && (
+        <p className="srv-desc" style={{ color: 'var(--green, #5fe69a)', marginBottom: 10 }} onClick={onDismissNotice}>
+          {t('streamers.twitchJustConnected')}
+        </p>
+      )}
+      {notice === 'error' && (
+        <p className="login-error show" style={{ marginBottom: 10 }} onClick={onDismissNotice}>
+          {t('streamers.twitchConnectError')}
+        </p>
+      )}
+      {error && <p className="login-error show" style={{ marginBottom: 10 }}>{error}</p>}
+
+      {status === null ? (
+        <p className="srv-desc">{t('common.loading')}</p>
+      ) : !status.enabled ? (
+        <p className="srv-desc">{t('streamers.twitchNotConfigured')}</p>
+      ) : status.connected ? (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.twitchConnectedAs', { login: status.twitch_login ?? '' })}
+          </p>
+          <div className="settings-foot">
+            <button className="btn-sm" disabled={busy} onClick={disconnect}>
+              {t('streamers.twitchDisconnect')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.twitchConnectHint')}
+          </p>
+          <button className="btn-sm" disabled={busy} onClick={connect}>
+            {t('streamers.twitchConnect')}
+          </button>
+        </>
+      )}
     </div>
   );
 }

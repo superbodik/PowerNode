@@ -19,6 +19,7 @@ import (
 	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/daemonclient"
 	"github.com/yourorg/panel/internal/ratelimit"
+	"github.com/yourorg/panel/internal/twitch"
 	"github.com/yourorg/panel/internal/ws"
 )
 
@@ -36,6 +37,7 @@ type Dependencies struct {
 	RepoSlug        string
 	AllowedOrigins  []string
 	RequireAdmin2FA bool
+	TwitchClient    *twitch.Client
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -97,11 +99,13 @@ func NewRouter(deps Dependencies) http.Handler {
 	serverAllocationHandler := &handlers.ServerAllocationHandler{DB: deps.DB, Subusers: subusers, NodeClient: deps.NodeClient}
 	sshKeyHandler := &handlers.SSHKeyHandler{DB: deps.DB}
 	sftpAuthHandler := &handlers.SFTPAuthHandler{DB: deps.DB, Subusers: subusers, EncryptionKey: deps.EncryptionKey}
+	twitchHandler := &handlers.TwitchHandler{DB: deps.DB, Client: deps.TwitchClient, EncryptionKey: deps.EncryptionKey}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
 		r.Post("/auth/refresh", authHandler.Refresh)
 		r.Post("/internal/sftp/authenticate", sftpAuthHandler.Authenticate)
+		r.Get("/auth/twitch/callback", twitchHandler.Callback)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(30 * time.Second))
@@ -183,6 +187,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Post("/account/2fa/setup", twofaHandler.Setup)
 			r.Post("/account/2fa/verify", twofaHandler.Verify)
 			r.Post("/account/2fa/disable", twofaHandler.Disable)
+
+			r.Get("/integrations/twitch/status", twitchHandler.Status)
+			r.Post("/integrations/twitch/start", twitchHandler.Start)
+			r.Delete("/integrations/twitch", twitchHandler.Disconnect)
 		})
 
 		r.Group(func(r chi.Router) {

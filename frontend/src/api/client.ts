@@ -398,6 +398,14 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
 
+  getTwitchStatus: () =>
+    request<{ enabled: boolean; connected: boolean; twitch_login?: string }>('/integrations/twitch/status'),
+
+  startTwitchConnect: () =>
+    request<{ authorize_url: string }>('/integrations/twitch/start', { method: 'POST' }),
+
+  disconnectTwitch: () => request<void>('/integrations/twitch', { method: 'DELETE' }),
+
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),
 

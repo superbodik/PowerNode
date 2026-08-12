@@ -612,9 +612,16 @@ export const en = {
   'streamers.subtitle': 'Everything for streaming in one place — servers, OBS credentials, and guides.',
   'streamers.createTile': '+ New streaming server',
   'streamers.createTileHint': 'Create a server pre-configured with the RTMP Relay egg — a couple of clicks.',
-  'streamers.servicesTile': 'Connect services (soon)',
-  'streamers.servicesTileHint':
-    'Twitch sign-in for subscription notifications needs a separate piece of install-level configuration first — in progress.',
+  'streamers.servicesTile': 'Connect services',
+  'streamers.twitchNotConfigured':
+    'Twitch integration isn\'t configured on this panel — an admin needs to register an app at dev.twitch.tv and set PANEL_TWITCH_CLIENT_ID / PANEL_TWITCH_CLIENT_SECRET in panel.env.',
+  'streamers.twitchConnectHint':
+    'Link a Twitch account — needed later for subscription/donation notifications and stream title management.',
+  'streamers.twitchConnect': 'Connect Twitch',
+  'streamers.twitchConnectedAs': 'Connected: {login}',
+  'streamers.twitchDisconnect': 'Disconnect',
+  'streamers.twitchJustConnected': 'Twitch account connected.',
+  'streamers.twitchConnectError': 'Could not connect Twitch — try again.',
   'streamers.guideTile': 'How to stream through PowerNode',
   'streamers.guideP1':
     '1. Create a server using the "RTMP Relay (offload stream encoding)" egg, set a Relay secret and your Twitch stream key.',
