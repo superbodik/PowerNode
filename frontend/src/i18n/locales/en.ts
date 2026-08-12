@@ -52,6 +52,10 @@ export const en = {
   // pages/Nodes.tsx
   'nodes.title': 'Nodes',
   'nodes.subtitle': 'Machines running wingsd, ready to host servers.',
+  'nodes.statsRamUsed': 'RAM used',
+  'nodes.statsRamTotal': 'RAM total',
+  'nodes.statsCpuCores': 'CPU cores',
+  'nodes.statsOffline': 'Node unreachable for stats.',
   'nodes.confirmDeleteDbHost': 'Delete this database host? Only possible if nothing is provisioned on it.',
   'nodes.confirmDeleteNode': 'Delete node "{name}"? This only removes it from the panel — it does not uninstall wingsd from the machine.',
   'nodes.confirmRegenToken': 'Generate a new daemon token for "{name}"? You\'ll need to run one command on the node to apply it.',
@@ -437,6 +441,9 @@ export const en = {
   'createServer.startupCommandPlaceholder': "leave empty to use the image's own entrypoint",
   'createServer.memoryMb': 'Memory (MB)',
   'createServer.diskMb': 'Disk (MB)',
+  'createServer.cpuCores': 'CPU (cores)',
+  'createServer.cpuCoresUnlimited': 'unlimited',
+  'createServer.cpuCoresHint': '{cores} cores available on this node',
   'createServer.creating': 'Creating…',
   'createServer.create': 'Create',
 

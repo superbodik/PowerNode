@@ -72,12 +72,18 @@ export interface Node {
   maintenance_mode: boolean;
   last_seen_at: string | null;
   agent_version: string | null;
+  // Self-reported by wingsd on each health check -- null until the node's
+  // first check-in, not an admin-set allocatable capacity like memory_mb.
+  total_cpu_cores?: number | null;
 }
 
 export interface NodeStatus {
   online: boolean;
   error?: string;
   agent_version?: string;
+  cpu_cores?: number;
+  mem_total_mb?: number;
+  mem_available_mb?: number;
 }
 
 export interface MeInfo {
@@ -187,6 +193,7 @@ export interface CreateServerRequest {
   memory_mb: number;
   swap_mb: number;
   disk_mb: number;
+  cpu_percent?: number | null;
   allocation_id?: number;
 }
 
@@ -199,6 +206,7 @@ export interface UpdateServerRequest {
   memory_mb: number;
   swap_mb: number;
   disk_mb: number;
+  cpu_percent?: number | null;
 }
 
 export interface CreateAllocationRequest {

@@ -26,6 +26,7 @@ export function CreateServerForm({ onCreated }: Props) {
     startup_command: '',
     memory_mb: 1024,
     disk_mb: 5120,
+    cpu_cores: '', // empty = unlimited; string so the field can be blank
     allocation_id: 0,
   });
   const [environment, setEnvironment] = useState<Record<string, string>>({});
@@ -96,6 +97,7 @@ export function CreateServerForm({ onCreated }: Props) {
     }
     setSubmitting(true);
     try {
+      const cores = parseFloat(form.cpu_cores);
       await api.createServer({
         name: form.name,
         node_id: form.node_id,
@@ -106,6 +108,7 @@ export function CreateServerForm({ onCreated }: Props) {
         memory_mb: form.memory_mb,
         swap_mb: 0,
         disk_mb: form.disk_mb,
+        cpu_percent: Number.isFinite(cores) && cores > 0 ? Math.round(cores * 100) : null,
         allocation_id: form.allocation_id || undefined,
       });
       setOpen(false);
@@ -229,6 +232,26 @@ export function CreateServerForm({ onCreated }: Props) {
               onChange={(e) => setForm((f) => ({ ...f, disk_mb: Number(e.target.value) }))}
               required
             />
+          </div>
+          <div className="sfield">
+            <label htmlFor="srv-cpu">{t('createServer.cpuCores')}</label>
+            <input
+              id="srv-cpu"
+              type="number"
+              step="0.25"
+              min="0"
+              placeholder={t('createServer.cpuCoresUnlimited')}
+              value={form.cpu_cores}
+              onChange={(e) => setForm((f) => ({ ...f, cpu_cores: e.target.value }))}
+            />
+            {(() => {
+              const node = nodes.find((n) => n.id === form.node_id);
+              return node?.total_cpu_cores ? (
+                <span className="srv-desc" style={{ fontSize: 10 }}>
+                  {t('createServer.cpuCoresHint', { cores: node.total_cpu_cores })}
+                </span>
+              ) : null;
+            })()}
           </div>
         </div>
 

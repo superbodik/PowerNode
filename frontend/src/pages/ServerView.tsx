@@ -77,6 +77,7 @@ export function ServerView({ uuid, onBack }: Props) {
     startup_command: '',
     memory_mb: 0,
     disk_mb: 0,
+    cpu_cores: '', // empty = unlimited; string so the field can be blank
     environment: {} as Record<string, string>,
   });
   const [eggs, setEggs] = useState<Egg[]>([]);
@@ -183,6 +184,7 @@ export function ServerView({ uuid, onBack }: Props) {
       startup_command: server.startup_command,
       memory_mb: server.memory_mb,
       disk_mb: server.disk_mb,
+      cpu_cores: server.cpu_percent ? String(server.cpu_percent / 100) : '',
       environment: { ...(server.environment ?? {}) },
     });
     setInfoError(null);
@@ -195,7 +197,13 @@ export function ServerView({ uuid, onBack }: Props) {
     setSavingInfo(true);
     setInfoError(null);
     try {
-      await api.updateServer(uuid, { ...infoForm, swap_mb: server.swap_mb });
+      const { cpu_cores, ...rest } = infoForm;
+      const cores = parseFloat(cpu_cores);
+      await api.updateServer(uuid, {
+        ...rest,
+        swap_mb: server.swap_mb,
+        cpu_percent: Number.isFinite(cores) && cores > 0 ? Math.round(cores * 100) : null,
+      });
       setEditingInfo(false);
       refreshServer();
     } catch (err) {
@@ -388,6 +396,18 @@ export function ServerView({ uuid, onBack }: Props) {
                         required
                       />
                     </div>
+                    <div className="sfield">
+                      <label htmlFor="edit-srv-cpu">{t('createServer.cpuCores')}</label>
+                      <input
+                        id="edit-srv-cpu"
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        placeholder={t('createServer.cpuCoresUnlimited')}
+                        value={infoForm.cpu_cores}
+                        onChange={(e) => setInfoForm((f) => ({ ...f, cpu_cores: e.target.value }))}
+                      />
+                    </div>
                   </div>
                   {eggVariables.length > 0 && (
                     <div className="settings-grid" style={{ marginTop: 14 }}>
@@ -462,6 +482,13 @@ export function ServerView({ uuid, onBack }: Props) {
                   <div className="sfield">
                     <label>{t('serverView.diskLimit')}</label>
                     <input readOnly value={`${server.disk_mb} MB`} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('createServer.cpuCores')}</label>
+                    <input
+                      readOnly
+                      value={server.cpu_percent ? `${server.cpu_percent / 100}` : t('createServer.cpuCoresUnlimited')}
+                    />
                   </div>
                 </div>
               )}

@@ -54,6 +54,10 @@ export const ru: Dict = {
   // pages/Nodes.tsx
   'nodes.title': 'Ноды',
   'nodes.subtitle': 'Машины с wingsd, готовые размещать серверы.',
+  'nodes.statsRamUsed': 'ОЗУ занято',
+  'nodes.statsRamTotal': 'ОЗУ всего',
+  'nodes.statsCpuCores': 'Ядер CPU',
+  'nodes.statsOffline': 'Нода недоступна для проверки статистики.',
   'nodes.confirmDeleteDbHost': 'Удалить этот хост базы данных? Возможно, только если на нём ничего не создано.',
   'nodes.confirmDeleteNode': 'Удалить ноду «{name}»? Это только уберёт её из панели — wingsd на машине не удаляется.',
   'nodes.confirmRegenToken': 'Сгенерировать новый токен демона для «{name}»? Понадобится выполнить одну команду на ноде, чтобы применить его.',
@@ -439,6 +443,9 @@ export const ru: Dict = {
   'createServer.startupCommandPlaceholder': 'оставьте пустым, чтобы использовать entrypoint образа',
   'createServer.memoryMb': 'Память (МБ)',
   'createServer.diskMb': 'Диск (МБ)',
+  'createServer.cpuCores': 'CPU (ядра)',
+  'createServer.cpuCoresUnlimited': 'не ограничено',
+  'createServer.cpuCoresHint': 'На ноде доступно {cores} ядер',
   'createServer.creating': 'Создание…',
   'createServer.create': 'Создать',
 

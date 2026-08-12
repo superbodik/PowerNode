@@ -103,14 +103,18 @@ func (c *Client) SendCommand(ctx context.Context, serverUUID uuid.UUID, command 
 }
 
 type healthzResponse struct {
-	Status   string `json:"status"`
-	Version  string `json:"version"`
-	CPUCores int    `json:"cpu_cores"`
+	Status         string `json:"status"`
+	Version        string `json:"version"`
+	CPUCores       int    `json:"cpu_cores"`
+	MemTotalMB     int64  `json:"mem_total_mb"`
+	MemAvailableMB int64  `json:"mem_available_mb"`
 }
 
 type PingResult struct {
-	Version  string
-	CPUCores int
+	Version        string
+	CPUCores       int
+	MemTotalMB     int64
+	MemAvailableMB int64
 }
 
 func (c *Client) Ping(ctx context.Context) (PingResult, error) {
@@ -128,7 +132,12 @@ func (c *Client) Ping(ctx context.Context) (PingResult, error) {
 	}
 	var health healthzResponse
 	_ = json.NewDecoder(resp.Body).Decode(&health)
-	return PingResult{Version: health.Version, CPUCores: health.CPUCores}, nil
+	return PingResult{
+		Version:        health.Version,
+		CPUCores:       health.CPUCores,
+		MemTotalMB:     health.MemTotalMB,
+		MemAvailableMB: health.MemAvailableMB,
+	}, nil
 }
 
 type ResourceStats struct {

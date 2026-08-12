@@ -312,6 +312,12 @@ type nodeStatusResponse struct {
 	Error        string `json:"error,omitempty"`
 	AgentVersion string `json:"agent_version,omitempty"`
 	CPUCores     int    `json:"cpu_cores,omitempty"`
+	// MemTotalMB/MemAvailableMB are a live snapshot from this check, not
+	// persisted anywhere -- unlike total_cpu_cores (a fixed hardware fact),
+	// memory usage changes constantly, so there's nothing meaningful to
+	// store as "the" value between checks.
+	MemTotalMB     int64 `json:"mem_total_mb,omitempty"`
+	MemAvailableMB int64 `json:"mem_available_mb,omitempty"`
 }
 
 func (h *NodeHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +354,13 @@ func (h *NodeHandler) Status(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, nodeStatusResponse{Online: true, AgentVersion: ping.Version, CPUCores: ping.CPUCores})
+	writeJSON(w, http.StatusOK, nodeStatusResponse{
+		Online:         true,
+		AgentVersion:   ping.Version,
+		CPUCores:       ping.CPUCores,
+		MemTotalMB:     ping.MemTotalMB,
+		MemAvailableMB: ping.MemAvailableMB,
+	})
 }
 
 func generateToken(n int) (string, error) {

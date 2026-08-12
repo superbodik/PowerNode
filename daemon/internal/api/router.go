@@ -33,13 +33,17 @@ func NewRouter(dockerManager *docker.Manager, consoleHub *console.Hub, daemonTok
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// runtime.NumCPU() reads the host's real logical core count --
-		// wingsd runs directly on the host (not itself containerized), so
-		// this is the machine's actual capacity, not a cgroup-limited view.
+		// runtime.NumCPU() reads the host's real logical core count, and
+		// hostMemoryMB reads its real RAM -- wingsd runs directly on the
+		// host (not itself containerized), so both are the machine's actual
+		// capacity, not a cgroup-limited view.
+		memTotalMB, memAvailableMB := hostMemoryMB()
 		json.NewEncoder(w).Encode(map[string]any{
-			"status":    "ok",
-			"version":   version,
-			"cpu_cores": runtime.NumCPU(),
+			"status":           "ok",
+			"version":          version,
+			"cpu_cores":        runtime.NumCPU(),
+			"mem_total_mb":     memTotalMB,
+			"mem_available_mb": memAvailableMB,
 		})
 	})
 

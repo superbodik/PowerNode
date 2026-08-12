@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { t } from '../i18n';
+import { NodeStatsTile } from '../components/NodeStatsTile';
 import type { Allocation, CreateNodeResponse, DatabaseHost, Node, NodeStatus } from '../types';
 
 const INSTALL_SCRIPT_URL = 'https://raw.githubusercontent.com/superbodik/PowerNode/main/install.sh';
@@ -269,6 +270,14 @@ export function Nodes() {
         <h1>{t('nodes.title')}</h1>
         <p>{t('nodes.subtitle')}</p>
       </div>
+
+      {nodes.length > 0 && (
+        <div className="servers-grid" style={{ marginBottom: 20 }}>
+          {nodes.map((node) => (
+            <NodeStatsTile key={node.id} node={node} />
+          ))}
+        </div>
+      )}
 
       {justCreated && (
         <div className="acc-card" style={{ marginBottom: 20 }}>
