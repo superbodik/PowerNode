@@ -43,6 +43,14 @@ function formatBytes(bytes: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
 }
 
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.floor(totalSeconds % 60);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
 function loadUsername(): string {
   try {
     const raw = localStorage.getItem('user');
@@ -77,8 +85,12 @@ export function ServerView({ uuid, onBack }: Props) {
     environment: {} as Record<string, string>,
   });
   const [eggs, setEggs] = useState<Egg[]>([]);
+  const [inboundKbps, setInboundKbps] = useState(0);
+  const [signalLive, setSignalLive] = useState(false);
+  const [liveSince, setLiveSince] = useState<number | null>(null);
   const consoleRef = useRef<ConsoleHandle | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
+  const prevNetSampleRef = useRef<{ rx: number; at: number } | null>(null);
 
   function refreshServer() {
     api
@@ -94,6 +106,34 @@ export function ServerView({ uuid, onBack }: Props) {
   }, []);
 
   useEffect(() => connectServerSocketWithRetry<ResourceStats>(uuid, setLive), [uuid]);
+
+  // Derives a "receiving a stream right now" signal purely from the
+  // container's own inbound network byte counter (already pushed every ~2s
+  // over the stats socket) — no mediamtx-specific API call needed. A small
+  // kbps floor filters out RTMP's idle keepalive traffic so a connected-but-
+  // silent OBS doesn't read as "live".
+  useEffect(() => {
+    if (!live) return;
+    const now = Date.now();
+    const prev = prevNetSampleRef.current;
+    prevNetSampleRef.current = { rx: live.network_rx, at: now };
+    if (!prev) return;
+
+    const deltaBytes = live.network_rx - prev.rx;
+    const deltaSeconds = (now - prev.at) / 1000;
+    if (deltaBytes < 0 || deltaSeconds <= 0) {
+      setInboundKbps(0);
+      setSignalLive(false);
+      setLiveSince(null);
+      return;
+    }
+
+    const kbps = Math.round((deltaBytes * 8) / 1000 / deltaSeconds);
+    setInboundKbps(kbps);
+    const isLive = kbps > 5 && live.state === 'running';
+    setSignalLive(isLive);
+    setLiveSince((prevSince) => (isLive ? (prevSince ?? now) : null));
+  }, [live]);
 
   useEffect(() => {
     if (tab !== 'console') return;
@@ -487,6 +527,32 @@ export function ServerView({ uuid, onBack }: Props) {
                 </div>
               </div>
             </div>
+
+            {streamingEgg && (
+              <div className="settings-card" style={{ marginTop: 20 }}>
+                <div className="settings-card-title">{t('serverView.streamStatus')}</div>
+                <div className="settings-grid">
+                  <div className="sfield">
+                    <label>{t('serverView.streamSignal')}</label>
+                    <div className={`status-badge ${signalLive ? 'online' : 'offline'}`}>
+                      <span className="dot" />
+                      {signalLive ? t('serverView.signalLive') : t('serverView.signalNone')}
+                    </div>
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.streamBitrate')}</label>
+                    <input readOnly value={signalLive ? `${inboundKbps} kbps` : '—'} />
+                  </div>
+                  <div className="sfield">
+                    <label>{t('serverView.streamUptime')}</label>
+                    <input
+                      readOnly
+                      value={signalLive && liveSince ? formatDuration((Date.now() - liveSince) / 1000) : '—'}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {streamingEgg && relaySecret && (
               <div className="settings-card" style={{ marginTop: 20 }}>

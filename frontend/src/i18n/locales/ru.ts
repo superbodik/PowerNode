@@ -287,6 +287,12 @@ export const ru: Dict = {
   'serverView.saveChanges': 'Сохранить изменения',
   'serverView.editHint':
     'Изменение образа, команды запуска, памяти или любой переменной ниже пересоздаёт контейнер — файлы и порты сохраняются, но сервер ненадолго перезапустится. Лимит диска — просто расчётное число, применяется сразу без перезапуска.',
+  'serverView.streamStatus': 'Статус трансляции',
+  'serverView.streamSignal': 'Сигнал',
+  'serverView.signalLive': 'Live',
+  'serverView.signalNone': 'Нет сигнала',
+  'serverView.streamBitrate': 'Битрейт',
+  'serverView.streamUptime': 'Идёт',
   'serverView.streamToObs': 'Стрим в OBS',
   'serverView.streamToObsHint':
     'Вставьте это в OBS в Settings → Stream, с Service = Custom. Держите Stream Key в секрете — у кого есть это значение, тот может публиковать через ваш relay на ваш Twitch-канал.',

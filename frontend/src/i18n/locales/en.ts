@@ -285,6 +285,12 @@ export const en = {
   'serverView.saveChanges': 'Save changes',
   'serverView.editHint':
     'Changing the image, startup command, memory, or any variable below recreates the container — files and ports are kept, but it briefly restarts. Disk limit is a capacity number only, applied immediately with no restart.',
+  'serverView.streamStatus': 'Stream status',
+  'serverView.streamSignal': 'Signal',
+  'serverView.signalLive': 'Live',
+  'serverView.signalNone': 'No signal',
+  'serverView.streamBitrate': 'Bitrate',
+  'serverView.streamUptime': 'Duration',
   'serverView.streamToObs': 'Stream to OBS',
   'serverView.streamToObsHint':
     'Paste these into OBS under Settings → Stream, with Service set to Custom. Keep the Stream Key private — anyone with it can publish through your relay onto your Twitch channel.',
