@@ -43,16 +43,14 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	stdin, err := h.docker.Attach(ctx, containerID)
-	if err != nil {
-		log.Printf("attach stdin failed: %v", err)
-		conn.WriteMessage(websocket.TextMessage, []byte("[console] could not attach to container (is the server running?): "+err.Error()))
-		return
-	}
-	h.setWriter(serverUUID, stdin)
-	defer h.clearWriter(serverUUID)
-	defer stdin.Close()
-
+	// Logs come first and unconditionally: ContainerLogs works against a
+	// container's stored output regardless of its current state, unlike
+	// Attach, which needs it running *right now*. A crash-looping container
+	// (bad startup command, image pull failure, whatever) is essentially
+	// never in a stable running state long enough to attach to — that's
+	// exactly when seeing *why* it's crashing matters most, so failing the
+	// whole connection on Attach alone used to hide the one thing that
+	// would explain the problem.
 	logs, err := h.docker.LogsFollow(ctx, containerID)
 	if err != nil {
 		log.Printf("logs follow failed: %v", err)
@@ -60,13 +58,27 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, serverUUID uuid.UUID
 		return
 	}
 	defer logs.Close()
-
 	go h.pumpLogs(conn, logs)
+
+	stdin, err := h.docker.Attach(ctx, containerID)
+	if err != nil {
+		log.Printf("attach stdin failed: %v", err)
+		conn.WriteMessage(websocket.TextMessage, []byte("[console] read-only — could not attach for input (is the server running?): "+err.Error()))
+		stdin = nil
+	} else {
+		h.setWriter(serverUUID, stdin)
+		defer h.clearWriter(serverUUID)
+		defer stdin.Close()
+	}
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			return
+		}
+		if stdin == nil {
+			conn.WriteMessage(websocket.TextMessage, []byte("[console] can't send input — not attached to a running container"))
+			continue
 		}
 		if _, err := stdin.Write(append(msg, '\n')); err != nil {
 			log.Printf("write stdin failed: %v", err)
