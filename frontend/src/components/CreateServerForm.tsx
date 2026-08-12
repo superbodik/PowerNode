@@ -34,7 +34,10 @@ export function CreateServerForm({ onCreated }: Props) {
   useEffect(() => {
     if (!open) return;
     api.listNodes().then(setNodes).catch(() => {});
-    api.listEggs().then(setEggs).catch(() => {});
+    // Eggs pulled out of the default catalog (Plugins page) shouldn't be
+    // pickable here even if a stale sessionStorage preset points at one --
+    // the pendingPresetEgg effect below just won't find a match for them.
+    api.listEggs().then((all) => setEggs(all.filter((e) => e.enabled))).catch(() => {});
   }, [open]);
 
   // Lets another page (the Streamers hub) open this form pre-selected to a

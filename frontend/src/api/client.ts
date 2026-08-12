@@ -354,6 +354,9 @@ export const api = {
 
   listEggs: () => request<Egg[]>('/eggs'),
 
+  setEggEnabled: (id: number, enabled: boolean) =>
+    request<void>(`/eggs/${id}/enabled`, { method: 'POST', body: JSON.stringify({ enabled }) }),
+
   listAllocations: (nodeId: number, freeOnly = false) =>
     request<Allocation[]>(`/allocations?node_id=${nodeId}${freeOnly ? '&free=true' : ''}`),
 

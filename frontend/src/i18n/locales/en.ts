@@ -139,6 +139,8 @@ export const en = {
   'plugins.subtitle': 'Install optional panel features on the designated plugin host node.',
   'plugins.noHostWarning':
     'No node is set as the plugin host yet. Go to Nodes, edit a node, and enable "Plugin host" -- ideally a private node, since installing here should stay admin-only.',
+  'plugins.featuresTitle': 'Features',
+  'plugins.containerTitle': 'Plugins',
   'plugins.noneYet': 'No plugins available yet -- check back after the next panel update.',
   'plugins.installed': 'Installed',
   'plugins.install': 'Install',

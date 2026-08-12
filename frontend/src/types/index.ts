@@ -166,6 +166,9 @@ export interface Egg {
   description: string;
   docker_image: string;
   startup_command: string;
+  // False for an egg that's been pulled out of the default catalog and
+  // gated behind the Plugins page (see Plugins.tsx's "features" section).
+  enabled: boolean;
   variables: EggVariable[];
 }
 

@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,12 +28,17 @@ type eggSummary struct {
 	Description    string               `json:"description"`
 	DockerImage    string               `json:"docker_image"`
 	StartupCommand string               `json:"startup_command"`
-	Variables      []eggVariableSummary `json:"variables"`
+	// Enabled eggs are the default catalog available to everyone. A
+	// disabled egg still exists (and its variables/servers keep working)
+	// but is only surfaced through the Plugins page, which can flip this
+	// flag back on -- see 0022_egg_enabled_flag.sql.
+	Enabled   bool                 `json:"enabled"`
+	Variables []eggVariableSummary `json:"variables"`
 }
 
 func (h *EggHandler) List(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.Query(r.Context(), `
-		SELECT id, category, name, description, docker_image, startup_command
+		SELECT id, category, name, description, docker_image, startup_command, enabled
 		FROM eggs ORDER BY category, name`)
 	if err != nil {
 		http.Error(w, "failed to list eggs", http.StatusInternalServerError)
@@ -40,7 +48,7 @@ func (h *EggHandler) List(w http.ResponseWriter, r *http.Request) {
 	eggs := make([]eggSummary, 0)
 	for rows.Next() {
 		var e eggSummary
-		if err := rows.Scan(&e.ID, &e.Category, &e.Name, &e.Description, &e.DockerImage, &e.StartupCommand); err != nil {
+		if err := rows.Scan(&e.ID, &e.Category, &e.Name, &e.Description, &e.DockerImage, &e.StartupCommand, &e.Enabled); err != nil {
 			http.Error(w, "failed to read eggs", http.StatusInternalServerError)
 			return
 		}
@@ -66,4 +74,35 @@ func (h *EggHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, eggs)
+}
+
+type setEggEnabledRequest struct {
+	Enabled bool `json:"enabled"`
+}
+
+// SetEnabled is the "install"/"uninstall" action for a feature-toggle
+// plugin (e.g. streaming) -- admin-only, see router.go.
+func (h *EggHandler) SetEnabled(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "invalid egg id", http.StatusBadRequest)
+		return
+	}
+	var req setEggEnabledRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	tag, err := h.DB.Exec(r.Context(), `UPDATE eggs SET enabled = $1 WHERE id = $2`, req.Enabled, id)
+	if err != nil {
+		http.Error(w, "failed to update egg", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		http.Error(w, "egg not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

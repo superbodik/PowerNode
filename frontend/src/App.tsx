@@ -63,6 +63,10 @@ function pathFor(loc: Location): string {
 
 export function App() {
   const [user, setUser] = useState<StoredUser | null>(() => loadUser());
+  // Streaming is a feature-toggle plugin (Plugins.tsx) -- its egg is cut
+  // from the default catalog until enabled, so the nav/route follow the
+  // same flag rather than always being visible.
+  const [streamingEnabled, setStreamingEnabled] = useState(false);
   const [{ view, activeServer }, setLocation] = useState<Location>(() => parseLocation());
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mustSetup2FA, setMustSetup2FA] = useState(false);
@@ -70,6 +74,10 @@ export function App() {
   useEffect(() => {
     if (!user) return;
     api.me().then((me) => setMustSetup2FA(me.must_setup_2fa)).catch(() => {});
+    api
+      .listEggs()
+      .then((eggs) => setStreamingEnabled(eggs.some((e) => e.category === 'streaming' && e.enabled)))
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -227,15 +235,17 @@ export function App() {
               <span className="nav-icon">◈</span> {t('nav.account')}
             </div>
           </div>
-          <div className="nav-section">
-            <div className="nav-section-label">{t('nav.streaming')}</div>
-            <div
-              className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
-              onClick={() => goTo('streamers')}
-            >
-              <span className="nav-icon">▶</span> {t('nav.streamers')}
+          {streamingEnabled && (
+            <div className="nav-section">
+              <div className="nav-section-label">{t('nav.streaming')}</div>
+              <div
+                className={`nav-item ${view === 'streamers' ? 'active' : ''}`}
+                onClick={() => goTo('streamers')}
+              >
+                <span className="nav-icon">▶</span> {t('nav.streamers')}
+              </div>
             </div>
-          </div>
+          )}
           <div className="sidebar-footer">
             <div
               className={`nav-item ${view === 'settings' ? 'active' : ''}`}
@@ -253,7 +263,7 @@ export function App() {
           <ErrorBoundary key={`${view}-${activeServer ?? ''}`}>
             {activeServer ? (
               <ServerView uuid={activeServer} onBack={closeServer} />
-            ) : view === 'streamers' ? (
+            ) : view === 'streamers' && streamingEnabled ? (
               <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
             ) : view === 'nodes' ? (
               <Nodes />

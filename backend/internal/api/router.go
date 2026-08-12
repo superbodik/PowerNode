@@ -177,6 +177,7 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Delete("/servers/{uuid}/subusers/{id}", subuserHandler.Delete)
 
 			r.Get("/eggs", eggHandler.List)
+			r.With(auth.RequireAdmin).Post("/eggs/{id}/enabled", eggHandler.SetEnabled)
 
 			r.Get("/allocations", allocationHandler.List)
 			r.With(auth.RequireAdmin).Post("/allocations", allocationHandler.Create)
