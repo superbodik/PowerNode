@@ -638,6 +638,8 @@ export const en = {
   'streamers.subtitle': 'Everything for streaming in one place — servers, OBS credentials, and guides.',
   'streamers.createTile': '+ New streaming server',
   'streamers.createTileHint': 'Create a server pre-configured with the RTMP Relay egg — a couple of clicks.',
+  'streamers.openTile': 'Your streaming server',
+  'streamers.openTileHint': 'Open it to manage OBS settings, allocations, and everything else.',
   'streamers.servicesTile': 'Connect services',
   'streamers.twitchNotConfigured':
     'Twitch integration isn\'t configured on this panel — an admin needs to register an app at dev.twitch.tv and set PANEL_TWITCH_CLIENT_ID / PANEL_TWITCH_CLIENT_SECRET in panel.env.',

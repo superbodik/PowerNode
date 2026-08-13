@@ -707,7 +707,7 @@ func chatWidgetPageHTML(login, parent string) string {
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>PowerNode Twitch chat</title>
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
   /* Twitch's own embed always ships a header bar (channel name, settings,
      popout icons) -- it's their iframe content, cross-origin, so its CSS
      can't be touched from here. Crop it out instead: render the iframe

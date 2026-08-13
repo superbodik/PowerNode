@@ -640,6 +640,8 @@ export const ru: Dict = {
   'streamers.subtitle': 'Всё для стрима в одном месте — серверы, реквизиты для OBS и гайды.',
   'streamers.createTile': '+ Новый стриминговый сервер',
   'streamers.createTileHint': 'Создать сервер с предустановленным RTMP Relay egg — за пару кликов.',
+  'streamers.openTile': 'Твой стриминговый сервер',
+  'streamers.openTileHint': 'Открой, чтобы управлять настройками OBS, портами и всем остальным.',
   'streamers.servicesTile': 'Подключение сервисов',
   'streamers.twitchNotConfigured':
     'Twitch-интеграция не настроена на этой панели — администратору нужно зарегистрировать приложение на dev.twitch.tv и указать PANEL_TWITCH_CLIENT_ID / PANEL_TWITCH_CLIENT_SECRET в panel.env.',

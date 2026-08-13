@@ -89,9 +89,17 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
       {error && <div className="login-error show" style={{ marginBottom: 16 }}>{error}</div>}
 
       <div className="servers-grid" style={{ marginBottom: 20 }}>
-        <div className="settings-card tile-action" onClick={onCreateStreaming} style={{ cursor: 'pointer' }}>
-          <div className="settings-card-title">{t('streamers.createTile')}</div>
-          <p className="srv-desc">{t('streamers.createTileHint')}</p>
+        <div
+          className="settings-card tile-action"
+          onClick={() => (servers.length > 0 ? onManage(servers[0].uuid) : onCreateStreaming())}
+          style={{ cursor: 'pointer' }}
+        >
+          <div className="settings-card-title">
+            {servers.length > 0 ? t('streamers.openTile') : t('streamers.createTile')}
+          </div>
+          <p className="srv-desc">
+            {servers.length > 0 ? t('streamers.openTileHint') : t('streamers.createTileHint')}
+          </p>
         </div>
 
         <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
