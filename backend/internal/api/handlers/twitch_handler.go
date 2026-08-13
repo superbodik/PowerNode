@@ -674,56 +674,112 @@ func (h *TwitchHandler) widgetURL(token string) string {
 	return base + "/api/v1/widgets/subs/" + token
 }
 
-// ChatWidgetPage serves a page embedding Twitch's own chat widget for a
-// channel, for use as an OBS Browser Source. Public and keyed by the
-// channel login rather than a secret token, unlike the alert widget --
-// chat is public information (anyone can already open twitch.tv/<login>
-// and watch it), there's nothing here to gate.
+// ChatWidgetPage serves a self-rendered chat page for a channel, for use
+// as an OBS Browser Source. Public and keyed by the channel login rather
+// than a secret token, unlike the alert widget -- chat is public
+// information (anyone can already open twitch.tv/<login> and watch it),
+// there's nothing here to gate.
 func (h *TwitchHandler) ChatWidgetPage(w http.ResponseWriter, r *http.Request) {
 	login := chi.URLParam(r, "login")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, chatWidgetPageHTML(login, h.chatEmbedParent()))
+	fmt.Fprint(w, chatWidgetPageHTML(login))
 }
 
 func (h *TwitchHandler) chatWidgetURL(login string) string {
 	return h.PublicURL + "/api/v1/widgets/chat/" + url.PathEscape(login)
 }
 
-// chatEmbedParent returns just the host part of PublicURL -- Twitch's chat
-// embed requires a "parent" query param matching the domain the iframe is
-// actually served from (this panel's own domain, since the widget page
-// itself is what OBS loads and what embeds the Twitch iframe), or Twitch
-// refuses to render it.
-func (h *TwitchHandler) chatEmbedParent() string {
-	u, err := url.Parse(h.PublicURL)
-	if err != nil || u.Hostname() == "" {
-		return "localhost"
-	}
-	return u.Hostname()
-}
-
-func chatWidgetPageHTML(login, parent string) string {
-	src := "https://www.twitch.tv/embed/" + url.QueryEscape(login) + "/chat?parent=" + url.QueryEscape(parent) + "&darkpopout"
+// chatWidgetPageHTML renders chat itself rather than embedding Twitch's own
+// iframe -- their embed always ships a header/input bar that's cross-origin
+// content we can't restyle (see the earlier header-crop hack this replaces).
+// Connects straight to Twitch's public anonymous chat IRC-over-WebSocket
+// (wss://irc-ws.chat.twitch.tv) -- no OAuth, no scope, exactly the same
+// access anyone reading chat anonymously already has -- and renders just
+// icon + name + text. How many messages stay visible falls out naturally
+// from the Browser Source's own height (older ones scroll off), not a
+// fixed count.
+func chatWidgetPageHTML(login string) string {
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>PowerNode Twitch chat</title>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; }
-  /* Twitch's own embed always ships a header bar (channel name, settings,
-     popout icons) -- it's their iframe content, cross-origin, so its CSS
-     can't be touched from here. Crop it out instead: render the iframe
-     taller than the visible box and shift it up so the header lands
-     off-screen above the wrapper's clipped edge. HEADER_PX is an estimate
-     of Twitch's current header height, not a documented constant -- if a
-     sliver of it still peeks through (or too much chat gets cropped) after
-     a Twitch UI change, fine-tune it here, or crop further from OBS itself
-     (right-click the Browser Source -> Transform -> Edit Transform).
-  */
-  .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
-  iframe { position: absolute; top: -34px; left: 0; width: 100%; height: calc(100% + 34px); border: 0; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, Segoe UI, sans-serif; }
+  #log { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; overflow: hidden; padding: 6px; box-sizing: border-box; }
+  .msg { display: flex; align-items: flex-start; gap: 6px; padding: 3px 4px; font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .avatar {
+    flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #0a080c; margin-top: 1px;
+  }
+  .name { font-weight: 700; margin-right: 4px; }
+  .text { color: #ece4e8; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .name { text-shadow: 0 1px 2px rgba(0,0,0,.8); }
 </style>
 </head>
 <body>
-  <div class="wrap"><iframe src="` + html.EscapeString(src) + `"></iframe></div>
+  <div id="log"></div>
+  <script>
+    var channel = ` + jsStringLiteral(strings.ToLower(login)) + `;
+    var log = document.getElementById('log');
+    var MAX_KEPT = 200; // trim DOM growth over a long stream; visible count is bounded by height anyway
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function parseTags(tagStr) {
+      var tags = {};
+      tagStr.split(';').forEach(function (pair) {
+        var i = pair.indexOf('=');
+        if (i === -1) return;
+        tags[pair.slice(0, i)] = pair.slice(i + 1);
+      });
+      return tags;
+    }
+
+    function addMessage(displayName, color, text) {
+      var safeColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#e8a8b8';
+      var el = document.createElement('div');
+      el.className = 'msg';
+      el.innerHTML =
+        '<div class="avatar" style="background:' + safeColor + '">' + escapeHtml((displayName || '?').charAt(0).toUpperCase()) + '</div>' +
+        '<div><span class="name" style="color:' + safeColor + '">' + escapeHtml(displayName) + '</span><span class="text">' + escapeHtml(text) + '</span></div>';
+      log.appendChild(el);
+      while (log.children.length > MAX_KEPT) log.removeChild(log.firstChild);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function connect() {
+      var ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+      ws.onopen = function () {
+        ws.send('CAP REQ :twitch.tv/tags');
+        ws.send('PASS SCHMOOPIIE');
+        ws.send('NICK justinfan' + Math.floor(Math.random() * 90000 + 10000));
+        ws.send('JOIN #' + channel);
+      };
+      ws.onmessage = function (event) {
+        event.data.split('\r\n').forEach(function (line) {
+          if (!line) return;
+          if (line.indexOf('PING') === 0) { ws.send('PONG :tmi.twitch.tv'); return; }
+
+          var tags = {};
+          if (line.charAt(0) === '@') {
+            var sp = line.indexOf(' ');
+            tags = parseTags(line.slice(1, sp));
+            line = line.slice(sp + 1);
+          }
+          if (line.indexOf('PRIVMSG') === -1) return;
+          var msgIdx = line.indexOf(' :');
+          if (msgIdx === -1) return;
+          var text = line.slice(msgIdx + 2);
+          var displayName = tags['display-name'] || (line.split('!')[0] || '').slice(1);
+          addMessage(displayName, tags['color'], text);
+        });
+      };
+      ws.onclose = function () { setTimeout(connect, 3000); };
+      ws.onerror = function () { ws.close(); };
+    }
+    connect();
+  </script>
 </body></html>`
 }
 
