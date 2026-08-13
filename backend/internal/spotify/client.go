@@ -70,6 +70,14 @@ func (c *Client) AuthorizeURL(state string) string {
 		"response_type": {"code"},
 		"scope":         {Scope},
 		"state":         {state},
+		// Spotify doesn't support a Google-style multi-account chooser (the
+		// browser only ever holds one active Spotify session), but without
+		// this it silently reuses that session and skips straight to the
+		// redirect if the user already approved the app once -- show_dialog
+		// forces the consent screen to render every time, so at minimum the
+		// user sees which account is active and can log out/switch there
+		// before approving, instead of it happening invisibly.
+		"show_dialog": {"true"},
 	}
 	return authorizeURL + "?" + q.Encode()
 }
