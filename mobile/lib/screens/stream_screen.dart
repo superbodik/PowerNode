@@ -70,6 +70,16 @@ class _StreamScreenState extends State<StreamScreen> with WidgetsBindingObserver
         back,
         ResolutionPreset.high,
         enableAudio: true,
+        // Video encoding on the CPU competes with the real-time audio
+        // encode thread for cycles -- on a phone that's the classic cause
+        // of crackling/popping audio while streaming (the audio thread
+        // misses its deadline under load). Routing the video path through
+        // OpenGL ES offloads that work to the GPU instead, freeing the CPU
+        // for audio. streamingPreset separately caps the encode resolution
+        // below the local preview's, cutting the encode workload further
+        // without making what the streamer sees any blurrier.
+        androidUseOpenGL: true,
+        streamingPreset: ResolutionPreset.medium,
       );
       await controller.initialize();
       if (!mounted) return;
@@ -90,7 +100,11 @@ class _StreamScreenState extends State<StreamScreen> with WidgetsBindingObserver
     final settings = _settings;
     if (controller == null || settings == null) return;
     try {
-      await controller.startVideoStreaming(settings.publishUrl);
+      // 2500kbps at the medium streamingPreset -- matched to a lighter
+      // encode load than the package's 1200kbps default assumed for
+      // whatever resolution it's driving, explicit rather than implicit
+      // so it's obvious where to tune it if a phone still struggles.
+      await controller.startVideoStreaming(settings.publishUrl, bitrate: 2500 * 1024);
       await WakelockPlus.enable();
       _ticker?.cancel();
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
