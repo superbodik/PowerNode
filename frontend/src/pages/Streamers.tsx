@@ -12,9 +12,10 @@ import type { Server } from '../types';
 interface Props {
   onManage: (uuid: string) => void;
   onCreateStreaming: () => void;
+  onOpenAnalytics: () => void;
 }
 
-export function Streamers({ onManage, onCreateStreaming }: Props) {
+export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics }: Props) {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +106,11 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
         <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
         <StripeTile notice={stripeNotice} onDismissNotice={() => setStripeNotice(null)} />
         <SpotifyTile notice={spotifyNotice} onDismissNotice={() => setSpotifyNotice(null)} />
+
+        <div className="settings-card tile-action" onClick={onOpenAnalytics} style={{ cursor: 'pointer' }}>
+          <div className="settings-card-title">{t('streamers.analyticsTile')}</div>
+          <p className="srv-desc">{t('streamers.analyticsTileHint')}</p>
+        </div>
       </div>
 
       <GuidePanel title={t('streamers.guideTile')}>

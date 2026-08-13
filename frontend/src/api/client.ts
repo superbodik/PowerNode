@@ -452,6 +452,15 @@ export const api = {
 
   disconnectSpotify: () => request<void>('/integrations/spotify', { method: 'DELETE' }),
 
+  getStreamerAnalytics: () =>
+    request<{
+      twitch_connected: boolean;
+      live: boolean;
+      viewer_count?: number;
+      donations_today: { currency: string; total_cents: number; count: number }[];
+      donations_all_time: { currency: string; total_cents: number; count: number }[];
+    }>('/streamers/analytics'),
+
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),
 

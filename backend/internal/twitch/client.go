@@ -28,6 +28,7 @@ const (
 	tokenURL     = "https://id.twitch.tv/oauth2/token"
 	usersURL     = "https://api.twitch.tv/helix/users"
 	eventSubURL  = "https://api.twitch.tv/helix/eventsub/subscriptions"
+	streamsURL   = "https://api.twitch.tv/helix/streams"
 )
 
 // Scope is the base "connect an account" scope: just enough to identify who
@@ -179,6 +180,44 @@ func (c *Client) FetchUser(ctx context.Context, accessToken string) (*User, erro
 	}
 	u := ur.Data[0]
 	return &User{ID: u.ID, Login: u.Login, DisplayName: u.DisplayName}, nil
+}
+
+type streamsResponse struct {
+	Data []struct {
+		ViewerCount int `json:"viewer_count"`
+	} `json:"data"`
+}
+
+// GetViewerCount reports the live viewer count for a channel, or
+// (0, false) if it's not currently live. Get Streams is public data --
+// works with an app token, no per-user scope or extended consent needed,
+// unlike stream key/subscriptions.
+func (c *Client) GetViewerCount(ctx context.Context, appToken, broadcasterUserID string) (int, bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		streamsURL+"?user_id="+url.QueryEscape(broadcasterUserID), nil)
+	if err != nil {
+		return 0, false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+appToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return 0, false, fmt.Errorf("call twitch streams endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return 0, false, fmt.Errorf("twitch get-streams returned %d", resp.StatusCode)
+	}
+
+	var sr streamsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&sr); err != nil {
+		return 0, false, fmt.Errorf("decode twitch streams response: %w", err)
+	}
+	if len(sr.Data) == 0 {
+		return 0, false, nil
+	}
+	return sr.Data[0].ViewerCount, true, nil
 }
 
 // RefreshUserToken exchanges a refresh token for a fresh access/refresh

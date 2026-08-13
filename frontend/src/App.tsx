@@ -3,6 +3,7 @@ import { api, clearTokens } from './api/client';
 import { locale, setLocale, t } from './i18n';
 import { Account } from './pages/Account';
 import { Activity } from './pages/Activity';
+import { Analytics } from './pages/Analytics';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
@@ -23,9 +24,9 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'streamers' | 'nodes' | 'plugins' | 'settings' | 'activity' | 'account' | 'users';
+type View = 'servers' | 'streamers' | 'analytics' | 'nodes' | 'plugins' | 'settings' | 'activity' | 'account' | 'users';
 
-const VIEWS: View[] = ['servers', 'streamers', 'nodes', 'plugins', 'settings', 'activity', 'account', 'users'];
+const VIEWS: View[] = ['servers', 'streamers', 'analytics', 'nodes', 'plugins', 'settings', 'activity', 'account', 'users'];
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -163,7 +164,9 @@ export function App() {
                       ? t('nav.users')
                       : view === 'streamers'
                         ? t('nav.streamers')
-                        : t('nav.dashboard')}
+                        : view === 'analytics'
+                          ? t('analytics.title')
+                          : t('nav.dashboard')}
           </span>
           {activeServer && (
             <>
@@ -264,7 +267,9 @@ export function App() {
             {activeServer ? (
               <ServerView uuid={activeServer} onBack={closeServer} />
             ) : view === 'streamers' && streamingEnabled ? (
-              <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} />
+              <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} onOpenAnalytics={() => goTo('analytics')} />
+            ) : view === 'analytics' && streamingEnabled ? (
+              <Analytics onBack={() => goTo('streamers')} />
             ) : view === 'nodes' ? (
               <Nodes />
             ) : view === 'plugins' ? (

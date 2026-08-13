@@ -124,6 +124,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		deps.DB, deps.Hub, deps.PublicURL, deps.StripeWebhookSecret, deps.StripeEnabled, deps.DonationPlatformFeeBps,
 	)
 	stripeHandler.Spotify = spotifyHandler
+	analyticsHandler := &handlers.AnalyticsHandler{DB: deps.DB, Twitch: deps.TwitchClient}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -233,6 +234,8 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/integrations/stripe/status", stripeHandler.Status)
 			r.Post("/integrations/stripe/connect/start", stripeHandler.ConnectStart)
 			r.Delete("/integrations/stripe", stripeHandler.Disconnect)
+
+			r.Get("/streamers/analytics", analyticsHandler.Get)
 
 			r.Get("/integrations/spotify/status", spotifyHandler.Status)
 			r.Post("/integrations/spotify/start", spotifyHandler.Start)
