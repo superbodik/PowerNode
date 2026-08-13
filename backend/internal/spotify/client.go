@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -101,7 +102,8 @@ func (c *Client) doTokenRequest(ctx context.Context, form url.Values) (*tokenRes
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("spotify token request returned %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("spotify token request returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var tr tokenResponse

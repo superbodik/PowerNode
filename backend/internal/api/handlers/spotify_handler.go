@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
@@ -58,17 +59,24 @@ func (h *SpotifyHandler) Start(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SpotifyHandler) Callback(w http.ResponseWriter, r *http.Request) {
-	fail := func() { http.Redirect(w, r, "/streamers?spotify=error", http.StatusFound) }
+	// fail always redirects the same way to the user (nothing sensitive to
+	// differentiate for them), but logs exactly which step broke -- this
+	// path previously failed completely silently, which made a real
+	// connect failure impossible to diagnose from the panel's own logs.
+	fail := func(step string, err error) {
+		log.Printf("spotify callback failed at %s: %v", step, err)
+		http.Redirect(w, r, "/streamers?spotify=error", http.StatusFound)
+	}
 
 	if !h.Client.Enabled() {
-		fail()
+		fail("enabled-check", errors.New("spotify client not configured"))
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 	if code == "" || state == "" {
-		fail()
+		fail("query-params", errors.New("missing code or state"))
 		return
 	}
 
@@ -78,29 +86,29 @@ func (h *SpotifyHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		state,
 	).Scan(&userID)
 	if err != nil {
-		fail()
+		fail("state-lookup", err)
 		return
 	}
 
 	tokens, err := h.Client.ExchangeCode(r.Context(), code)
 	if err != nil {
-		fail()
+		fail("exchange-code", err)
 		return
 	}
 	spotifyUser, err := h.Client.FetchUser(r.Context(), tokens.AccessToken)
 	if err != nil {
-		fail()
+		fail("fetch-user", err)
 		return
 	}
 
 	accessEnc, err := crypto.Encrypt(h.EncryptionKey, tokens.AccessToken)
 	if err != nil {
-		fail()
+		fail("encrypt-access-token", err)
 		return
 	}
 	refreshEnc, err := crypto.Encrypt(h.EncryptionKey, tokens.RefreshToken)
 	if err != nil {
-		fail()
+		fail("encrypt-refresh-token", err)
 		return
 	}
 
@@ -116,7 +124,7 @@ func (h *SpotifyHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		userID, spotifyUser.ID, spotifyUser.DisplayName, accessEnc, refreshEnc,
 	)
 	if err != nil {
-		fail()
+		fail("save-connection", err)
 		return
 	}
 
