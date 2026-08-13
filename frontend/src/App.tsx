@@ -7,6 +7,7 @@ import { Analytics } from './pages/Analytics';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Nodes } from './pages/Nodes';
+import { Overlay } from './pages/Overlay';
 import { Plugins } from './pages/Plugins';
 import { ServerView } from './pages/ServerView';
 import { Settings } from './pages/Settings';
@@ -24,9 +25,9 @@ interface StoredUser {
   username: string;
 }
 
-type View = 'servers' | 'streamers' | 'analytics' | 'nodes' | 'plugins' | 'settings' | 'activity' | 'account' | 'users';
+type View = 'servers' | 'streamers' | 'analytics' | 'overlay' | 'nodes' | 'plugins' | 'settings' | 'activity' | 'account' | 'users';
 
-const VIEWS: View[] = ['servers', 'streamers', 'analytics', 'nodes', 'plugins', 'settings', 'activity', 'account', 'users'];
+const VIEWS: View[] = ['servers', 'streamers', 'analytics', 'overlay', 'nodes', 'plugins', 'settings', 'activity', 'account', 'users'];
 
 function loadUser(): StoredUser | null {
   const raw = localStorage.getItem('user');
@@ -120,6 +121,16 @@ export function App() {
     navigate({ view, activeServer: null });
   }
 
+  // The moderator overlay editor link (/overlay-editor?token=...) is handed
+  // to people who don't have -- and shouldn't need -- a panel login; it
+  // authenticates itself with the possession token in the URL, so it has to
+  // bypass the login gate entirely rather than living inside the normal
+  // view-routing tree below.
+  if (window.location.pathname === '/overlay-editor') {
+    const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
+    return <Overlay token={token} />;
+  }
+
   if (!user) {
     return <Login onLoggedIn={() => setUser(loadUser())} />;
   }
@@ -166,7 +177,9 @@ export function App() {
                         ? t('nav.streamers')
                         : view === 'analytics'
                           ? t('analytics.title')
-                          : t('nav.dashboard')}
+                          : view === 'overlay'
+                            ? t('overlay.title')
+                            : t('nav.dashboard')}
           </span>
           {activeServer && (
             <>
@@ -267,9 +280,16 @@ export function App() {
             {activeServer ? (
               <ServerView uuid={activeServer} onBack={closeServer} />
             ) : view === 'streamers' && streamingEnabled ? (
-              <Streamers onManage={openServer} onCreateStreaming={handleCreateStreaming} onOpenAnalytics={() => goTo('analytics')} />
+              <Streamers
+                onManage={openServer}
+                onCreateStreaming={handleCreateStreaming}
+                onOpenAnalytics={() => goTo('analytics')}
+                onOpenOverlay={() => goTo('overlay')}
+              />
             ) : view === 'analytics' && streamingEnabled ? (
               <Analytics onBack={() => goTo('streamers')} />
+            ) : view === 'overlay' && streamingEnabled ? (
+              <Overlay onBack={() => goTo('streamers')} />
             ) : view === 'nodes' ? (
               <Nodes />
             ) : view === 'plugins' ? (

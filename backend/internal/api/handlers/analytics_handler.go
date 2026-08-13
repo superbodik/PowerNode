@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yourorg/panel/internal/auth"
@@ -41,20 +43,57 @@ func (h *AnalyticsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	writeJSON(w, http.StatusOK, h.compute(r.Context(), claims.UserID))
+}
 
+// PublicSummary is a trimmed, public (unauthenticated) version keyed by
+// username instead of a logged-in caller -- exists specifically for the
+// overlay render page, which is a plain OBS Browser Source with no way to
+// carry an API key. Donation totals are collapsed into a single display
+// string rather than the raw per-currency breakdown Get returns, since
+// an anonymous overlay viewer has no use for the structured form.
+func (h *AnalyticsHandler) PublicSummary(w http.ResponseWriter, r *http.Request) {
+	username := chi.URLParam(r, "username")
+	var userID int64
+	if err := h.DB.QueryRow(r.Context(), `SELECT id FROM users WHERE username = $1`, username).Scan(&userID); err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	full := h.compute(r.Context(), userID)
+
+	var summary string
+	if len(full.DonationsToday) == 0 {
+		summary = "0"
+	} else {
+		for i, ct := range full.DonationsToday {
+			if i > 0 {
+				summary += " + "
+			}
+			summary += fmt.Sprintf("%.2f %s", float64(ct.TotalCents)/100, ct.Currency)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"live":                    full.Live,
+		"viewer_count":            full.ViewerCount,
+		"donations_today_summary": summary,
+	})
+}
+
+func (h *AnalyticsHandler) compute(ctx context.Context, userID int64) analyticsResponse {
 	resp := analyticsResponse{
 		DonationsToday:   []currencyTotal{},
 		DonationsAllTime: []currencyTotal{},
 	}
 
 	var twitchUserID string
-	if err := h.DB.QueryRow(r.Context(),
-		`SELECT twitch_user_id FROM twitch_connections WHERE user_id = $1`, claims.UserID,
+	if err := h.DB.QueryRow(ctx,
+		`SELECT twitch_user_id FROM twitch_connections WHERE user_id = $1`, userID,
 	).Scan(&twitchUserID); err == nil {
 		resp.TwitchConnected = true
 		if h.Twitch.Enabled() {
-			if appToken, aerr := h.Twitch.AppAccessToken(r.Context()); aerr == nil {
-				if vc, live, verr := h.Twitch.GetViewerCount(r.Context(), appToken, twitchUserID); verr == nil {
+			if appToken, aerr := h.Twitch.AppAccessToken(ctx); aerr == nil {
+				if vc, live, verr := h.Twitch.GetViewerCount(ctx, appToken, twitchUserID); verr == nil {
 					resp.Live = live
 					resp.ViewerCount = vc
 				}
@@ -62,10 +101,9 @@ func (h *AnalyticsHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp.DonationsAllTime = h.donationTotals(r.Context(), claims.UserID, "")
-	resp.DonationsToday = h.donationTotals(r.Context(), claims.UserID, "AND created_at >= date_trunc('day', now())")
-
-	writeJSON(w, http.StatusOK, resp)
+	resp.DonationsAllTime = h.donationTotals(ctx, userID, "")
+	resp.DonationsToday = h.donationTotals(ctx, userID, "AND created_at >= date_trunc('day', now())")
+	return resp
 }
 
 func (h *AnalyticsHandler) donationTotals(ctx context.Context, userID int64, extraWhere string) []currencyTotal {

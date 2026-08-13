@@ -13,9 +13,10 @@ interface Props {
   onManage: (uuid: string) => void;
   onCreateStreaming: () => void;
   onOpenAnalytics: () => void;
+  onOpenOverlay: () => void;
 }
 
-export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics }: Props) {
+export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpenOverlay }: Props) {
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +111,11 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics }: Prop
         <div className="settings-card tile-action" onClick={onOpenAnalytics} style={{ cursor: 'pointer' }}>
           <div className="settings-card-title">{t('streamers.analyticsTile')}</div>
           <p className="srv-desc">{t('streamers.analyticsTileHint')}</p>
+        </div>
+
+        <div className="settings-card tile-action" onClick={onOpenOverlay} style={{ cursor: 'pointer' }}>
+          <div className="settings-card-title">{t('streamers.overlayTile')}</div>
+          <p className="srv-desc">{t('streamers.overlayTileHint')}</p>
         </div>
       </div>
 

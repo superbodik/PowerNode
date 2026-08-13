@@ -397,3 +397,23 @@ export interface CreateUserRequest {
   is_admin: boolean;
   server_limit: number | null;
 }
+
+export type OverlayWidgetType = 'chat' | 'text' | 'image' | 'viewer_count' | 'donation_total';
+
+export interface OverlayWidget {
+  id?: number;
+  widget_type: OverlayWidgetType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  z_index: number;
+  config: Record<string, unknown>;
+}
+
+export interface OverlayLayout {
+  name: string;
+  moderator_url: string;
+  render_url: string;
+  widgets: OverlayWidget[];
+}

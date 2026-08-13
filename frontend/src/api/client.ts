@@ -16,6 +16,8 @@ import type {
   MeInfo,
   Node,
   NodeStatus,
+  OverlayLayout,
+  OverlayWidget,
   PanelUser,
   PowerAction,
   Schedule,
@@ -129,6 +131,28 @@ async function request<T>(path: string, init?: RequestInit, isRetry = false): Pr
     window.location.reload();
     throw new Error('session expired');
   }
+  if (!res.ok) {
+    throw new Error(await errorMessage(res, path, init));
+  }
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+// publicRequest is like request(), but never redirects/reloads on 401 -- used
+// for the overlay editor, which can be opened either by the logged-in owner
+// (a normal JWT, attached automatically) or by an anonymous moderator with
+// only a possession token in the URL. A bad/missing token there should just
+// surface as an error message, not force-reload the page (request()'s normal
+// 401 handling assumes a session that's worth trying to refresh).
+async function publicRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...init?.headers,
+    },
+  });
   if (!res.ok) {
     throw new Error(await errorMessage(res, path, init));
   }
@@ -460,6 +484,15 @@ export const api = {
       donations_today: { currency: string; total_cents: number; count: number }[];
       donations_all_time: { currency: string; total_cents: number; count: number }[];
     }>('/streamers/analytics'),
+
+  getOverlayLayout: (token?: string) =>
+    publicRequest<OverlayLayout>(`/overlay/layout${token ? `?token=${encodeURIComponent(token)}` : ''}`),
+
+  saveOverlayWidgets: (widgets: OverlayWidget[], token?: string) =>
+    publicRequest<void>(`/overlay/layout${token ? `?token=${encodeURIComponent(token)}` : ''}`, {
+      method: 'PUT',
+      body: JSON.stringify({ widgets }),
+    }),
 
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),

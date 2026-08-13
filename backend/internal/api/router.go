@@ -125,6 +125,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	)
 	stripeHandler.Spotify = spotifyHandler
 	analyticsHandler := &handlers.AnalyticsHandler{DB: deps.DB, Twitch: deps.TwitchClient}
+	overlayHandler := &handlers.OverlayHandler{DB: deps.DB, PublicURL: deps.PublicURL}
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -140,6 +141,25 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/donate/{username}", stripeHandler.DonatePage)
 		r.Get("/donate/{username}/thanks", stripeHandler.DonateThanksPage)
 		r.Post("/donate/{username}/checkout", stripeHandler.CreateCheckout)
+
+		// Public: the actual OBS Browser Source (keyed by render_token) and
+		// the live-data feed it polls (keyed by username, same trust model
+		// as the chat widget -- nothing here is sensitive, it's meant to be
+		// on-screen).
+		r.Get("/overlay/render/{token}", overlayHandler.RenderPage)
+		r.Get("/streamers/public-analytics/{username}", analyticsHandler.PublicSummary)
+
+		// The editor endpoints accept EITHER a logged-in owner OR a bare
+		// moderator_token (?token=...) with no login -- OverlayHandler's
+		// resolveOwner sorts out which, so this only needs optional auth
+		// rather than the mandatory auth.Middleware used elsewhere.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(30 * time.Second))
+			r.Use(auth.OptionalMiddleware(deps.Token, resolveAPIKey(deps.DB)))
+
+			r.Get("/overlay/layout", overlayHandler.GetLayout)
+			r.Put("/overlay/layout", overlayHandler.SaveWidgets)
+		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Timeout(30 * time.Second))
