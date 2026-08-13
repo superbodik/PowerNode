@@ -675,6 +675,19 @@ export const en = {
   'streamers.donationPageUrlLabel': 'Your donation page',
   'streamers.testAlertDonation': 'Test: donation alert',
   'streamers.stripeJustConnected': 'Stripe account connected.',
+
+  'streamers.spotifyTile': 'Song requests',
+  'streamers.spotifyNotConfigured':
+    'Spotify integration isn\'t configured on this panel — an admin needs to register an app at developer.spotify.com and set PANEL_SPOTIFY_CLIENT_ID / PANEL_SPOTIFY_CLIENT_SECRET in panel.env.',
+  'streamers.spotifyConnectHint':
+    'Connect Spotify so donors can request a song — it gets queued on your active playback automatically when a donation with a track request comes in.',
+  'streamers.spotifyConnect': 'Connect Spotify',
+  'streamers.spotifyConnectedAs': 'Connected: {name}',
+  'streamers.spotifyReadyHint':
+    'Song requests from the donation page now queue automatically — just have Spotify open and playing something.',
+  'streamers.spotifyDisconnect': 'Disconnect',
+  'streamers.spotifyJustConnected': 'Spotify account connected.',
+  'streamers.spotifyConnectError': 'Could not connect Spotify — try again.',
   'streamers.guideTile': 'How to stream through PowerNode',
   'streamers.guideP1':
     '1. Create a server using the "RTMP Relay (offload stream encoding)" egg, set a Relay secret and your Twitch stream key.',

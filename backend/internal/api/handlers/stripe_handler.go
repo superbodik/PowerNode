@@ -18,6 +18,7 @@ import (
 	"github.com/stripe/stripe-go/v81/webhook"
 
 	"github.com/yourorg/panel/internal/auth"
+	"github.com/yourorg/panel/internal/spotify"
 	"github.com/yourorg/panel/internal/ws"
 )
 
@@ -34,7 +35,11 @@ type StripeHandler struct {
 	PublicURL      string
 	WebhookSecret  string
 	PlatformFeeBps int
-	enabled        bool
+	// Spotify is optional (nil-safe) -- only used to queue a donor's
+	// requested track once a donation completes. Donations work fine
+	// without it ever being set.
+	Spotify *SpotifyHandler
+	enabled bool
 }
 
 func NewStripeHandler(db *pgxpool.Pool, hub *ws.Hub, publicURL, webhookSecret string, enabled bool, platformFeeBps int) *StripeHandler {
@@ -194,16 +199,27 @@ func (h *StripeHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 func (h *StripeHandler) DonatePage(w http.ResponseWriter, r *http.Request) {
 	username := chi.URLParam(r, "username")
 	var chargesEnabled bool
+	var recipientUserID int64
 	err := h.DB.QueryRow(r.Context(), `
-		SELECT c.charges_enabled FROM stripe_connections c JOIN users u ON u.id = c.user_id
+		SELECT u.id, c.charges_enabled FROM stripe_connections c JOIN users u ON u.id = c.user_id
 		WHERE u.username = $1`, username,
-	).Scan(&chargesEnabled)
+	).Scan(&recipientUserID, &chargesEnabled)
 	if err != nil || !chargesEnabled {
 		http.Error(w, "this streamer isn't accepting donations right now", http.StatusNotFound)
 		return
 	}
+
+	spotifyEnabled := false
+	if h.Spotify != nil {
+		var exists bool
+		h.DB.QueryRow(r.Context(),
+			`SELECT EXISTS(SELECT 1 FROM spotify_connections WHERE user_id = $1)`, recipientUserID,
+		).Scan(&exists)
+		spotifyEnabled = exists
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, donatePageHTML(username))
+	fmt.Fprint(w, donatePageHTML(username, spotifyEnabled))
 }
 
 func (h *StripeHandler) DonateThanksPage(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +232,7 @@ type createDonationCheckoutRequest struct {
 	Currency    string `json:"currency"`
 	DonorName   string `json:"donor_name"`
 	Message     string `json:"message"`
+	TrackQuery  string `json:"track_query"`
 }
 
 const (
@@ -254,6 +271,9 @@ func (h *StripeHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.DonorName == "" {
 		req.DonorName = "Anonymous"
+	}
+	if len(req.TrackQuery) > 150 {
+		req.TrackQuery = req.TrackQuery[:150]
 	}
 
 	var recipientUserID int64
@@ -294,6 +314,7 @@ func (h *StripeHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 			"donor_name":         req.DonorName,
 			"message":            req.Message,
 			"platform_fee_cents": fmt.Sprintf("%d", feeCents),
+			"track_query":        req.TrackQuery,
 		},
 		SuccessURL: stripe.String(h.PublicURL + "/api/v1/donate/" + username + "/thanks"),
 		CancelURL:  stripe.String(h.PublicURL + "/api/v1/donate/" + username),
@@ -351,13 +372,26 @@ func (h *StripeHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		paymentIntentID = sess.PaymentIntent.ID
 	}
 
+	trackQuery := sess.Metadata["track_query"]
+	var trackQueued bool
+	var trackName, trackArtist string
+	if h.Spotify != nil && trackQuery != "" {
+		var track *spotify.Track
+		trackQueued, track = h.Spotify.QueueForDonation(r.Context(), recipientUserID, trackQuery)
+		if track != nil {
+			trackName, trackArtist = track.Name, track.Artist
+		}
+	}
+
 	_, err = h.DB.Exec(r.Context(), `
 		INSERT INTO donations (recipient_user_id, stripe_checkout_session_id, stripe_payment_intent_id,
-		                        donor_name, message, amount_cents, currency, platform_fee_cents)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		                        donor_name, message, amount_cents, currency, platform_fee_cents,
+		                        track_query, track_queued)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (stripe_checkout_session_id) DO NOTHING`,
 		recipientUserID, sess.ID, paymentIntentID,
 		sess.Metadata["donor_name"], sess.Metadata["message"], sess.AmountTotal, string(sess.Currency), feeCents,
+		trackQuery, trackQueued,
 	)
 	if err != nil {
 		http.Error(w, "failed to record donation", http.StatusInternalServerError)
@@ -365,21 +399,33 @@ func (h *StripeHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if widgetToken, err := getOrCreateWidgetToken(r.Context(), h.DB, recipientUserID); err == nil {
-		h.Hub.BroadcastWidget(widgetToken, map[string]any{
+		msg := map[string]any{
 			"type":      "donation",
 			"user_name": sess.Metadata["donor_name"],
 			"message":   sess.Metadata["message"],
 			"amount":    sess.AmountTotal,
 			"currency":  string(sess.Currency),
-		})
+		}
+		if trackQueued {
+			msg["track_name"] = trackName
+			msg["track_artist"] = trackArtist
+		}
+		h.Hub.BroadcastWidget(widgetToken, msg)
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func donatePageHTML(username string) string {
+func donatePageHTML(username string, spotifyEnabled bool) string {
 	safeUsername := html.EscapeString(username)
 	checkoutURL := "/api/v1/donate/" + url.PathEscape(username) + "/checkout"
+	trackField := ""
+	if spotifyEnabled {
+		trackField = `
+    <label>Song request (optional)</label>
+    <input id="track" type="text" maxlength="150" placeholder="Artist - Song title" />
+    <span style="display:block;font-size:11px;color:#8a7a82;margin-top:4px;">Queued on their Spotify if they're live and listening.</span>`
+	}
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>Donate to ` + safeUsername + `</title>
 <style>
@@ -413,7 +459,7 @@ func donatePageHTML(username string) string {
     <label>Your name (optional)</label>
     <input id="name" type="text" maxlength="60" placeholder="Anonymous" />
     <label>Message (optional)</label>
-    <textarea id="message" maxlength="300"></textarea>
+    <textarea id="message" maxlength="300"></textarea>` + trackField + `
     <button class="submit" id="submit">Donate</button>
     <div class="error" id="error"></div>
   </div>
@@ -442,6 +488,7 @@ func donatePageHTML(username string) string {
           currency: 'usd',
           donor_name: document.getElementById('name').value,
           message: document.getElementById('message').value,
+          track_query: document.getElementById('track') ? document.getElementById('track').value : '',
         }),
       }).then(function (res) {
         if (!res.ok) throw new Error('failed');

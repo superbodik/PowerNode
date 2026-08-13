@@ -444,6 +444,14 @@ export const api = {
 
   disconnectStripe: () => request<void>('/integrations/stripe', { method: 'DELETE' }),
 
+  getSpotifyStatus: () =>
+    request<{ enabled: boolean; connected: boolean; display_name?: string }>('/integrations/spotify/status'),
+
+  startSpotifyConnect: () =>
+    request<{ authorize_url: string }>('/integrations/spotify/start', { method: 'POST' }),
+
+  disconnectSpotify: () => request<void>('/integrations/spotify', { method: 'DELETE' }),
+
   listFiles: (uuid: string, path: string) =>
     request<FileEntry[]>(`/servers/${uuid}/files?path=${encodeURIComponent(path)}`),
 

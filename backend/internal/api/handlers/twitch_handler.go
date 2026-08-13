@@ -775,7 +775,9 @@ func widgetPageHTML(token string) string {
             showAlert(data.user_name, 'raided with ' + data.viewers + ' viewer' + (data.viewers === 1 ? '' : 's') + '!');
           } else if (data.type === 'donation') {
             var amt = (data.amount / 100).toFixed(2) + ' ' + (data.currency || '').toUpperCase();
-            showAlert(data.user_name, 'donated ' + amt + (data.message ? ': ' + data.message : '') + '!');
+            var extra = data.message ? ': ' + data.message : '';
+            if (data.track_name) extra += ' 🎵 ' + data.track_name + (data.track_artist ? ' - ' + data.track_artist : '');
+            showAlert(data.user_name, 'donated ' + amt + extra + '!');
           }
         } catch (e) { /* ignore malformed messages */ }
       };

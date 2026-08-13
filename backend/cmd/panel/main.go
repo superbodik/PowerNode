@@ -25,6 +25,7 @@ import (
 	"github.com/yourorg/panel/internal/models"
 	"github.com/yourorg/panel/internal/ratelimit"
 	"github.com/yourorg/panel/internal/scheduler"
+	"github.com/yourorg/panel/internal/spotify"
 	"github.com/yourorg/panel/internal/twitch"
 	"github.com/yourorg/panel/internal/ws"
 )
@@ -124,6 +125,15 @@ func main() {
 		log.Printf("stripe donations enabled (platform fee: %d bps)", cfg.DonationPlatformFeeBps)
 	}
 
+	var spotifyRedirectURI string
+	if cfg.PublicURL != "" {
+		spotifyRedirectURI = cfg.PublicURL + "/api/v1/auth/spotify/callback"
+	}
+	spotifyClient := spotify.New(cfg.SpotifyClientID, cfg.SpotifyClientSecret, spotifyRedirectURI)
+	if spotifyClient.Enabled() {
+		log.Printf("spotify song requests enabled (redirect: %s)", spotifyRedirectURI)
+	}
+
 	router := api.NewRouter(api.Dependencies{
 		DB:                     pool,
 		Token:                  tokenManager,
@@ -144,6 +154,7 @@ func main() {
 		StripeEnabled:          cfg.StripeSecretKey != "",
 		StripeWebhookSecret:    cfg.StripeWebhookSecret,
 		DonationPlatformFeeBps: cfg.DonationPlatformFeeBps,
+		SpotifyClient:          spotifyClient,
 	})
 
 	srv := &http.Server{

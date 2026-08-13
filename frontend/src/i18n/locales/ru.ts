@@ -677,6 +677,19 @@ export const ru: Dict = {
   'streamers.donationPageUrlLabel': 'Твоя страница для донатов',
   'streamers.testAlertDonation': 'Тест: донат',
   'streamers.stripeJustConnected': 'Аккаунт Stripe подключён.',
+
+  'streamers.spotifyTile': 'Заказ музыки',
+  'streamers.spotifyNotConfigured':
+    'Spotify-интеграция не настроена на этой панели — администратору нужно зарегистрировать приложение на developer.spotify.com и указать PANEL_SPOTIFY_CLIENT_ID / PANEL_SPOTIFY_CLIENT_SECRET в panel.env.',
+  'streamers.spotifyConnectHint':
+    'Подключи Spotify, чтобы донатеры могли заказать трек — он сам встанет в очередь твоего плеера, когда придёт донат с запросом песни.',
+  'streamers.spotifyConnect': 'Подключить Spotify',
+  'streamers.spotifyConnectedAs': 'Подключено: {name}',
+  'streamers.spotifyReadyHint':
+    'Заказы треков со страницы доната теперь встают в очередь автоматически — просто держи Spotify открытым и что-нибудь играющим.',
+  'streamers.spotifyDisconnect': 'Отключить',
+  'streamers.spotifyJustConnected': 'Аккаунт Spotify подключён.',
+  'streamers.spotifyConnectError': 'Не удалось подключить Spotify — попробуйте ещё раз.',
   'streamers.guideTile': 'Как стримить через PowerNode',
   'streamers.guideP1':
     '1. Создайте сервер на базе egg "RTMP Relay (offload stream encoding)", укажите Relay secret и свой Twitch stream key.',

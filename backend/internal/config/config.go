@@ -62,6 +62,11 @@ type Config struct {
 	StripeSecretKey        string
 	StripeWebhookSecret    string
 	DonationPlatformFeeBps int
+
+	// Spotify song requests: same opt-in shape as Twitch/Stripe -- unset
+	// disables the feature entirely rather than erroring.
+	SpotifyClientID     string
+	SpotifyClientSecret string
 }
 
 func Load() Config {
@@ -90,6 +95,8 @@ func Load() Config {
 		StripeSecretKey:        getEnv("PANEL_STRIPE_SECRET_KEY", ""),
 		StripeWebhookSecret:    getEnv("PANEL_STRIPE_WEBHOOK_SECRET", ""),
 		DonationPlatformFeeBps: parseIntEnv("PANEL_DONATION_FEE_BPS", 500), // 500bps = 5%
+		SpotifyClientID:        getEnv("PANEL_SPOTIFY_CLIENT_ID", ""),
+		SpotifyClientSecret:    getEnv("PANEL_SPOTIFY_CLIENT_SECRET", ""),
 	}
 
 	if cfg.JWTSecret == "" || cfg.JWTSecret == "change-me-in-production" {

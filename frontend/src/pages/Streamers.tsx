@@ -20,6 +20,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [twitchNotice, setTwitchNotice] = useState<'connected' | 'error' | null>(null);
   const [stripeNotice, setStripeNotice] = useState<'success' | null>(null);
+  const [spotifyNotice, setSpotifyNotice] = useState<'connected' | 'error' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +56,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
     const params = new URLSearchParams(window.location.search);
     const twitchResult = params.get('twitch');
     const stripeResult = params.get('stripe');
+    const spotifyResult = params.get('spotify');
     if (twitchResult === 'connected' || twitchResult === 'error') {
       setTwitchNotice(twitchResult);
       params.delete('twitch');
@@ -67,7 +69,11 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
       // tile just re-shows the connect button since nothing changed.
       params.delete('stripe');
     }
-    if (twitchResult || stripeResult) {
+    if (spotifyResult === 'connected' || spotifyResult === 'error') {
+      setSpotifyNotice(spotifyResult);
+      params.delete('spotify');
+    }
+    if (twitchResult || stripeResult || spotifyResult) {
       const rest = params.toString();
       window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
     }
@@ -90,6 +96,7 @@ export function Streamers({ onManage, onCreateStreaming }: Props) {
 
         <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
         <StripeTile notice={stripeNotice} onDismissNotice={() => setStripeNotice(null)} />
+        <SpotifyTile notice={spotifyNotice} onDismissNotice={() => setSpotifyNotice(null)} />
       </div>
 
       <GuidePanel title={t('streamers.guideTile')}>
@@ -541,6 +548,105 @@ function StripeTile({
           </p>
           <button className="btn-sm" disabled={busy} onClick={connect}>
             {t('streamers.stripeConnect')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+interface SpotifyStatus {
+  enabled: boolean;
+  connected: boolean;
+  display_name?: string;
+}
+
+function SpotifyTile({
+  notice,
+  onDismissNotice,
+}: {
+  notice: 'connected' | 'error' | null;
+  onDismissNotice: () => void;
+}) {
+  const [status, setStatus] = useState<SpotifyStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api
+      .getSpotifyStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ enabled: false, connected: false }));
+  }
+
+  useEffect(refresh, [notice]);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startSpotifyConnect();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectSpotify();
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">{t('streamers.spotifyTile')}</div>
+
+      {notice === 'connected' && (
+        <p className="srv-desc" style={{ color: 'var(--green, #5fe69a)', marginBottom: 10 }} onClick={onDismissNotice}>
+          {t('streamers.spotifyJustConnected')}
+        </p>
+      )}
+      {notice === 'error' && (
+        <p className="login-error show" style={{ marginBottom: 10 }} onClick={onDismissNotice}>
+          {t('streamers.spotifyConnectError')}
+        </p>
+      )}
+      {error && <p className="login-error show" style={{ marginBottom: 10 }}>{error}</p>}
+
+      {status === null ? (
+        <p className="srv-desc">{t('common.loading')}</p>
+      ) : !status.enabled ? (
+        <p className="srv-desc">{t('streamers.spotifyNotConfigured')}</p>
+      ) : status.connected ? (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.spotifyConnectedAs', { name: status.display_name ?? '' })}
+          </p>
+          <p className="srv-desc" style={{ marginBottom: 10, fontSize: 11 }}>
+            {t('streamers.spotifyReadyHint')}
+          </p>
+          <div className="settings-foot">
+            <button className="btn-sm" disabled={busy} onClick={disconnect}>
+              {t('streamers.spotifyDisconnect')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.spotifyConnectHint')}
+          </p>
+          <button className="btn-sm" disabled={busy} onClick={connect}>
+            {t('streamers.spotifyConnect')}
           </button>
         </>
       )}

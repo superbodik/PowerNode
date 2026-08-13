@@ -19,6 +19,7 @@ import (
 	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/daemonclient"
 	"github.com/yourorg/panel/internal/ratelimit"
+	"github.com/yourorg/panel/internal/spotify"
 	"github.com/yourorg/panel/internal/twitch"
 	"github.com/yourorg/panel/internal/ws"
 )
@@ -48,6 +49,7 @@ type Dependencies struct {
 	StripeEnabled          bool
 	StripeWebhookSecret    string
 	DonationPlatformFeeBps int
+	SpotifyClient          *spotify.Client
 }
 
 const maxRequestBodyBytes = 100 << 20
@@ -117,9 +119,11 @@ func NewRouter(deps Dependencies) http.Handler {
 		EventSubSecret: deps.TwitchEventSubSecret,
 		PublicURL:      deps.PublicURL,
 	}
+	spotifyHandler := &handlers.SpotifyHandler{DB: deps.DB, Client: deps.SpotifyClient, EncryptionKey: deps.EncryptionKey}
 	stripeHandler := handlers.NewStripeHandler(
 		deps.DB, deps.Hub, deps.PublicURL, deps.StripeWebhookSecret, deps.StripeEnabled, deps.DonationPlatformFeeBps,
 	)
+	stripeHandler.Spotify = spotifyHandler
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -127,6 +131,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Post("/internal/sftp/authenticate", sftpAuthHandler.Authenticate)
 		r.Get("/auth/twitch/callback", twitchHandler.Callback)
 		r.Post("/twitch/eventsub", twitchHandler.EventSubWebhook)
+		r.Get("/auth/spotify/callback", spotifyHandler.Callback)
 		r.Get("/widgets/subs/{token}", twitchHandler.WidgetPage)
 		r.Get("/widgets/chat/{login}", twitchHandler.ChatWidgetPage)
 		r.Get("/integrations/stripe/connect/return", stripeHandler.ConnectReturn)
@@ -228,6 +233,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/integrations/stripe/status", stripeHandler.Status)
 			r.Post("/integrations/stripe/connect/start", stripeHandler.ConnectStart)
 			r.Delete("/integrations/stripe", stripeHandler.Disconnect)
+
+			r.Get("/integrations/spotify/status", spotifyHandler.Status)
+			r.Post("/integrations/spotify/start", spotifyHandler.Start)
+			r.Delete("/integrations/spotify", spotifyHandler.Disconnect)
 		})
 
 		r.Group(func(r chi.Router) {

@@ -235,6 +235,20 @@ systemctl restart wingsd</code></pre>
         <code>checkout.session.completed</code>). If the Donations tile says the integration isn't
         configured, that's what's missing.</p>
 
+        <h3>Song requests</h3>
+        <p>Also on the <strong>Streamers</strong> page, the <strong>Song requests</strong> tile connects
+        your own Spotify account (again non-custodial — the panel can only search the public catalog and
+        queue onto your existing playback, never touch your library or playlists). Once connected, the
+        donation page shows an optional "Song request" field; when a donation with a request comes
+        through, the panel searches Spotify for the closest match and adds it to your active playback
+        queue automatically. Requires an active Spotify session on your end (app open, something already
+        playing) — if there's nothing to queue onto, the donation still goes through fine, the song
+        request just silently doesn't queue.</p>
+        <p>Requires <code>PANEL_SPOTIFY_CLIENT_ID</code> and <code>PANEL_SPOTIFY_CLIENT_SECRET</code> in
+        <code>panel.env</code>, from an app registered at
+        <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> —
+        set its Redirect URI to <code>https://your-panel/api/v1/auth/spotify/callback</code>.</p>
+
         <h3>Or: a third-party donation service</h3>
         <p>Still a fine choice, especially if your audience already knows one of these from other
         streamers:</p>
