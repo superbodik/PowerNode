@@ -34,6 +34,7 @@
       <a href="#deploy">Install</a>
       <a href="docs.html">Docs</a>
       <a href="api.html">API</a>
+      <a href="#contact">Contact</a>
     </div>
     <a class="btn-ghost" href="https://github.com/superbodik/PowerNode" target="_blank" rel="noopener">
       <span>GitHub</span>
@@ -272,6 +273,33 @@
       </div>
       <pre id="updateCmd">PANEL_UPDATE=1 bash &lt;(curl -sSL https://raw.githubusercontent.com/superbodik/PowerNode/main/install.sh)</pre>
     </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <h2 class="section-title reveal">Want to work together?</h2>
+    <p class="section-sub reveal">Collab pitches, integration ideas, anything else — drop a note below.</p>
+
+    <form class="contact-form reveal" action="/contact" method="POST">
+      <!-- Honeypot: invisible to real visitors via CSS, bots that fill every field trip it. -->
+      <div class="hp-field" aria-hidden="true">
+        <label for="website">Leave this field empty</label>
+        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+      </div>
+
+      <div class="form-row">
+        <label for="name">Name</label>
+        <input type="text" id="name" name="name" maxlength="80" required />
+      </div>
+      <div class="form-row">
+        <label for="contact">Email or Telegram — so there's a way to reply</label>
+        <input type="text" id="contact" name="contact" maxlength="120" required />
+      </div>
+      <div class="form-row">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" maxlength="2000" rows="5" required></textarea>
+      </div>
+      <button class="btn-primary" type="submit">Send</button>
+    </form>
   </section>
 
   <section class="cta">
