@@ -221,6 +221,18 @@ install_nginx_site() {
 		location / {
 			try_files $uri /index.html;
 		}
+
+		# index.html points at content-hashed JS/CSS filenames that change on
+		# every build (index-<hash>.js) -- if a browser caches index.html
+		# itself, it keeps asking for an asset filename that no longer exists
+		# after the next update, try_files falls back to index.html for that
+		# missing file, and the browser gets HTML back where it expected a
+		# JS module (blocked as a MIME-type mismatch, breaking the whole
+		# app until a hard refresh). index.html must always be revalidated;
+		# the hashed assets it points to are safe to cache indefinitely.
+		location = /index.html {
+			add_header Cache-Control "no-cache, no-store, must-revalidate";
+		}
 	}
 	EOF
 	ln -sf /etc/nginx/sites-available/panel /etc/nginx/sites-enabled/panel
