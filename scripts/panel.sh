@@ -200,6 +200,17 @@ install_nginx_site() {
 			proxy_set_header X-Real-IP $remote_addr;
 		}
 
+		# Short public alias for donation pages -- /donate/<username> instead
+		# of /api/v1/donate/<username>, since this is the link streamers
+		# actually share with viewers. proxy_pass carrying a path here makes
+		# nginx rewrite the matched prefix, so /donate/alice/checkout reaches
+		# the backend as /api/v1/donate/alice/checkout.
+		location /donate/ {
+			proxy_pass http://127.0.0.1:8080/api/v1/donate/;
+			proxy_set_header Host $host;
+			proxy_set_header X-Real-IP $remote_addr;
+		}
+
 		location /ws/ {
 			proxy_pass http://127.0.0.1:8080;
 			proxy_http_version 1.1;

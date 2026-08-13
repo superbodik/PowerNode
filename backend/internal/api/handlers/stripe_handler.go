@@ -63,8 +63,14 @@ type stripeStatusResponse struct {
 	DonationPageURL  string `json:"donation_page_url,omitempty"`
 }
 
+// donationPageURL uses the short public path (/donate/..., not
+// /api/v1/donate/...) -- nginx aliases it to the backend (see
+// scripts/panel.sh's "location /donate/" block), so it's what actually
+// gets shared with viewers. The backend's real routes are still under
+// /api/v1/donate for consistency with everything else it serves; this is
+// just the externally-facing address.
 func (h *StripeHandler) donationPageURL(username string) string {
-	return h.PublicURL + "/api/v1/donate/" + username
+	return h.PublicURL + "/donate/" + username
 }
 
 // ConnectStart creates (or reuses) this user's Stripe Express account and
@@ -316,8 +322,8 @@ func (h *StripeHandler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 			"platform_fee_cents": fmt.Sprintf("%d", feeCents),
 			"track_query":        req.TrackQuery,
 		},
-		SuccessURL: stripe.String(h.PublicURL + "/api/v1/donate/" + username + "/thanks"),
-		CancelURL:  stripe.String(h.PublicURL + "/api/v1/donate/" + username),
+		SuccessURL: stripe.String(h.PublicURL + "/donate/" + username + "/thanks"),
+		CancelURL:  stripe.String(h.PublicURL + "/donate/" + username),
 	})
 	if err != nil {
 		http.Error(w, "failed to start checkout: "+err.Error(), http.StatusBadGateway)
@@ -418,7 +424,7 @@ func (h *StripeHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 
 func donatePageHTML(username string, spotifyEnabled bool) string {
 	safeUsername := html.EscapeString(username)
-	checkoutURL := "/api/v1/donate/" + url.PathEscape(username) + "/checkout"
+	checkoutURL := "/donate/" + url.PathEscape(username) + "/checkout"
 	trackField := ""
 	if spotifyEnabled {
 		trackField = `
