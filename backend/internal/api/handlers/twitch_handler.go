@@ -706,10 +706,24 @@ func chatWidgetPageHTML(login, parent string) string {
 	src := "https://www.twitch.tv/embed/" + url.QueryEscape(login) + "/chat?parent=" + url.QueryEscape(parent) + "&darkpopout"
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>PowerNode Twitch chat</title>
-<style>html, body, iframe { margin: 0; padding: 0; border: 0; width: 100%; height: 100%; overflow: hidden; }</style>
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+  /* Twitch's own embed always ships a header bar (channel name, settings,
+     popout icons) -- it's their iframe content, cross-origin, so its CSS
+     can't be touched from here. Crop it out instead: render the iframe
+     taller than the visible box and shift it up so the header lands
+     off-screen above the wrapper's clipped edge. HEADER_PX is an estimate
+     of Twitch's current header height, not a documented constant -- if a
+     sliver of it still peeks through (or too much chat gets cropped) after
+     a Twitch UI change, fine-tune it here, or crop further from OBS itself
+     (right-click the Browser Source -> Transform -> Edit Transform).
+  */
+  .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  iframe { position: absolute; top: -34px; left: 0; width: 100%; height: calc(100% + 34px); border: 0; }
+</style>
 </head>
 <body>
-  <iframe src="` + html.EscapeString(src) + `" height="100%" width="100%"></iframe>
+  <div class="wrap"><iframe src="` + html.EscapeString(src) + `"></iframe></div>
 </body></html>`
 }
 
