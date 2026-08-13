@@ -94,6 +94,8 @@ daemon/     wingsd — демон на каждой ноде (Go) — Docker, cg
 frontend/   SPA (React + Vite + TS), стили — panel.css (собственный дизайн)
 website/    маркетинговый сайт (чистый Python + HTML/CSS/JS, деплоится через
             собственный же egg "Python: Website" — догфудинг)
+mobile/     PowerNode IRL — Flutter-приложение для мобильного RTMP-стрима
+            прямо на relay-сервер, без OBS
 scripts/    установщик: один файл на этап (docker/database/panel/daemon/...)
 ```
 
