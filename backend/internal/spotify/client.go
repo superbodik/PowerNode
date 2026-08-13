@@ -174,7 +174,8 @@ func (c *Client) FetchUser(ctx context.Context, accessToken string) (*User, erro
 		return nil, ErrTokenExpired
 	}
 	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("spotify me request returned %d", resp.StatusCode)
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("spotify me request returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var mr meResponse
