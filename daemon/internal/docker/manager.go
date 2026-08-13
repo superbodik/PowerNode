@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -88,6 +90,7 @@ func (m *Manager) CreateContainer(ctx context.Context, spec CreateSpec) (string,
 	if err != nil {
 		return "", fmt.Errorf("invalid port bindings: %w", err)
 	}
+	openFirewallPorts(spec.PortBindings)
 
 	// A startup command runs as a shell script regardless of what the base
 	// image's own ENTRYPOINT is — some images (nginx) wrap an arbitrary CMD
@@ -249,6 +252,11 @@ func (m *Manager) KillContainer(ctx context.Context, containerID string) error {
 }
 
 func (m *Manager) RemoveContainer(ctx context.Context, containerID string) error {
+	// Best-effort: close whatever host ports this container had open before
+	// it's gone and Docker can no longer tell us what they were.
+	if info, err := m.cli.ContainerInspect(ctx, containerID); err == nil && info.HostConfig != nil {
+		closeFirewallPorts(info.HostConfig.PortBindings)
+	}
 	return m.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true, RemoveVolumes: true})
 }
 
@@ -317,6 +325,49 @@ func toPortMap(bindings map[string]string) (nat.PortMap, nat.PortSet, error) {
 		portSet[p] = struct{}{}
 	}
 	return portMap, portSet, nil
+}
+
+// openFirewallPorts opens each host port a container is being given so
+// traffic can actually reach it -- Docker publishing a port and the OS
+// firewall allowing it are two independent things, and nothing else in
+// this codebase manages the latter. Best-effort and non-fatal: a node
+// without ufw (or with it disabled) shouldn't fail server creation over
+// this, and it's better to at least try than to leave every allocated
+// port silently unreachable the way it was before this existed.
+func openFirewallPorts(bindings map[string]string) {
+	for containerPort, hostPort := range bindings {
+		firewallAllow(portProto(containerPort), hostPort)
+	}
+}
+
+// closeFirewallPorts is the mirror of openFirewallPorts, given Docker's
+// own port-binding shape (as returned by ContainerInspect) rather than
+// CreateSpec's -- called right before a container is removed, since that's
+// the last moment we can still ask Docker what ports it had.
+func closeFirewallPorts(bindings nat.PortMap) {
+	for port, hostBindings := range bindings {
+		for _, hb := range hostBindings {
+			firewallRevoke(port.Proto(), hb.HostPort)
+		}
+	}
+}
+
+func firewallAllow(proto, hostPort string) {
+	if proto != "tcp" && proto != "udp" || hostPort == "" {
+		return
+	}
+	if out, err := exec.Command("ufw", "allow", hostPort+"/"+proto, "comment", "server allocation").CombinedOutput(); err != nil {
+		log.Printf("firewall: failed to allow %s/%s (continuing without it): %v: %s", hostPort, proto, err, strings.TrimSpace(string(out)))
+	}
+}
+
+func firewallRevoke(proto, hostPort string) {
+	if proto != "tcp" && proto != "udp" || hostPort == "" {
+		return
+	}
+	if out, err := exec.Command("ufw", "delete", "allow", hostPort+"/"+proto).CombinedOutput(); err != nil {
+		log.Printf("firewall: failed to revoke %s/%s (continuing without it): %v: %s", hostPort, proto, err, strings.TrimSpace(string(out)))
+	}
 }
 
 func portProto(spec string) string {
