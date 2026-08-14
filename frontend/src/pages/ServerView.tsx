@@ -236,39 +236,101 @@ export function ServerView({ uuid, onBack }: Props) {
   const relaySecret = relaySecretOf(server);
   const obsServerUrl = obsServerUrlFor(server);
   const telegramProxyEgg = server ? eggs.find((e) => e.id === server.egg_id)?.name === 'Telegram MTProto Proxy' : false;
-  const [proxySecret, setProxySecret] = useState<string | null>(null);
+  const [proxyKeys, setProxyKeys] = useState<{ name: string; secret: string }[] | null>(null);
+  const [proxyKeysMtime, setProxyKeysMtime] = useState<number | undefined>(undefined);
+  const [legacySecret, setLegacySecret] = useState<string | null>(null);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
-  // PROXY_SECRET is only in the server's own environment if the user typed
-  // one explicitly -- left blank, the container generates one on first
-  // boot and keeps it in a file on its own volume instead (see the egg's
-  // startup script), so that's the fallback source here.
+  function loadProxyKeys(uuid: string) {
+    api
+      .readFile(uuid, 'keys.json')
+      .then(({ text, mtime }) => {
+        try {
+          const parsed = JSON.parse(text) as { name: string; secret: string }[];
+          setProxyKeys(parsed);
+          setProxyKeysMtime(mtime);
+        } catch {
+          setProxyKeys(null);
+        }
+      })
+      .catch(() => setProxyKeys(null));
+  }
+
+  // keys.json (multiple named secrets sharing one port) is what current
+  // installs generate on boot -- but a server created before that egg
+  // update, or one that hasn't started even once yet, won't have it. The
+  // single PROXY_SECRET env var / .secret file fallback keeps those
+  // showing *something* instead of an empty card.
   useEffect(() => {
     if (!telegramProxyEgg || !server) {
-      setProxySecret(null);
+      setProxyKeys(null);
+      setLegacySecret(null);
       return;
     }
+    loadProxyKeys(server.uuid);
     if (server.environment.PROXY_SECRET) {
-      setProxySecret(server.environment.PROXY_SECRET);
-      return;
+      setLegacySecret(server.environment.PROXY_SECRET);
+    } else {
+      api
+        .readFile(server.uuid, '.secret')
+        .then(({ text }) => setLegacySecret(text.trim()))
+        .catch(() => setLegacySecret(null));
     }
-    let cancelled = false;
-    api
-      .readFile(server.uuid, '.secret')
-      .then(({ text }) => {
-        if (!cancelled) setProxySecret(text.trim());
-      })
-      .catch(() => {
-        if (!cancelled) setProxySecret(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telegramProxyEgg, server?.uuid, server?.environment.PROXY_SECRET]);
 
-  const telegramProxyLink =
-    telegramProxyEgg && server && proxySecret && server.primary_address
-      ? buildTelegramProxyLink(server, proxySecret)
-      : null;
+  async function addProxyKey() {
+    if (!server) return;
+    const name = newKeyName.trim();
+    if (!name) return;
+    if ((proxyKeys ?? []).some((k) => k.name === name)) {
+      setKeyError(t('serverView.telegramProxyDuplicateName'));
+      return;
+    }
+    setKeyBusy(true);
+    setKeyError(null);
+    try {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      const secret = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      const updated = [...(proxyKeys ?? []), { name, secret }];
+      await api.writeFile(server.uuid, 'keys.json', JSON.stringify(updated), proxyKeysMtime);
+      setNewKeyName('');
+      await api.power(server.uuid, 'restart');
+      loadProxyKeys(server.uuid);
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function deleteProxyKey(name: string) {
+    if (!server || !proxyKeys) return;
+    setKeyBusy(true);
+    setKeyError(null);
+    try {
+      const updated = proxyKeys.filter((k) => k.name !== name);
+      await api.writeFile(server.uuid, 'keys.json', JSON.stringify(updated), proxyKeysMtime);
+      await api.power(server.uuid, 'restart');
+      loadProxyKeys(server.uuid);
+    } catch (err) {
+      setKeyError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  const telegramProxyLinks =
+    telegramProxyEgg && server && server.primary_address
+      ? proxyKeys
+        ? proxyKeys.map((k) => ({ name: k.name, link: buildTelegramProxyLink(server, k.secret) }))
+        : legacySecret
+          ? [{ name: null, link: buildTelegramProxyLink(server, legacySecret) }]
+          : []
+      : [];
 
   if (error) return <div className="login-error show">{error}</div>;
   if (!server) return <p className="srv-desc">{t('common.loading')}</p>;
@@ -633,24 +695,51 @@ export function ServerView({ uuid, onBack }: Props) {
                 <div className="settings-card-title">{t('serverView.telegramProxyTitle')}</div>
                 {!server.primary_address ? (
                   <p className="srv-desc">{t('serverView.needsPort')}</p>
-                ) : !telegramProxyLink ? (
+                ) : telegramProxyLinks.length === 0 ? (
                   <p className="srv-desc">{t('serverView.telegramProxyNoSecret')}</p>
                 ) : (
                   <>
                     <p className="srv-desc" style={{ marginBottom: 12 }}>
                       {t('serverView.telegramProxyHint')}
                     </p>
-                    <div className="sfield">
-                      <label>{t('serverView.telegramProxyLinkLabel')}</label>
-                      <div className="api-item">
-                        <span className="api-key">{telegramProxyLink}</span>
-                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(telegramProxyLink)}>
-                          {t('common.copy')}
-                        </button>
+                    {telegramProxyLinks.map((k, i) => (
+                      <div className="sfield" key={k.name ?? i} style={{ marginBottom: 10 }}>
+                        <label>{k.name ?? t('serverView.telegramProxyLinkLabel')}</label>
+                        <div className="api-item">
+                          <span className="api-key">{k.link}</span>
+                          <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(k.link)}>
+                            {t('common.copy')}
+                          </button>
+                          {proxyKeys && k.name && (
+                            <button className="btn-sm" disabled={keyBusy} onClick={() => deleteProxyKey(k.name!)}>
+                              {t('serverView.telegramProxyRevoke')}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ))}
+
+                    {proxyKeys && (
+                      <div className="sfield" style={{ marginTop: 14 }}>
+                        <label>{t('serverView.telegramProxyNewKeyLabel')}</label>
+                        <div className="api-item">
+                          <input
+                            value={newKeyName}
+                            onChange={(e) => setNewKeyName(e.target.value)}
+                            placeholder={t('serverView.telegramProxyNewKeyPlaceholder')}
+                          />
+                          <button className="btn-sm" disabled={keyBusy || !newKeyName.trim()} onClick={addProxyKey}>
+                            {t('serverView.telegramProxyCreateKey')}
+                          </button>
+                        </div>
+                        <span className="srv-desc" style={{ fontSize: 10 }}>
+                          {t('serverView.telegramProxyNewKeyHint')}
+                        </span>
+                      </div>
+                    )}
                   </>
                 )}
+                {keyError && <p className="login-error show" style={{ marginTop: 10 }}>{keyError}</p>}
               </div>
             )}
 

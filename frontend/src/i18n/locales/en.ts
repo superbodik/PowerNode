@@ -325,8 +325,14 @@ export const en = {
     'Add a port on the Network tab matching RTMP_PORT before this is usable — OBS has nothing to connect to yet.',
 
   'serverView.telegramProxyTitle': 'Share this proxy',
-  'serverView.telegramProxyHint': 'Send this link to anyone who wants to use it — tapping it opens Telegram and offers to add the proxy directly, nothing to type by hand.',
+  'serverView.telegramProxyHint': 'Everyone shares the same port with their own key — send a key\'s link only to the person it\'s for; revoking it cuts off just them, everyone else keeps working.',
   'serverView.telegramProxyLinkLabel': 'tg://proxy link',
+  'serverView.telegramProxyRevoke': 'Revoke',
+  'serverView.telegramProxyNewKeyLabel': 'New key',
+  'serverView.telegramProxyNewKeyPlaceholder': "e.g. a friend's name",
+  'serverView.telegramProxyCreateKey': 'Create key',
+  'serverView.telegramProxyNewKeyHint': 'Restarts the server to apply — existing keys keep working, only takes a moment.',
+  'serverView.telegramProxyDuplicateName': 'A key with that name already exists.',
   'serverView.telegramProxyNoSecret': "Waiting on the server's first start to generate a secret — start it, then check back here.",
 
   // guides

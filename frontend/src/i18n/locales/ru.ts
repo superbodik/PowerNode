@@ -327,8 +327,14 @@ export const ru: Dict = {
     'Добавьте порт на вкладке Network, совпадающий с RTMP_PORT, прежде чем этим можно будет пользоваться — сейчас OBS подключаться некуда.',
 
   'serverView.telegramProxyTitle': 'Поделиться прокси',
-  'serverView.telegramProxyHint': 'Отправь эту ссылку любому, кто хочет ей пользоваться — по тапу Telegram сам предложит добавить прокси, ничего вводить руками не нужно.',
+  'serverView.telegramProxyHint': 'Все делят один порт, но у каждого свой ключ — давай ссылку конкретного ключа только тому, для кого он создан. Отзыв ключа отключит только его, остальные продолжат работать.',
   'serverView.telegramProxyLinkLabel': 'Ссылка tg://proxy',
+  'serverView.telegramProxyRevoke': 'Отозвать',
+  'serverView.telegramProxyNewKeyLabel': 'Новый ключ',
+  'serverView.telegramProxyNewKeyPlaceholder': 'например, имя друга',
+  'serverView.telegramProxyCreateKey': 'Создать ключ',
+  'serverView.telegramProxyNewKeyHint': 'Для применения сервер перезапустится — остальные ключи продолжат работать, это займёт пару секунд.',
+  'serverView.telegramProxyDuplicateName': 'Ключ с таким именем уже есть.',
   'serverView.telegramProxyNoSecret': 'Секрет появится после первого запуска сервера — запусти его и вернись сюда.',
 
   // guides
