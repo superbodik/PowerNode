@@ -690,6 +690,15 @@ export const ru: Dict = {
   'streamers.spotifyConnectHint':
     'Подключи Spotify, чтобы донатеры могли заказать трек — он сам встанет в очередь твоего плеера, когда придёт донат с запросом песни.',
   'streamers.spotifyConnect': 'Подключить Spotify',
+
+  'streamers.songRequestsTile': 'Заказ музыки (баллы канала)',
+  'streamers.songRequestsHint': 'Создаёт награду за баллы канала "Song Request" — зритель вставляет ссылку на YouTube, SoundCloud или Яндекс Музыку при обмене баллов, и она попадает в очередь, которую проигрывает Browser Source в OBS. Нужен апгрейд Twitch ниже, если доступ к баллам канала ещё не выдан.',
+  'streamers.songRequestsCostLabel': 'Цена (баллы канала)',
+  'streamers.songRequestsEnable': 'Включить заказ музыки',
+  'streamers.songRequestsDisable': 'Отключить',
+  'streamers.songRequestsWidgetUrlLabel': 'URL для Browser Source в OBS',
+  'streamers.songRequestsWidgetUrlHint': 'Добавь эту ссылку как Browser Source в OBS — она проигрывает очередь вживую.',
+  'streamers.songRequestsSkip': 'Пропустить',
   'streamers.spotifyConnectedAs': 'Подключено: {name}',
   'streamers.spotifyReadyHint':
     'Заказы треков со страницы доната теперь встают в очередь автоматически — просто держи Spotify открытым и что-нибудь играющим.',

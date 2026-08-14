@@ -20,6 +20,7 @@ import type {
   OverlayWidget,
   PanelUser,
   PowerAction,
+  QueuedSongRequest,
   Schedule,
   Server,
   ServerAllocation,
@@ -484,6 +485,22 @@ export const api = {
       donations_today: { currency: string; total_cents: number; count: number }[];
       donations_all_time: { currency: string; total_cents: number; count: number }[];
     }>('/streamers/analytics'),
+
+  getSongRequestsStatus: () =>
+    request<{ enabled: boolean; widget_url?: string }>('/integrations/twitch/song-requests/status'),
+
+  enableSongRequests: (costPoints?: number) =>
+    request<{ enabled: boolean; widget_url?: string }>('/integrations/twitch/song-requests/enable', {
+      method: 'POST',
+      body: JSON.stringify({ cost_points: costPoints ?? 0 }),
+    }),
+
+  disableSongRequests: () => request<void>('/integrations/twitch/song-requests', { method: 'DELETE' }),
+
+  getSongRequestQueue: () => request<QueuedSongRequest[]>('/twitch/song-requests/queue'),
+
+  advanceSongRequest: (id: number) =>
+    request<void>(`/twitch/song-requests/queue/${id}/advance`, { method: 'POST' }),
 
   getOverlayLayout: (token?: string) =>
     publicRequest<OverlayLayout>(`/overlay/layout${token ? `?token=${encodeURIComponent(token)}` : ''}`),

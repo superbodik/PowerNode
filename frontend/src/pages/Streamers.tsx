@@ -7,7 +7,7 @@ import { useStreamSignal } from '../hooks/useStreamSignal';
 import { useStreamSessionStats } from '../hooks/useStreamSessionStats';
 import { formatDuration, formatRelativeTime } from '../utils/format';
 import { obsServerUrlFor, relaySecretOf } from '../utils/streaming';
-import type { Server } from '../types';
+import type { QueuedSongRequest, Server } from '../types';
 
 interface Props {
   onManage: (uuid: string) => void;
@@ -107,6 +107,7 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpen
         <TwitchTile notice={twitchNotice} onDismissNotice={() => setTwitchNotice(null)} />
         <StripeTile notice={stripeNotice} onDismissNotice={() => setStripeNotice(null)} />
         <SpotifyTile notice={spotifyNotice} onDismissNotice={() => setSpotifyNotice(null)} />
+        <SongRequestTile />
 
         <div className="settings-card tile-action" onClick={onOpenAnalytics} style={{ cursor: 'pointer' }}>
           <div className="settings-card-title">{t('streamers.analyticsTile')}</div>
@@ -668,6 +669,163 @@ function SpotifyTile({
           <button className="btn-sm" disabled={busy} onClick={connect}>
             {t('streamers.spotifyConnect')}
           </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SongRequestTile() {
+  const [status, setStatus] = useState<{ enabled: boolean; widget_url?: string } | null>(null);
+  const [queue, setQueue] = useState<QueuedSongRequest[]>([]);
+  const [cost, setCost] = useState('500');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api
+      .getSongRequestsStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ enabled: false }));
+  }
+
+  useEffect(refresh, []);
+
+  useEffect(() => {
+    if (!status?.enabled) return;
+    function loadQueue() {
+      api.getSongRequestQueue().then(setQueue).catch(() => {});
+    }
+    loadQueue();
+    const interval = setInterval(loadQueue, 10000);
+    return () => clearInterval(interval);
+  }, [status?.enabled]);
+
+  async function enable() {
+    setBusy(true);
+    setError(null);
+    try {
+      const parsed = parseInt(cost, 10);
+      const result = await api.enableSongRequests(Number.isFinite(parsed) && parsed > 0 ? parsed : undefined);
+      setStatus(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disable() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disableSongRequests();
+      refresh();
+      setQueue([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function upgradeForRedemptions() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startTwitchExtended();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function skip(id: number) {
+    try {
+      await api.advanceSongRequest(id);
+      setQueue((q) => q.filter((item) => item.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  const needsUpgrade = error?.includes('reconnect twitch with channel points access') ?? false;
+
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">{t('streamers.songRequestsTile')}</div>
+
+      {error && <p className="login-error show" style={{ marginBottom: 10 }}>{error}</p>}
+
+      {status === null ? (
+        <p className="srv-desc">{t('common.loading')}</p>
+      ) : status.enabled ? (
+        <>
+          {status.widget_url && (
+            <div className="sfield" style={{ marginBottom: 10 }}>
+              <label>{t('streamers.songRequestsWidgetUrlLabel')}</label>
+              <div className="api-item">
+                <span className="api-key">{status.widget_url}</span>
+                <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(status.widget_url ?? '')}>
+                  {t('common.copy')}
+                </button>
+              </div>
+              <span className="srv-desc" style={{ fontSize: 10 }}>
+                {t('streamers.songRequestsWidgetUrlHint')}
+              </span>
+            </div>
+          )}
+
+          {queue.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              {queue.map((item) => (
+                <div
+                  key={item.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 11 }}
+                >
+                  <span style={{ opacity: 0.7 }}>{item.redeemer_name}:</span>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.link}
+                  </span>
+                  <button className="btn-sm" onClick={() => skip(item.id)}>
+                    {t('streamers.songRequestsSkip')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="settings-foot">
+            <button className="btn-sm" disabled={busy} onClick={disable}>
+              {t('streamers.songRequestsDisable')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.songRequestsHint')}
+          </p>
+          <div className="sfield" style={{ marginBottom: 10 }}>
+            <label>{t('streamers.songRequestsCostLabel')}</label>
+            <input
+              type="number"
+              min={1}
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              style={{ maxWidth: 120 }}
+            />
+          </div>
+          {needsUpgrade ? (
+            <button className="btn-sm" disabled={busy} onClick={upgradeForRedemptions}>
+              {t('streamers.subsUpgrade')}
+            </button>
+          ) : (
+            <button className="btn-sm" disabled={busy} onClick={enable}>
+              {t('streamers.songRequestsEnable')}
+            </button>
+          )}
         </>
       )}
     </div>

@@ -688,6 +688,15 @@ export const en = {
   'streamers.spotifyConnectHint':
     'Connect Spotify so donors can request a song — it gets queued on your active playback automatically when a donation with a track request comes in.',
   'streamers.spotifyConnect': 'Connect Spotify',
+
+  'streamers.songRequestsTile': 'Song requests (Channel Points)',
+  'streamers.songRequestsHint': 'Creates a "Song Request" Channel Points reward -- viewers paste a YouTube, SoundCloud, or Yandex Music link when redeeming it, and it lands in a queue an OBS Browser Source plays through. Needs the Twitch upgrade below if you haven\'t already granted channel points access.',
+  'streamers.songRequestsCostLabel': 'Cost (channel points)',
+  'streamers.songRequestsEnable': 'Enable song requests',
+  'streamers.songRequestsDisable': 'Disable',
+  'streamers.songRequestsWidgetUrlLabel': 'OBS Browser Source URL',
+  'streamers.songRequestsWidgetUrlHint': 'Add this as a Browser Source in OBS -- it plays the queue live.',
+  'streamers.songRequestsSkip': 'Skip',
   'streamers.spotifyConnectedAs': 'Connected: {name}',
   'streamers.spotifyReadyHint':
     'Song requests from the donation page now queue automatically — just have Spotify open and playing something.',

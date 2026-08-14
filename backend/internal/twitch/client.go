@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,8 +41,12 @@ const (
 // one upgrade rather than several separate consent screens since they're
 // the same tier of access.
 const (
-	Scope         = "user:read:email"
-	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key moderator:read:followers"
+	Scope = "user:read:email"
+	// channel:manage:redemptions covers both creating/reading the channel
+	// points reward and reading+fulfilling its redemptions -- there's no
+	// separate lesser scope worth splitting out for song requests, unlike
+	// the sub/follow alert widget's read-only channel:read:subscriptions.
+	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key moderator:read:followers channel:manage:redemptions"
 )
 
 type Client struct {
@@ -293,6 +298,127 @@ func (c *Client) GetStreamKey(ctx context.Context, userAccessToken, broadcasterU
 		return "", fmt.Errorf("twitch stream-key request returned no data")
 	}
 	return sr.Data[0].StreamKey, nil
+}
+
+type customRewardsResponse struct {
+	Data []struct {
+		ID string `json:"id"`
+	} `json:"data"`
+}
+
+// CreateCustomReward creates a Channel Points reward the broadcaster's
+// viewers can redeem, requiring free-text input (the song link). Requires a
+// USER access token carrying channel:manage:redemptions -- confirmed
+// against Twitch's API reference, not assumed, since the read-only
+// channel:read:redemptions scope is *not* enough here (that only covers
+// listing rewards/redemptions, not creating one).
+func (c *Client) CreateCustomReward(ctx context.Context, userAccessToken, broadcasterUserID, title string, costPoints int) (string, error) {
+	body := map[string]any{
+		"title":                  title,
+		"cost":                   costPoints,
+		"is_user_input_required": true,
+		"prompt":                 "Paste a YouTube, SoundCloud, or Yandex Music link",
+		"is_enabled":             true,
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+
+	reqURL := "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=" + url.QueryEscape(broadcasterUserID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+userAccessToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call twitch create-custom-reward endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return "", ErrTokenExpired
+	}
+	if resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("twitch create-custom-reward returned %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	var cr customRewardsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
+		return "", fmt.Errorf("decode twitch create-custom-reward response: %w", err)
+	}
+	if len(cr.Data) == 0 {
+		return "", fmt.Errorf("twitch create-custom-reward returned no data")
+	}
+	return cr.Data[0].ID, nil
+}
+
+// DeleteCustomReward removes a reward this app created. Twitch only allows
+// deleting rewards the requesting client created in the first place --
+// requires channel:manage:redemptions, same as creating one.
+func (c *Client) DeleteCustomReward(ctx context.Context, userAccessToken, broadcasterUserID, rewardID string) error {
+	reqURL := "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=" +
+		url.QueryEscape(broadcasterUserID) + "&id=" + url.QueryEscape(rewardID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+userAccessToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("call twitch delete-custom-reward endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrTokenExpired
+	}
+	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("twitch delete-custom-reward returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// UpdateRedemptionStatus marks a redemption fulfilled (or canceled, which
+// refunds the viewer's points -- not used today, but the same call shape).
+// Requires channel:manage:redemptions.
+func (c *Client) UpdateRedemptionStatus(ctx context.Context, userAccessToken, broadcasterUserID, rewardID, redemptionID, status string) error {
+	reqURL := "https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?" +
+		url.Values{
+			"broadcaster_id": {broadcasterUserID},
+			"reward_id":      {rewardID},
+			"id":             {redemptionID},
+		}.Encode()
+	payload, err := json.Marshal(map[string]string{"status": status})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, reqURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+userAccessToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("call twitch update-redemption-status endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrTokenExpired
+	}
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("twitch update-redemption-status returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 type appTokenResponse struct {

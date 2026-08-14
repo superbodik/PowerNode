@@ -126,6 +126,15 @@ func NewRouter(deps Dependencies) http.Handler {
 	stripeHandler.Spotify = spotifyHandler
 	analyticsHandler := &handlers.AnalyticsHandler{DB: deps.DB, Twitch: deps.TwitchClient}
 	overlayHandler := &handlers.OverlayHandler{DB: deps.DB, PublicURL: deps.PublicURL}
+	songRequestHandler := &handlers.SongRequestHandler{
+		DB:             deps.DB,
+		Client:         deps.TwitchClient,
+		Hub:            deps.Hub,
+		EncryptionKey:  deps.EncryptionKey,
+		EventSubSecret: deps.TwitchEventSubSecret,
+		PublicURL:      deps.PublicURL,
+	}
+	twitchHandler.SongRequests = songRequestHandler
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -136,6 +145,19 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Get("/auth/spotify/callback", spotifyHandler.Callback)
 		r.Get("/widgets/subs/{token}", twitchHandler.WidgetPage)
 		r.Get("/widgets/chat/{login}", twitchHandler.ChatWidgetPage)
+		r.Get("/widgets/song-requests/{token}", songRequestHandler.RenderPage)
+
+		// The widget's own queue view/advance calls carry no panel session
+		// (OBS Browser Source), so these accept either a logged-in owner or
+		// the render_token in the URL -- same optional-auth shape as the
+		// overlay editor.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Timeout(30 * time.Second))
+			r.Use(auth.OptionalMiddleware(deps.Token, resolveAPIKey(deps.DB)))
+
+			r.Get("/twitch/song-requests/queue", songRequestHandler.Queue)
+			r.Post("/twitch/song-requests/queue/{id}/advance", songRequestHandler.Advance)
+		})
 		r.Get("/integrations/stripe/connect/return", stripeHandler.ConnectReturn)
 		r.Post("/webhooks/stripe", stripeHandler.Webhook)
 		r.Get("/donate/{username}", stripeHandler.DonatePage)
@@ -250,6 +272,10 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/integrations/twitch/stream-key", twitchHandler.GetStreamKey)
 			r.Post("/integrations/twitch/subscriptions/test", twitchHandler.SendTestAlert)
 			r.Delete("/integrations/twitch", twitchHandler.Disconnect)
+
+			r.Get("/integrations/twitch/song-requests/status", songRequestHandler.Status)
+			r.Post("/integrations/twitch/song-requests/enable", songRequestHandler.Enable)
+			r.Delete("/integrations/twitch/song-requests", songRequestHandler.Disable)
 
 			r.Get("/integrations/stripe/status", stripeHandler.Status)
 			r.Post("/integrations/stripe/connect/start", stripeHandler.ConnectStart)

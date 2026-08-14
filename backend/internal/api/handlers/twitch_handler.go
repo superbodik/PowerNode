@@ -79,6 +79,10 @@ type TwitchHandler struct {
 	EncryptionKey  string
 	EventSubSecret string
 	PublicURL      string
+	// SongRequests handles the one EventSub type (songRequestEventType)
+	// that isn't an alert-widget notification -- wired in router.go after
+	// both handlers exist, same cross-wiring as StripeHandler.Spotify.
+	SongRequests *SongRequestHandler
 }
 
 type twitchStartResponse struct {
@@ -602,6 +606,8 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 			IsAnonymous         bool   `json:"is_anonymous"`
 			FromBroadcasterName string `json:"from_broadcaster_user_name"`
 			Viewers             int    `json:"viewers"`
+			ID                  string `json:"id"`
+			UserInput           string `json:"user_input"`
 		} `json:"event"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -614,6 +620,19 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 	).Scan(&userID); err != nil {
 		return
 	}
+
+	// Song requests get their own dispatch path rather than sharing the
+	// widgetToken lookup below: a user who enabled song requests but never
+	// the sub/follow/raid alert widget has no twitch_widget_tokens row at
+	// all, and that lookup failing would otherwise silently drop every
+	// redemption for them before it ever reached this switch.
+	if payload.Subscription.Type == songRequestEventType {
+		if h.SongRequests != nil {
+			h.SongRequests.HandleRedemption(r.Context(), userID, payload.Event.ID, payload.Event.UserName, payload.Event.UserInput)
+		}
+		return
+	}
+
 	var widgetToken string
 	if err := h.DB.QueryRow(r.Context(),
 		`SELECT token FROM twitch_widget_tokens WHERE user_id = $1`, userID,

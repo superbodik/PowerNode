@@ -417,6 +417,14 @@ export interface OverlayWidget {
   config: Record<string, unknown>;
 }
 
+export interface QueuedSongRequest {
+  id: number;
+  redeemer_name: string;
+  link: string;
+  provider: string;
+  status: string;
+}
+
 export interface OverlayLayout {
   name: string;
   moderator_url: string;
