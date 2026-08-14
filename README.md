@@ -9,7 +9,7 @@
 которая реально переподключается, и модульная система деплоя ("eggs") —
 Minecraft, Discord/Telegram-боты, Python-приложения или любой свой Docker-образ.
 
-[![version](https://img.shields.io/badge/version-0.1.1-c4788a?style=flat-square)](https://github.com/superbodik/PowerNode/releases/tag/v0.1.1)
+[![version](https://img.shields.io/badge/version-0.4.1B-c4788a?style=flat-square)](https://github.com/superbodik/PowerNode/releases/tag/v0.4.1B)
 [![go](https://img.shields.io/badge/go-1.22-00ADD8?style=flat-square&logo=go&logoColor=white)](backend/go.mod)
 [![react](https://img.shields.io/badge/frontend-React%20%2B%20TS-61DAFB?style=flat-square&logo=react&logoColor=white)](frontend/package.json)
 [![license](https://img.shields.io/badge/license-self--hosted-8a7580?style=flat-square)](#)
