@@ -56,6 +56,24 @@ function loadUsername(): string {
   }
 }
 
+// Mirrors mtprotoproxy's own TLS-mode secret format ("ee" + secret + hex of
+// the UTF-8 TLS_DOMAIN bytes) so the panel can show a ready tg://proxy link
+// without needing the container to print it anywhere first.
+function hexEncodeUtf8(value: string): string {
+  return Array.from(new TextEncoder().encode(value))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function buildTelegramProxyLink(server: Server, secret: string): string {
+  const host = server.primary_address?.split(':')[0] ?? '';
+  const port = server.environment.PROXY_PORT || server.primary_address?.split(':')[1] || '443';
+  const tlsDomain = server.environment.TLS_DOMAIN || 'www.google.com';
+  const tlsSecret = 'ee' + secret + hexEncodeUtf8(tlsDomain);
+  const params = new URLSearchParams({ server: host, port: String(port), secret: tlsSecret });
+  return 'tg://proxy?' + params.toString();
+}
+
 export function ServerView({ uuid, onBack }: Props) {
   const [server, setServer] = useState<Server | null>(null);
   const [live, setLive] = useState<ResourceStats | null>(null);
@@ -217,6 +235,40 @@ export function ServerView({ uuid, onBack }: Props) {
   const streamingEgg = server ? eggs.find((e) => e.id === server.egg_id)?.category === 'streaming' : false;
   const relaySecret = relaySecretOf(server);
   const obsServerUrl = obsServerUrlFor(server);
+  const telegramProxyEgg = server ? eggs.find((e) => e.id === server.egg_id)?.name === 'Telegram MTProto Proxy' : false;
+  const [proxySecret, setProxySecret] = useState<string | null>(null);
+
+  // PROXY_SECRET is only in the server's own environment if the user typed
+  // one explicitly -- left blank, the container generates one on first
+  // boot and keeps it in a file on its own volume instead (see the egg's
+  // startup script), so that's the fallback source here.
+  useEffect(() => {
+    if (!telegramProxyEgg || !server) {
+      setProxySecret(null);
+      return;
+    }
+    if (server.environment.PROXY_SECRET) {
+      setProxySecret(server.environment.PROXY_SECRET);
+      return;
+    }
+    let cancelled = false;
+    api
+      .readFile(server.uuid, '.secret')
+      .then(({ text }) => {
+        if (!cancelled) setProxySecret(text.trim());
+      })
+      .catch(() => {
+        if (!cancelled) setProxySecret(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [telegramProxyEgg, server?.uuid, server?.environment.PROXY_SECRET]);
+
+  const telegramProxyLink =
+    telegramProxyEgg && server && proxySecret && server.primary_address
+      ? buildTelegramProxyLink(server, proxySecret)
+      : null;
 
   if (error) return <div className="login-error show">{error}</div>;
   if (!server) return <p className="srv-desc">{t('common.loading')}</p>;
@@ -572,6 +624,32 @@ export function ServerView({ uuid, onBack }: Props) {
                   </>
                 ) : (
                   <p className="srv-desc">{t('serverView.needsPort')}</p>
+                )}
+              </div>
+            )}
+
+            {telegramProxyEgg && (
+              <div className="settings-card" style={{ marginTop: 20 }}>
+                <div className="settings-card-title">{t('serverView.telegramProxyTitle')}</div>
+                {!server.primary_address ? (
+                  <p className="srv-desc">{t('serverView.needsPort')}</p>
+                ) : !telegramProxyLink ? (
+                  <p className="srv-desc">{t('serverView.telegramProxyNoSecret')}</p>
+                ) : (
+                  <>
+                    <p className="srv-desc" style={{ marginBottom: 12 }}>
+                      {t('serverView.telegramProxyHint')}
+                    </p>
+                    <div className="sfield">
+                      <label>{t('serverView.telegramProxyLinkLabel')}</label>
+                      <div className="api-item">
+                        <span className="api-key">{telegramProxyLink}</span>
+                        <button className="btn-sm" onClick={() => navigator.clipboard?.writeText(telegramProxyLink)}>
+                          {t('common.copy')}
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}

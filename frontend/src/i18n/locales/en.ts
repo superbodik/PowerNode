@@ -324,6 +324,11 @@ export const en = {
   'serverView.needsPort':
     'Add a port on the Network tab matching RTMP_PORT before this is usable — OBS has nothing to connect to yet.',
 
+  'serverView.telegramProxyTitle': 'Share this proxy',
+  'serverView.telegramProxyHint': 'Send this link to anyone who wants to use it — tapping it opens Telegram and offers to add the proxy directly, nothing to type by hand.',
+  'serverView.telegramProxyLinkLabel': 'tg://proxy link',
+  'serverView.telegramProxyNoSecret': "Waiting on the server's first start to generate a secret — start it, then check back here.",
+
   // guides
   'guide.overview.title': 'How this tab works',
   'guide.overview.p1':
