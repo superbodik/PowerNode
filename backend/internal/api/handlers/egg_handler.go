@@ -19,6 +19,14 @@ type eggVariableSummary struct {
 	DefaultValue string `json:"default_value"`
 	IsEditable   bool   `json:"is_editable"`
 	Rules        string `json:"rules"`
+	// IsPort marks the single variable (at most one per egg) that should be
+	// kept in sync with whatever port the server actually gets allocated --
+	// see 0032_egg_variable_port_and_secret_flags.sql.
+	IsPort bool `json:"is_port"`
+	// AutoGenerate marks a variable the create-server form should fill with
+	// a random value up front instead of leaving blank for the user to
+	// invent one, e.g. RELAY_SECRET.
+	AutoGenerate bool `json:"auto_generate"`
 }
 
 type eggSummary struct {
@@ -59,14 +67,14 @@ func (h *EggHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	for i := range eggs {
 		varRows, err := h.DB.Query(r.Context(),
-			`SELECT name, env_variable, default_value, is_editable, rules
+			`SELECT name, env_variable, default_value, is_editable, rules, is_port, auto_generate
 			 FROM egg_variables WHERE egg_id = $1 ORDER BY id`, eggs[i].ID)
 		if err != nil {
 			continue
 		}
 		for varRows.Next() {
 			var v eggVariableSummary
-			if err := varRows.Scan(&v.Name, &v.EnvVariable, &v.DefaultValue, &v.IsEditable, &v.Rules); err == nil {
+			if err := varRows.Scan(&v.Name, &v.EnvVariable, &v.DefaultValue, &v.IsEditable, &v.Rules, &v.IsPort, &v.AutoGenerate); err == nil {
 				eggs[i].Variables = append(eggs[i].Variables, v)
 			}
 		}

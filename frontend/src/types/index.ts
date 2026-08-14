@@ -157,6 +157,12 @@ export interface EggVariable {
   default_value: string;
   is_editable: boolean;
   rules: string;
+  // Marks the single variable (at most one per egg) that should track
+  // whatever port the server actually gets allocated.
+  is_port: boolean;
+  // Marks a variable the create-server form should fill with a random
+  // value up front instead of leaving it for the user to invent.
+  auto_generate: boolean;
 }
 
 export interface Egg {

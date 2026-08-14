@@ -9,6 +9,12 @@ interface Props {
 
 export const PRESET_EGG_KEY = 'pn_preset_egg_name';
 
+function randomSecret(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function CreateServerForm({ onCreated }: Props) {
   const [pendingPresetEgg] = useState(() => sessionStorage.getItem(PRESET_EGG_KEY));
   const [open, setOpen] = useState(() => pendingPresetEgg != null);
@@ -28,8 +34,32 @@ export function CreateServerForm({ onCreated }: Props) {
     disk_mb: 5120,
     cpu_cores: '', // empty = unlimited; string so the field can be blank
     allocation_id: 0,
+    custom_port: '', // a port to create fresh instead of picking an existing allocation
   });
   const [environment, setEnvironment] = useState<Record<string, string>>({});
+
+  const selectedEgg = eggs.find((e) => e.id === form.egg_id);
+  const portVariable = selectedEgg?.variables.find((v) => v.is_port);
+
+  // Keeps the egg's port variable (RTMP_PORT, PROXY_PORT, PORT, ...) in sync
+  // with whatever port the user actually picks below, instead of making
+  // them type the same number twice and hope they match.
+  function choosePort(port: number | '') {
+    if (!portVariable) return;
+    setEnvironment((env) => ({ ...env, [portVariable.env_variable]: port === '' ? '' : String(port) }));
+  }
+
+  function selectAllocation(allocationId: number) {
+    setForm((f) => ({ ...f, allocation_id: allocationId, custom_port: '' }));
+    const alloc = allocations.find((a) => a.id === allocationId);
+    choosePort(alloc ? alloc.port : '');
+  }
+
+  function setCustomPort(value: string) {
+    setForm((f) => ({ ...f, allocation_id: 0, custom_port: value }));
+    const port = Number(value);
+    choosePort(value !== '' && Number.isFinite(port) ? port : '');
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -69,9 +99,19 @@ export function CreateServerForm({ onCreated }: Props) {
       egg_id: eggId,
       docker_image: egg?.docker_image ?? f.docker_image,
       startup_command: egg?.startup_command ?? f.startup_command,
+      allocation_id: 0,
+      custom_port: '',
     }));
     setEnvironment(
-      Object.fromEntries((egg?.variables ?? []).map((v) => [v.env_variable, v.default_value])),
+      Object.fromEntries(
+        (egg?.variables ?? []).map((v) => [
+          v.env_variable,
+          // A blank secret nobody outside this panel can supply is worse
+          // than one nobody asked for -- fill it up front, visibly, the
+          // same way TWITCH_KEY gets filled below when it can be looked up.
+          v.auto_generate && !v.default_value ? randomSecret() : v.default_value,
+        ]),
+      ),
     );
 
     // If this egg wants a Twitch stream key and the user has linked Twitch
@@ -98,10 +138,15 @@ export function CreateServerForm({ onCreated }: Props) {
       setError(t('createServer.selectEggRequired'));
       return;
     }
+    const customPort = form.custom_port ? Number(form.custom_port) : null;
+    if (customPort !== null && (!Number.isInteger(customPort) || customPort < 1024 || customPort > 65535)) {
+      setError(t('createServer.portRangeError'));
+      return;
+    }
     setSubmitting(true);
     try {
       const cores = parseFloat(form.cpu_cores);
-      await api.createServer({
+      const created = await api.createServer({
         name: form.name,
         node_id: form.node_id,
         egg_id: form.egg_id,
@@ -114,8 +159,16 @@ export function CreateServerForm({ onCreated }: Props) {
         cpu_percent: Number.isFinite(cores) && cores > 0 ? Math.round(cores * 100) : null,
         allocation_id: form.allocation_id || undefined,
       });
+
+      // A port picked from the dropdown was already an existing allocation
+      // and got attached above; a typed custom port doesn't exist yet, so
+      // publish it now that the server (and its uuid) actually exists.
+      if (customPort !== null) {
+        await api.createServerAllocation(created.uuid, customPort);
+      }
+
       setOpen(false);
-      setForm((f) => ({ ...f, name: '', allocation_id: 0 }));
+      setForm((f) => ({ ...f, name: '', allocation_id: 0, custom_port: '' }));
       setEnvironment({});
       onCreated();
     } catch (err) {
@@ -188,7 +241,7 @@ export function CreateServerForm({ onCreated }: Props) {
             <select
               id="srv-allocation"
               value={form.allocation_id}
-              onChange={(e) => setForm((f) => ({ ...f, allocation_id: Number(e.target.value) }))}
+              onChange={(e) => selectAllocation(Number(e.target.value))}
             >
               <option value={0}>{t('common.none')}</option>
               {allocations.map((a) => (
@@ -198,6 +251,23 @@ export function CreateServerForm({ onCreated }: Props) {
               ))}
             </select>
           </div>
+          {portVariable && (
+            <div className="sfield">
+              <label htmlFor="srv-custom-port">{t('createServer.customPort')}</label>
+              <input
+                id="srv-custom-port"
+                type="number"
+                min={1024}
+                max={65535}
+                placeholder={t('createServer.customPortPlaceholder')}
+                value={form.custom_port}
+                onChange={(e) => setCustomPort(e.target.value)}
+              />
+              <span className="srv-desc" style={{ fontSize: 10 }}>
+                {t('createServer.customPortHint', { variable: portVariable.name })}
+              </span>
+            </div>
+          )}
           <div className="sfield span2">
             <label htmlFor="srv-image">{t('createServer.dockerImage')}</label>
             <input
