@@ -417,6 +417,12 @@ export interface OverlayWidget {
   config: Record<string, unknown>;
 }
 
+export interface BotCommand {
+  id: number;
+  name: string;
+  response: string;
+}
+
 export interface QueuedSongRequest {
   id: number;
   redeemer_name: string;

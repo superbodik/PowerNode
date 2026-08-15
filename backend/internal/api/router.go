@@ -135,6 +135,14 @@ func NewRouter(deps Dependencies) http.Handler {
 		PublicURL:      deps.PublicURL,
 	}
 	twitchHandler.SongRequests = songRequestHandler
+	twitchBotHandler := &handlers.TwitchBotHandler{
+		DB:             deps.DB,
+		Client:         deps.TwitchClient,
+		EncryptionKey:  deps.EncryptionKey,
+		EventSubSecret: deps.TwitchEventSubSecret,
+		PublicURL:      deps.PublicURL,
+	}
+	twitchHandler.Bot = twitchBotHandler
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -276,6 +284,13 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Get("/integrations/twitch/song-requests/status", songRequestHandler.Status)
 			r.Post("/integrations/twitch/song-requests/enable", songRequestHandler.Enable)
 			r.Delete("/integrations/twitch/song-requests", songRequestHandler.Disable)
+
+			r.Post("/integrations/twitch/bot/start", twitchHandler.StartBot)
+			r.Get("/integrations/twitch/bot/status", twitchBotHandler.Status)
+			r.Delete("/integrations/twitch/bot", twitchBotHandler.Disconnect)
+			r.Get("/integrations/twitch/bot/commands", twitchBotHandler.ListCommands)
+			r.Post("/integrations/twitch/bot/commands", twitchBotHandler.SaveCommand)
+			r.Delete("/integrations/twitch/bot/commands/{id}", twitchBotHandler.DeleteCommand)
 
 			r.Get("/integrations/stripe/status", stripeHandler.Status)
 			r.Post("/integrations/stripe/connect/start", stripeHandler.ConnectStart)

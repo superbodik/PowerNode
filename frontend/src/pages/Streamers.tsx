@@ -7,7 +7,7 @@ import { useStreamSignal } from '../hooks/useStreamSignal';
 import { useStreamSessionStats } from '../hooks/useStreamSessionStats';
 import { formatDuration, formatRelativeTime } from '../utils/format';
 import { obsServerUrlFor, relaySecretOf } from '../utils/streaming';
-import type { QueuedSongRequest, Server } from '../types';
+import type { BotCommand, QueuedSongRequest, Server } from '../types';
 
 interface Props {
   onManage: (uuid: string) => void;
@@ -32,10 +32,6 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpen
       .then(async ([allServers, eggs]) => {
         const streamingEggIds = new Set(eggs.filter((e) => e.category === 'streaming').map((e) => e.id));
         const candidates = allServers.filter((s) => streamingEggIds.has(s.egg_id));
-        // listServers doesn't include environment (it's per-row secret data,
-        // not something worth carrying for every server in a list response);
-        // fetch full details for just the handful of streaming servers so
-        // their OBS credentials can be shown right here.
         const full = await Promise.all(candidates.map((s) => api.getServer(s.uuid).catch(() => s)));
         if (!cancelled) setServers(full);
       })
@@ -50,10 +46,6 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpen
     };
   }, []);
 
-  // The OAuth round trip leaves the app entirely (redirects to twitch.tv and
-  // back), so the result comes back as a query param on this page rather
-  // than a normal API response. Show it once, then scrub it from the URL so
-  // a refresh doesn't re-show a stale toast.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const twitchResult = params.get('twitch');
@@ -67,8 +59,6 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpen
       setStripeNotice('success');
       params.delete('stripe');
     } else if (stripeResult) {
-      // 'refresh' (onboarding link expired mid-flow) needs no toast -- the
-      // tile just re-shows the connect button since nothing changed.
       params.delete('stripe');
     }
     if (spotifyResult === 'connected' || spotifyResult === 'error') {
@@ -108,6 +98,7 @@ export function Streamers({ onManage, onCreateStreaming, onOpenAnalytics, onOpen
         <StripeTile notice={stripeNotice} onDismissNotice={() => setStripeNotice(null)} />
         <SpotifyTile notice={spotifyNotice} onDismissNotice={() => setSpotifyNotice(null)} />
         <SongRequestTile />
+        <TwitchBotTile />
 
         <div className="settings-card tile-action" onClick={onOpenAnalytics} style={{ cursor: 'pointer' }}>
           <div className="settings-card-title">{t('streamers.analyticsTile')}</div>
@@ -826,6 +817,148 @@ function SongRequestTile() {
               {t('streamers.songRequestsEnable')}
             </button>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function TwitchBotTile() {
+  const [status, setStatus] = useState<{ connected: boolean; bot_login?: string; needs_main_connection: boolean } | null>(null);
+  const [commands, setCommands] = useState<BotCommand[]>([]);
+  const [newName, setNewName] = useState('');
+  const [newResponse, setNewResponse] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function refresh() {
+    api
+      .getTwitchBotStatus()
+      .then(setStatus)
+      .catch(() => setStatus({ connected: false, needs_main_connection: true }));
+  }
+
+  useEffect(refresh, []);
+
+  useEffect(() => {
+    if (!status?.connected) return;
+    api.listBotCommands().then(setCommands).catch(() => {});
+  }, [status?.connected]);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { authorize_url } = await api.startTwitchBotConnect();
+      window.location.href = authorize_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectTwitchBot();
+      setCommands([]);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addCommand() {
+    if (!newName.trim() || !newResponse.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const cmd = await api.saveBotCommand(newName.trim(), newResponse.trim());
+      setCommands((cur) => [...cur.filter((c) => c.name !== cmd.name), cmd].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewName('');
+      setNewResponse('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeCommand(id: number) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteBotCommand(id);
+      setCommands((cur) => cur.filter((c) => c.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">{t('streamers.botTile')}</div>
+
+      {error && <p className="login-error show" style={{ marginBottom: 10 }}>{error}</p>}
+
+      {status === null ? (
+        <p className="srv-desc">{t('common.loading')}</p>
+      ) : status.connected ? (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.botConnectedAs', { login: status.bot_login ?? '' })}
+          </p>
+          {status.needs_main_connection && (
+            <p className="srv-desc" style={{ marginBottom: 10, color: 'var(--pink-b, #e8a8b8)' }}>
+              {t('streamers.botNeedsMainConnection')}
+            </p>
+          )}
+
+          {commands.map((c) => (
+            <div className="sfield" key={c.id} style={{ marginBottom: 8 }}>
+              <div className="api-item">
+                <span className="api-key">!{c.name} → {c.response}</span>
+                <button className="btn-sm" disabled={busy} onClick={() => removeCommand(c.id)}>
+                  {t('common.delete')}
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="sfield" style={{ marginTop: 10 }}>
+            <label>{t('streamers.botAddCommand')}</label>
+            <div className="api-item">
+              <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="!discord" style={{ maxWidth: 100 }} />
+              <input
+                value={newResponse}
+                onChange={(e) => setNewResponse(e.target.value)}
+                placeholder={t('streamers.botResponsePlaceholder')}
+              />
+              <button className="btn-sm" disabled={busy || !newName.trim() || !newResponse.trim()} onClick={addCommand}>
+                {t('common.add')}
+              </button>
+            </div>
+          </div>
+
+          <div className="settings-foot" style={{ marginTop: 10 }}>
+            <button className="btn-sm" disabled={busy} onClick={disconnect}>
+              {t('streamers.botDisconnect')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="srv-desc" style={{ marginBottom: 10 }}>
+            {t('streamers.botConnectHint')}
+          </p>
+          <button className="btn-sm" disabled={busy} onClick={connect}>
+            {t('streamers.botConnect')}
+          </button>
         </>
       )}
     </div>

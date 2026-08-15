@@ -42,9 +42,6 @@ export function CreateServerForm({ onCreated }: Props) {
   const selectedEgg = eggs.find((e) => e.id === form.egg_id);
   const portVariable = selectedEgg?.variables.find((v) => v.is_port);
 
-  // Keeps the egg's port variable (RTMP_PORT, PROXY_PORT, PORT, ...) in sync
-  // with whatever port the user actually picks below, instead of making
-  // them type the same number twice and hope they match.
   function choosePort(port: number | '') {
     if (!portVariable) return;
     setEnvironment((env) => ({ ...env, [portVariable.env_variable]: port === '' ? '' : String(port) }));
@@ -65,15 +62,9 @@ export function CreateServerForm({ onCreated }: Props) {
   useEffect(() => {
     if (!open) return;
     api.listNodes().then(setNodes).catch(() => {});
-    // Eggs pulled out of the default catalog (Plugins page) shouldn't be
-    // pickable here even if a stale sessionStorage preset points at one --
-    // the pendingPresetEgg effect below just won't find a match for them.
     api.listEggs().then((all) => setEggs(all.filter((e) => e.enabled))).catch(() => {});
   }, [open]);
 
-  // Lets another page (the Streamers hub) open this form pre-selected to a
-  // specific egg without the two pages needing to share any React state —
-  // it just drops a name in sessionStorage before navigating here.
   useEffect(() => {
     if (!pendingPresetEgg || eggs.length === 0) return;
     const egg = eggs.find((e) => e.name === pendingPresetEgg);
@@ -107,19 +98,11 @@ export function CreateServerForm({ onCreated }: Props) {
       Object.fromEntries(
         (egg?.variables ?? []).map((v) => [
           v.env_variable,
-          // A blank secret nobody outside this panel can supply is worse
-          // than one nobody asked for -- fill it up front, visibly, the
-          // same way TWITCH_KEY gets filled below when it can be looked up.
           v.auto_generate && !v.default_value ? randomSecret() : v.default_value,
         ]),
       ),
     );
 
-    // If this egg wants a Twitch stream key and the user has linked Twitch
-    // with stream-key access, pull it automatically instead of making them
-    // copy it from Twitch's own dashboard. Silently leaves the field blank
-    // on any failure (not connected, scope not granted, API error) -- this
-    // is a convenience on top of manual entry, never a hard requirement.
     if (egg?.variables.some((v) => v.env_variable === 'TWITCH_KEY')) {
       api
         .getTwitchStreamKey()
@@ -161,9 +144,6 @@ export function CreateServerForm({ onCreated }: Props) {
         allocation_id: form.allocation_id || undefined,
       });
 
-      // A port picked from the dropdown was already an existing allocation
-      // and got attached above; a typed custom port doesn't exist yet, so
-      // publish it now that the server (and its uuid) actually exists.
       if (customPort !== null) {
         await api.createServerAllocation(created.uuid, customPort);
       }

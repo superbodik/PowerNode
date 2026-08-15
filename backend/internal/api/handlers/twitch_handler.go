@@ -25,14 +25,6 @@ import (
 	"github.com/yourorg/panel/internal/ws"
 )
 
-// eventSubType describes one EventSub subscription to register: its name,
-// the version Twitch expects for that name (they're not all "1" --
-// channel.follow is versioned "2"), and how to build its condition from the
-// connected user's own Twitch id. Twitch doesn't use the same condition
-// shape across types: channel.subscribe/gift key on broadcaster_user_id,
-// channel.follow additionally needs moderator_user_id, and channel.raid
-// uses to_broadcaster_user_id instead of broadcaster_user_id entirely (to
-// select *incoming* raids rather than ones this channel started).
 type eventSubType struct {
 	Name           string
 	Version        string
@@ -43,16 +35,6 @@ func sameIDCondition(twitchUserID string) map[string]string {
 	return map[string]string{"broadcaster_user_id": twitchUserID}
 }
 
-// subscriptionEventTypes are the EventSub types registered when a user
-// enables the alert widget.
-//   - channel.subscribe covers direct paid subs (is_gift is ignored there
-//     to avoid double-alerting a gifted sub -- channel.subscription.gift
-//     carries the richer "gifted N subs" payload).
-//   - channel.follow covers free follows -- a distinct Twitch concept from
-//     a paid subscription.
-//   - channel.raid covers incoming raids.
-//
-// All added per explicit request to alert on more than just paid subs.
 var subscriptionEventTypes = []eventSubType{
 	{Name: "channel.subscribe", Version: "1", BuildCondition: sameIDCondition},
 	{Name: "channel.subscription.gift", Version: "1", BuildCondition: sameIDCondition},
@@ -79,33 +61,27 @@ type TwitchHandler struct {
 	EncryptionKey  string
 	EventSubSecret string
 	PublicURL      string
-	// SongRequests handles the one EventSub type (songRequestEventType)
-	// that isn't an alert-widget notification -- wired in router.go after
-	// both handlers exist, same cross-wiring as StripeHandler.Spotify.
-	SongRequests *SongRequestHandler
+	SongRequests   *SongRequestHandler
+	Bot            *TwitchBotHandler
 }
 
 type twitchStartResponse struct {
 	AuthorizeURL string `json:"authorize_url"`
 }
 
-// Start issues a one-time state token tying this OAuth attempt to the
-// logged-in PowerNode user, then hands back the URL to send the browser to.
-// The frontend navigates there directly (window.location, not fetch) --
-// Twitch's own login/consent screen has to render in the top-level page.
 func (h *TwitchHandler) Start(w http.ResponseWriter, r *http.Request) {
-	h.start(w, r, h.Client.AuthorizeURL)
+	h.start(w, r, h.Client.AuthorizeURL, "account")
 }
 
-// StartExtended is the same flow, requesting the broader
-// channel:read:subscriptions scope needed for the subscription-alert
-// widget. Kept as an explicit separate button/endpoint rather than folded
-// into the base connect flow -- see twitch.Scope's doc comment.
 func (h *TwitchHandler) StartExtended(w http.ResponseWriter, r *http.Request) {
-	h.start(w, r, h.Client.AuthorizeExtendedURL)
+	h.start(w, r, h.Client.AuthorizeExtendedURL, "account")
 }
 
-func (h *TwitchHandler) start(w http.ResponseWriter, r *http.Request, buildURL func(state string) string) {
+func (h *TwitchHandler) StartBot(w http.ResponseWriter, r *http.Request) {
+	h.start(w, r, h.Client.AuthorizeBotURL, "bot")
+}
+
+func (h *TwitchHandler) start(w http.ResponseWriter, r *http.Request, buildURL func(state string) string, kind string) {
 	if !h.Client.Enabled() {
 		http.Error(w, "twitch integration is not configured on this panel", http.StatusServiceUnavailable)
 		return
@@ -122,12 +98,10 @@ func (h *TwitchHandler) start(w http.ResponseWriter, r *http.Request, buildURL f
 		return
 	}
 
-	// Opportunistic cleanup so abandoned flows (closed tab mid-redirect,
-	// declined consent) don't grow this table forever -- no cron needed.
 	_, _ = h.DB.Exec(r.Context(), `DELETE FROM twitch_oauth_states WHERE created_at < now() - interval '15 minutes'`)
 
 	if _, err := h.DB.Exec(r.Context(),
-		`INSERT INTO twitch_oauth_states (state, user_id) VALUES ($1, $2)`, state, claims.UserID,
+		`INSERT INTO twitch_oauth_states (state, user_id, kind) VALUES ($1, $2, $3)`, state, claims.UserID, kind,
 	); err != nil {
 		http.Error(w, "failed to start twitch connect", http.StatusInternalServerError)
 		return
@@ -136,12 +110,6 @@ func (h *TwitchHandler) start(w http.ResponseWriter, r *http.Request, buildURL f
 	writeJSON(w, http.StatusOK, twitchStartResponse{AuthorizeURL: buildURL(state)})
 }
 
-// Callback is hit by Twitch's own redirect, not the panel's frontend --
-// there's no Authorization header here, which is exactly why Start had to
-// stash the user id server-side against the state token in the first place.
-// It only saves the connection; enabling the subscription widget is a
-// separate, explicit step (EnableSubscriptions) so a scope upgrade doesn't
-// silently register webhooks as a side effect of a redirect.
 func (h *TwitchHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	fail := func() { http.Redirect(w, r, "/streamers?twitch=error", http.StatusFound) }
 
@@ -158,14 +126,12 @@ func (h *TwitchHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID int64
+	var kind string
 	err := h.DB.QueryRow(r.Context(),
-		`DELETE FROM twitch_oauth_states WHERE state = $1 AND created_at > now() - interval '15 minutes' RETURNING user_id`,
+		`DELETE FROM twitch_oauth_states WHERE state = $1 AND created_at > now() - interval '15 minutes' RETURNING user_id, kind`,
 		state,
-	).Scan(&userID)
+	).Scan(&userID, &kind)
 	if err != nil {
-		// Covers both "no such state" and "expired" (already deleted by the
-		// interval check failing to match) identically -- neither is
-		// recoverable, and there's nothing sensitive to leak either way.
 		fail()
 		return
 	}
@@ -189,6 +155,30 @@ func (h *TwitchHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	refreshEnc, err := crypto.Encrypt(h.EncryptionKey, tokens.RefreshToken)
 	if err != nil {
 		fail()
+		return
+	}
+
+	if kind == "bot" {
+		_, err = h.DB.Exec(r.Context(), `
+			INSERT INTO twitch_bot_connections (user_id, bot_twitch_user_id, bot_twitch_login, access_token_encrypted, refresh_token_encrypted, scopes, connected_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, now(), now())
+			ON CONFLICT (user_id) DO UPDATE SET
+				bot_twitch_user_id = EXCLUDED.bot_twitch_user_id,
+				bot_twitch_login = EXCLUDED.bot_twitch_login,
+				access_token_encrypted = EXCLUDED.access_token_encrypted,
+				refresh_token_encrypted = EXCLUDED.refresh_token_encrypted,
+				scopes = EXCLUDED.scopes,
+				updated_at = now()`,
+			userID, twitchUser.ID, twitchUser.Login, accessEnc, refreshEnc, strings.Join(tokens.Scopes, " "),
+		)
+		if err != nil {
+			fail()
+			return
+		}
+		if h.Bot != nil {
+			h.Bot.EnsureSubscription(r.Context(), userID)
+		}
+		http.Redirect(w, r, "/streamers?twitchbot=connected", http.StatusFound)
 		return
 	}
 
@@ -218,10 +208,7 @@ type twitchStatusResponse struct {
 	TwitchLogin        string `json:"twitch_login,omitempty"`
 	HasSubscriptions   bool   `json:"has_subscriptions_scope"`
 	SubscriptionWidget string `json:"subscription_widget_url,omitempty"`
-	// ChatWidget only needs the base connect (a known login), not the
-	// extended upgrade -- chat is public, there's no elevated scope to gate
-	// it behind.
-	ChatWidget string `json:"chat_widget_url,omitempty"`
+	ChatWidget         string `json:"chat_widget_url,omitempty"`
 }
 
 func (h *TwitchHandler) Status(w http.ResponseWriter, r *http.Request) {
@@ -256,10 +243,6 @@ func (h *TwitchHandler) Status(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// EnableSubscriptions registers the EventSub subscriptions (idempotently --
-// safe to call again) and mints a widget token if one doesn't exist yet.
-// Requires the connection to already carry channel:read:subscriptions,
-// obtained via StartExtended/Callback first.
 func (h *TwitchHandler) EnableSubscriptions(w http.ResponseWriter, r *http.Request) {
 	if !h.Client.Enabled() {
 		http.Error(w, "twitch integration is not configured on this panel", http.StatusServiceUnavailable)
@@ -354,11 +337,6 @@ type testAlertRequest struct {
 	Kind string `json:"kind"`
 }
 
-// SendTestAlert pushes a fake event through the exact same WS broadcast
-// path a real EventSub notification would use, so the OBS Browser Source
-// can be checked without waiting for an actual subscription. Never touches
-// Twitch's API -- it's purely internal, gated only on the widget already
-// existing.
 func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if !ok {
@@ -418,11 +396,6 @@ func (h *TwitchHandler) SendTestAlert(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetStreamKey fetches the connected broadcaster's own RTMP stream key, so
-// the create-server form can fill in TWITCH_KEY without the user copying it
-// from Twitch's dashboard by hand. Requires channel:read:stream_key,
-// obtained via StartExtended/Callback -- the same upgrade as the
-// subscription-alert widget.
 func (h *TwitchHandler) GetStreamKey(w http.ResponseWriter, r *http.Request) {
 	claims, ok := auth.FromContext(r.Context())
 	if !ok {
@@ -495,10 +468,6 @@ func (h *TwitchHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort: also tell Twitch to stop sending events. Not fatal if
-	// this fails (Twitch also revokes on its own once the grant is gone) --
-	// the panel-side rows are the source of truth for whether we still act
-	// on notifications from these subscription IDs.
 	rows, _ := h.DB.Query(r.Context(),
 		`SELECT twitch_subscription_id FROM twitch_eventsub_subscriptions WHERE user_id = $1`, claims.UserID)
 	var subIDs []string
@@ -528,11 +497,6 @@ func (h *TwitchHandler) Disconnect(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// EventSubWebhook is Twitch's own delivery endpoint -- public, no
-// PowerNode auth, no Authorization header. The HMAC signature over the
-// message id + timestamp + raw body is the only thing standing between
-// this and anyone posting fake subscription alerts, so it's checked before
-// anything else runs.
 func (h *TwitchHandler) EventSubWebhook(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
@@ -608,6 +572,10 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 			Viewers             int    `json:"viewers"`
 			ID                  string `json:"id"`
 			UserInput           string `json:"user_input"`
+			ChatterUserID       string `json:"chatter_user_id"`
+			Message             struct {
+				Text string `json:"text"`
+			} `json:"message"`
 		} `json:"event"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -621,14 +589,16 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 		return
 	}
 
-	// Song requests get their own dispatch path rather than sharing the
-	// widgetToken lookup below: a user who enabled song requests but never
-	// the sub/follow/raid alert widget has no twitch_widget_tokens row at
-	// all, and that lookup failing would otherwise silently drop every
-	// redemption for them before it ever reached this switch.
 	if payload.Subscription.Type == songRequestEventType {
 		if h.SongRequests != nil {
 			h.SongRequests.HandleRedemption(r.Context(), userID, payload.Event.ID, payload.Event.UserName, payload.Event.UserInput)
+		}
+		return
+	}
+
+	if payload.Subscription.Type == twitchBotEventType {
+		if h.Bot != nil {
+			h.Bot.HandleChatMessage(r.Context(), userID, payload.Event.ChatterUserID, payload.Event.Message.Text)
 		}
 		return
 	}
@@ -643,8 +613,6 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 	switch payload.Subscription.Type {
 	case "channel.subscribe":
 		if payload.Event.IsGift {
-			// Covered by the channel.subscription.gift notification instead --
-			// alerting on both would double up for the same event.
 			return
 		}
 		h.Hub.BroadcastWidget(widgetToken, map[string]any{
@@ -677,11 +645,6 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 	}
 }
 
-// WidgetPage serves the OBS Browser Source page -- a small, standalone,
-// unauthenticated HTML+JS page (the token in the URL is the only "auth").
-// Deliberately not part of the React app: OBS's embedded browser has no
-// logged-in PowerNode session to share, and this needs to work as a bare
-// URL pasted into a Browser Source, not behind the SPA's login gate.
 func (h *TwitchHandler) WidgetPage(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -693,11 +656,6 @@ func (h *TwitchHandler) widgetURL(token string) string {
 	return base + "/api/v1/widgets/subs/" + token
 }
 
-// ChatWidgetPage serves a self-rendered chat page for a channel, for use
-// as an OBS Browser Source. Public and keyed by the channel login rather
-// than a secret token, unlike the alert widget -- chat is public
-// information (anyone can already open twitch.tv/<login> and watch it),
-// there's nothing here to gate.
 func (h *TwitchHandler) ChatWidgetPage(w http.ResponseWriter, r *http.Request) {
 	login := chi.URLParam(r, "login")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -865,17 +823,10 @@ func widgetPageHTML(token string) string {
 </body></html>`
 }
 
-// jsStringLiteral safely embeds a server-controlled token (hex from
-// randomToken, never user input) into an inline <script> block.
 func jsStringLiteral(s string) string {
 	return "\"" + html.EscapeString(s) + "\""
 }
 
-// verifyEventSubSignature implements Twitch's documented algorithm exactly:
-// HMAC-SHA256 over the concatenation of the message ID, the timestamp, and
-// the raw request body (in that order), prefixed "sha256=" and hex-encoded.
-// Compared with hmac.Equal (constant-time) rather than ==, per Twitch's own
-// recommendation to use a time-safe comparison.
 func verifyEventSubSignature(secret, messageID, timestamp string, body []byte, signature string) bool {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(messageID + timestamp))

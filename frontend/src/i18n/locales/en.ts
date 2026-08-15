@@ -1,17 +1,16 @@
 export const en = {
-  // common
   'common.save': 'Save',
   'common.saving': 'Saving…',
   'common.cancel': 'Cancel',
   'common.delete': 'Delete',
   'common.deleting': 'Deleting…',
+  'common.add': 'Add',
   'common.copy': 'Copy',
   'common.loading': 'Loading…',
   'common.none': 'None',
   'common.show': 'Show',
   'common.hide': 'Hide',
 
-  // App.tsx — topbar/sidebar
   'app.toggleNav': 'Toggle navigation',
   'app.somethingBroke': 'Something broke while rendering this page.',
   'app.reload': 'Reload',
@@ -31,7 +30,6 @@ export const en = {
   'app.switchToRussian': 'Switch to Russian',
   'app.switchToEnglish': 'Switch to English',
 
-  // pages/Login.tsx
   'login.invalidWithCode': 'Invalid email, password, or code',
   'login.invalid': 'Invalid email or password',
   'login.signIn': 'Sign in',
@@ -46,11 +44,9 @@ export const en = {
   'login.verifyAndSignIn': 'Verify & sign in',
   'login.back': '← Back',
 
-  // pages/Dashboard.tsx
   'dashboard.title': 'Servers',
   'dashboard.subtitle': 'Everything you have access to, across every node.',
 
-  // pages/Nodes.tsx
   'nodes.title': 'Nodes',
   'nodes.subtitle': 'Machines running wingsd, ready to host servers.',
   'nodes.statsRamUsed': 'RAM used',
@@ -149,7 +145,6 @@ export const en = {
   'plugins.manage': 'Manage',
   'plugins.confirmUninstall': 'Uninstall "{name}"? This removes its container and data.',
 
-  // pages/Users.tsx
   'users.title': 'Users',
   'users.subtitle': 'Everyone with a PowerNode account.',
   'users.createUser': 'Create user',
@@ -174,7 +169,6 @@ export const en = {
   'users.noUsersYet': 'No users yet.',
   'users.noUsersMatch': 'No users match your search.',
 
-  // pages/Activity.tsx
   'activity.forbidden': 'Only admins can view the activity log.',
   'activity.title': 'Activity',
   'activity.subtitle': 'Recent actions across the panel.',
@@ -188,7 +182,6 @@ export const en = {
   'activity.noActivityMatch': 'No activity matches your search.',
   'activity.loadMore': 'Load more',
 
-  // pages/Account.tsx
   'account.title': 'Account',
   'account.subtitle': 'API keys for programmatic access.',
   'account.apiKeys': 'API Keys',
@@ -236,7 +229,6 @@ export const en = {
   'account.disabling': 'Disabling…',
   'account.disable2fa': 'Disable 2FA',
 
-  // pages/Settings.tsx
   'settings.title': 'Settings',
   'settings.subtitle': 'Panel version and updates.',
   'settings.version': 'Version',
@@ -249,7 +241,6 @@ export const en = {
   'settings.updateAvailableSuffix': ". Run this on the panel's server:",
   'settings.upToDate': "You're up to date (v{version}).",
 
-  // pages/ServerView.tsx
   'serverView.back': '← Back',
   'serverView.suspendedTitle': 'This server is suspended',
   'serverView.suspended': 'This server is suspended.',
@@ -335,7 +326,6 @@ export const en = {
   'serverView.telegramProxyDuplicateName': 'A key with that name already exists.',
   'serverView.telegramProxyNoSecret': "Waiting on the server's first start to generate a secret — start it, then check back here.",
 
-  // guides
   'guide.overview.title': 'How this tab works',
   'guide.overview.p1':
     'Status, live resource use, and the four power buttons on the left cover day-to-day operation. The Server info card below is a summary of how the server is configured, not just decoration — click Edit to actually change any of it.',
@@ -424,7 +414,6 @@ export const en = {
   'guide.sharing.p4':
     'Removing a collaborator revokes access immediately — no grace period, no confirmation needed on their end.',
 
-  // components/StatusBadge.tsx
   'status.running': 'Online',
   'status.offline': 'Offline',
   'status.starting': 'Starting',
@@ -433,7 +422,6 @@ export const en = {
   'status.install_failed': 'Install failed',
   'status.suspended': 'Suspended',
 
-  // components/ServerList.tsx + ServerCard.tsx
   'serverList.statServers': 'Servers',
   'serverList.statOnline': 'Online',
   'serverList.statOffline': 'Offline',
@@ -453,7 +441,6 @@ export const en = {
   'serverCard.restart': 'Restart',
   'serverCard.manage': 'Manage',
 
-  // components/CreateServerForm.tsx
   'createServer.button': '+ Create Server',
   'createServer.title': 'Create server',
   'createServer.name': 'Name',
@@ -479,7 +466,6 @@ export const en = {
   'createServer.creating': 'Creating…',
   'createServer.create': 'Create',
 
-  // components/FileManager.tsx
   'files.looksBinary': '"{name}" looks like a binary file — use Download instead of editing it as text.',
   'files.conflict':
     '"{name}" was changed on disk since you opened it — reopen it to see the latest version before saving again.',
@@ -499,7 +485,6 @@ export const en = {
   'files.delete': 'Delete',
   'files.emptyDirectory': 'Empty directory.',
 
-  // components/DatabaseManager.tsx
   'db.confirmDelete': 'Delete database "{name}"? This drops it and its user permanently.',
   'db.forbidden': "You don't have permission to view this server's databases.",
   'db.noHostsYet': 'No database hosts registered yet — an admin needs to add one on the Nodes page first.',
@@ -514,7 +499,6 @@ export const en = {
   'db.passwordLine': 'Password: ',
   'db.noDatabasesYet': 'No databases yet.',
 
-  // components/DomainManager.tsx
   'domains.confirmDelete': 'Remove "{domain}"? This deletes its reverse proxy and TLS certificate.',
   'domains.forbidden': "You don't have permission to view this server's domains.",
   'domains.addCustomDomain': 'Add a custom domain',
@@ -535,7 +519,6 @@ export const en = {
   'domains.addedLine': 'Added: ',
   'domains.noCustomDomainsYet': 'No custom domains yet.',
 
-  // components/PortManager.tsx
   'ports.forbidden': "You don't have permission to view this server's ports.",
   'ports.confirmRemovePrimary':
     "Remove port {port}? This is the server's main address — its listed address will change. The container will be recreated to apply this and will briefly restart.",
@@ -553,7 +536,6 @@ export const en = {
   'ports.removing': 'Removing…',
   'ports.noPortsAssignedYet': 'No ports assigned yet.',
 
-  // components/BackupManager.tsx
   'backups.confirmRestore': 'Restore "{name}"? This overwrites files currently on the server.',
   'backups.confirmDelete': 'Delete backup "{name}"? This cannot be undone.',
   'backups.forbidden': "You don't have permission to view this server's backups.",
@@ -572,7 +554,6 @@ export const en = {
   'backups.createdLine': 'Created: ',
   'backups.noBackupsYet': 'No backups yet.',
 
-  // components/ScheduleManager.tsx
   'schedules.commandLabel': 'Command: {payload}',
   'schedules.backupLabelNamed': 'Backup: {payload}',
   'schedules.backupLabelAuto': 'Backup (auto-named)',
@@ -611,7 +592,6 @@ export const en = {
   'schedules.neverRun': 'Never run',
   'schedules.noSchedulesYet': 'No schedules yet.',
 
-  // components/SubuserManager.tsx
   'subusers.confirmRemove': "Remove {email}'s access to this server?",
   'subusers.forbidden': "Only this server's owner or an admin can manage sharing.",
   'subusers.addCollaborator': 'Add a collaborator',
@@ -622,7 +602,6 @@ export const en = {
   'subusers.remove': 'Remove',
   'subusers.noCollaboratorsYet': 'No collaborators yet.',
 
-  // types/index.ts — subuser/API-key permission labels
   'perm.controlStart': 'Start',
   'perm.controlStop': 'Stop',
   'perm.controlRestart': 'Restart',
@@ -643,7 +622,6 @@ export const en = {
   'perm.allocationsRead': 'View ports',
   'perm.allocationsWrite': 'Manage ports',
 
-  // components/TwoFactorGate.tsx
   'twofaGate.required': '2FA required',
   'twofaGate.hint': 'Admin accounts on this panel must have two-factor authentication enabled before continuing.',
   'twofaGate.setUp': 'Set up 2FA',
@@ -708,6 +686,15 @@ export const en = {
   'streamers.songRequestsWidgetUrlLabel': 'OBS Browser Source URL',
   'streamers.songRequestsWidgetUrlHint': 'Add this as a Browser Source in OBS -- it plays the queue live.',
   'streamers.songRequestsSkip': 'Skip',
+
+  'streamers.botTile': 'Chat bot',
+  'streamers.botConnectHint': 'Connect a separate bot account so it can post in your chat -- create a second Twitch account for it first, then connect that one here.',
+  'streamers.botConnect': 'Connect bot account',
+  'streamers.botConnectedAs': 'Bot connected as {login}.',
+  'streamers.botNeedsMainConnection': 'Connect your own Twitch account too (above) -- the bot needs to know which channel to post in.',
+  'streamers.botAddCommand': 'Add command',
+  'streamers.botResponsePlaceholder': 'response text',
+  'streamers.botDisconnect': 'Disconnect bot',
   'streamers.spotifyConnectedAs': 'Connected: {name}',
   'streamers.spotifyReadyHint':
     'Song requests from the donation page now queue automatically — just have Spotify open and playing something.',

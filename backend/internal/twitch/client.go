@@ -1,9 +1,3 @@
-// Package twitch is a minimal client for Twitch's OAuth authorization-code
-// flow and the one Helix endpoint needed to identify who just connected.
-// Verified against Twitch's own docs (dev.twitch.tv/docs/authentication)
-// rather than assumed, since getting a redirect_uri or token exchange
-// detail wrong here breaks the whole flow silently for every installed
-// panel using it.
 package twitch
 
 import (
@@ -19,9 +13,6 @@ import (
 	"time"
 )
 
-// ErrTokenExpired signals a caller should refresh the user access token
-// (via RefreshUserToken) and retry, rather than treating the request as a
-// hard failure.
 var ErrTokenExpired = errors.New("twitch access token expired")
 
 const (
@@ -32,21 +23,10 @@ const (
 	streamsURL   = "https://api.twitch.tv/helix/streams"
 )
 
-// Scope is the base "connect an account" scope: just enough to identify who
-// connected. ScopeExtended is requested by a separate, explicit upgrade
-// step (not bundled into the base connect flow) since it grants meaningfully
-// bigger things than proving identity: reading the broadcaster's subscriber
-// list and followers (alert widget), and reading their stream key
-// (auto-filling TWITCH_KEY when creating a relay server). All bundled into
-// one upgrade rather than several separate consent screens since they're
-// the same tier of access.
 const (
-	Scope = "user:read:email"
-	// channel:manage:redemptions covers both creating/reading the channel
-	// points reward and reading+fulfilling its redemptions -- there's no
-	// separate lesser scope worth splitting out for song requests, unlike
-	// the sub/follow alert widget's read-only channel:read:subscriptions.
+	Scope         = "user:read:email"
 	ScopeExtended = "user:read:email channel:read:subscriptions channel:read:stream_key moderator:read:followers channel:manage:redemptions"
+	ScopeBot      = "user:read:chat chat:edit"
 )
 
 type Client struct {
@@ -69,10 +49,6 @@ func New(clientID, clientSecret, redirectURI string) *Client {
 	}
 }
 
-// Enabled reports whether this panel install has everything needed to run
-// the flow: a registered Twitch app, and a known public URL to redirect
-// back to (Twitch redirects the user's browser, so this can't be relative
-// or default to localhost).
 func (c *Client) Enabled() bool {
 	return c.ClientID != "" && c.ClientSecret != "" && c.RedirectURI != ""
 }
@@ -92,12 +68,12 @@ func (c *Client) AuthorizeURL(state string) string {
 	return c.authorizeURL(state, Scope)
 }
 
-// AuthorizeExtendedURL requests the broader scope needed for
-// subscription-alert EventSub subscriptions and stream-key auto-fill.
-// Kept as an explicit separate entry point rather than folded into
-// AuthorizeURL -- see the Scope doc comment.
 func (c *Client) AuthorizeExtendedURL(state string) string {
 	return c.authorizeURL(state, ScopeExtended)
+}
+
+func (c *Client) AuthorizeBotURL(state string) string {
+	return c.authorizeURL(state, ScopeBot)
 }
 
 type Tokens struct {
@@ -156,9 +132,6 @@ type usersResponse struct {
 	} `json:"data"`
 }
 
-// FetchUser looks up the identity of whoever the access token belongs to.
-// Called with no query parameters, Twitch's Get Users endpoint returns the
-// token owner's own record.
 func (c *Client) FetchUser(ctx context.Context, accessToken string) (*User, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, usersURL, nil)
 	if err != nil {
@@ -193,10 +166,6 @@ type streamsResponse struct {
 	} `json:"data"`
 }
 
-// GetViewerCount reports the live viewer count for a channel, or
-// (0, false) if it's not currently live. Get Streams is public data --
-// works with an app token, no per-user scope or extended consent needed,
-// unlike stream key/subscriptions.
 func (c *Client) GetViewerCount(ctx context.Context, appToken, broadcasterUserID string) (int, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		streamsURL+"?user_id="+url.QueryEscape(broadcasterUserID), nil)
@@ -225,11 +194,6 @@ func (c *Client) GetViewerCount(ctx context.Context, appToken, broadcasterUserID
 	return sr.Data[0].ViewerCount, true, nil
 }
 
-// RefreshUserToken exchanges a refresh token for a fresh access/refresh
-// token pair. User access tokens are short-lived (~4 hours); callers that
-// keep using a stored connection (e.g. fetching the stream key on demand,
-// possibly long after the account was connected) need this rather than
-// assuming the originally-stored access token is still valid.
 func (c *Client) RefreshUserToken(ctx context.Context, refreshToken string) (*Tokens, error) {
 	form := url.Values{
 		"client_id":     {c.ClientID},
@@ -265,10 +229,6 @@ type streamKeyResponse struct {
 	} `json:"data"`
 }
 
-// GetStreamKey fetches the broadcaster's own RTMP stream key. Requires a
-// USER access token carrying channel:read:stream_key -- unlike EventSub
-// subscription creation, this is not something an app token can do, since
-// the key is specific to whichever user consented to share it.
 func (c *Client) GetStreamKey(ctx context.Context, userAccessToken, broadcasterUserID string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
 		"https://api.twitch.tv/helix/streams/key?broadcaster_id="+url.QueryEscape(broadcasterUserID), nil)
@@ -306,12 +266,6 @@ type customRewardsResponse struct {
 	} `json:"data"`
 }
 
-// CreateCustomReward creates a Channel Points reward the broadcaster's
-// viewers can redeem, requiring free-text input (the song link). Requires a
-// USER access token carrying channel:manage:redemptions -- confirmed
-// against Twitch's API reference, not assumed, since the read-only
-// channel:read:redemptions scope is *not* enough here (that only covers
-// listing rewards/redemptions, not creating one).
 func (c *Client) CreateCustomReward(ctx context.Context, userAccessToken, broadcasterUserID, title string, costPoints int) (string, error) {
 	body := map[string]any{
 		"title":                  title,
@@ -357,9 +311,6 @@ func (c *Client) CreateCustomReward(ctx context.Context, userAccessToken, broadc
 	return cr.Data[0].ID, nil
 }
 
-// DeleteCustomReward removes a reward this app created. Twitch only allows
-// deleting rewards the requesting client created in the first place --
-// requires channel:manage:redemptions, same as creating one.
 func (c *Client) DeleteCustomReward(ctx context.Context, userAccessToken, broadcasterUserID, rewardID string) error {
 	reqURL := "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id=" +
 		url.QueryEscape(broadcasterUserID) + "&id=" + url.QueryEscape(rewardID)
@@ -384,9 +335,6 @@ func (c *Client) DeleteCustomReward(ctx context.Context, userAccessToken, broadc
 	return nil
 }
 
-// UpdateRedemptionStatus marks a redemption fulfilled (or canceled, which
-// refunds the viewer's points -- not used today, but the same call shape).
-// Requires channel:manage:redemptions.
 func (c *Client) UpdateRedemptionStatus(ctx context.Context, userAccessToken, broadcasterUserID, rewardID, redemptionID, status string) error {
 	reqURL := "https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?" +
 		url.Values{
@@ -421,16 +369,44 @@ func (c *Client) UpdateRedemptionStatus(ctx context.Context, userAccessToken, br
 	return nil
 }
 
+func (c *Client) SendChatMessage(ctx context.Context, userAccessToken, broadcasterUserID, senderUserID, message string) error {
+	payload, err := json.Marshal(map[string]string{
+		"broadcaster_id": broadcasterUserID,
+		"sender_id":      senderUserID,
+		"message":        message,
+	})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.twitch.tv/helix/chat/messages", strings.NewReader(string(payload)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+userAccessToken)
+	req.Header.Set("Client-Id", c.ClientID)
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return fmt.Errorf("call twitch send-chat-message endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		return ErrTokenExpired
+	}
+	if resp.StatusCode >= 300 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("twitch send-chat-message returned %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	return nil
+}
+
 type appTokenResponse struct {
 	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
 }
 
-// AppAccessToken returns a client-credentials app token, caching it until
-// shortly before it expires. EventSub webhook subscriptions specifically
-// require an app token, not a user token -- confirmed against Twitch's own
-// docs ("When subscribing to events using webhooks, you must use an app
-// access token. The request fails if you use a user access token.").
 func (c *Client) AppAccessToken(ctx context.Context) (string, error) {
 	c.appTokenMu.Lock()
 	defer c.appTokenMu.Unlock()
@@ -465,7 +441,6 @@ func (c *Client) AppAccessToken(ctx context.Context) (string, error) {
 	}
 
 	c.appToken = tr.AccessToken
-	// Refresh a bit early rather than racing an exact expiry.
 	c.appTokenExpiry = time.Now().Add(time.Duration(tr.ExpiresIn)*time.Second - 5*time.Minute)
 	return c.appToken, nil
 }
@@ -489,10 +464,6 @@ type eventSubCreateResponse struct {
 	} `json:"data"`
 }
 
-// CreateEventSubSubscription registers a webhook-transport EventSub
-// subscription for a broadcaster and returns Twitch's ID for it (needed
-// later to delete it on disconnect). appToken must come from
-// AppAccessToken, not a user token -- see its doc comment.
 func (c *Client) CreateEventSubSubscription(ctx context.Context, appToken, eventType, version string, condition map[string]string, callbackURL, secret string) (string, error) {
 	body := eventSubCreateRequest{
 		Type:      eventType,
@@ -532,8 +503,6 @@ func (c *Client) CreateEventSubSubscription(ctx context.Context, appToken, event
 	return er.Data[0].ID, nil
 }
 
-// DeleteEventSubSubscription removes a webhook subscription, e.g. when a
-// user disconnects their Twitch account.
 func (c *Client) DeleteEventSubSubscription(ctx context.Context, appToken, subscriptionID string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, eventSubURL+"?id="+url.QueryEscape(subscriptionID), nil)
 	if err != nil {

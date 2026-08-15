@@ -2,6 +2,7 @@ import type {
   ActivityEntry,
   Allocation,
   ApiKey,
+  BotCommand,
   CreateAllocationRequest,
   CreateApiKeyResponse,
   CreateDatabaseHostRequest,
@@ -485,6 +486,24 @@ export const api = {
       donations_today: { currency: string; total_cents: number; count: number }[];
       donations_all_time: { currency: string; total_cents: number; count: number }[];
     }>('/streamers/analytics'),
+
+  getTwitchBotStatus: () =>
+    request<{ connected: boolean; bot_login?: string; needs_main_connection: boolean }>('/integrations/twitch/bot/status'),
+
+  startTwitchBotConnect: () =>
+    request<{ authorize_url: string }>('/integrations/twitch/bot/start', { method: 'POST' }),
+
+  disconnectTwitchBot: () => request<void>('/integrations/twitch/bot', { method: 'DELETE' }),
+
+  listBotCommands: () => request<BotCommand[]>('/integrations/twitch/bot/commands'),
+
+  saveBotCommand: (name: string, response: string) =>
+    request<BotCommand>('/integrations/twitch/bot/commands', {
+      method: 'POST',
+      body: JSON.stringify({ name, response }),
+    }),
+
+  deleteBotCommand: (id: number) => request<void>(`/integrations/twitch/bot/commands/${id}`, { method: 'DELETE' }),
 
   getSongRequestsStatus: () =>
     request<{ enabled: boolean; widget_url?: string }>('/integrations/twitch/song-requests/status'),

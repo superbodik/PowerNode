@@ -57,9 +57,6 @@ function loadUsername(): string {
   }
 }
 
-// Mirrors mtprotoproxy's own TLS-mode secret format ("ee" + secret + hex of
-// the UTF-8 TLS_DOMAIN bytes) so the panel can show a ready tg://proxy link
-// without needing the container to print it anywhere first.
 function hexEncodeUtf8(value: string): string {
   return Array.from(new TextEncoder().encode(value))
     .map((b) => b.toString(16).padStart(2, '0'))
@@ -259,11 +256,6 @@ export function ServerView({ uuid, onBack }: Props) {
       .catch(() => setProxyKeys(null));
   }
 
-  // keys.json (multiple named secrets sharing one port) is what current
-  // installs generate on boot -- but a server created before that egg
-  // update, or one that hasn't started even once yet, won't have it. The
-  // single PROXY_SECRET env var / .secret file fallback keeps those
-  // showing *something* instead of an empty card.
   useEffect(() => {
     if (!telegramProxyEgg || !server) {
       setProxyKeys(null);

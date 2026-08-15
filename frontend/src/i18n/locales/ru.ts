@@ -1,19 +1,18 @@
 import type { Dict } from '..';
 
 export const ru: Dict = {
-  // common
   'common.save': 'Сохранить',
   'common.saving': 'Сохранение…',
   'common.cancel': 'Отмена',
   'common.delete': 'Удалить',
   'common.deleting': 'Удаление…',
+  'common.add': 'Добавить',
   'common.copy': 'Копировать',
   'common.loading': 'Загрузка…',
   'common.none': 'Нет',
   'common.show': 'Показать',
   'common.hide': 'Скрыть',
 
-  // App.tsx — topbar/sidebar
   'app.toggleNav': 'Переключить навигацию',
   'app.somethingBroke': 'Что-то сломалось при отображении этой страницы.',
   'app.reload': 'Перезагрузить',
@@ -33,7 +32,6 @@ export const ru: Dict = {
   'app.switchToRussian': 'Переключить на русский',
   'app.switchToEnglish': 'Переключить на английский',
 
-  // pages/Login.tsx
   'login.invalidWithCode': 'Неверный email, пароль или код',
   'login.invalid': 'Неверный email или пароль',
   'login.signIn': 'Войти',
@@ -48,11 +46,9 @@ export const ru: Dict = {
   'login.verifyAndSignIn': 'Подтвердить и войти',
   'login.back': '← Назад',
 
-  // pages/Dashboard.tsx
   'dashboard.title': 'Серверы',
   'dashboard.subtitle': 'Всё, к чему у вас есть доступ, по всем нодам.',
 
-  // pages/Nodes.tsx
   'nodes.title': 'Ноды',
   'nodes.subtitle': 'Машины с wingsd, готовые размещать серверы.',
   'nodes.statsRamUsed': 'ОЗУ занято',
@@ -151,7 +147,6 @@ export const ru: Dict = {
   'plugins.manage': 'Управлять',
   'plugins.confirmUninstall': 'Удалить "{name}"? Это удалит контейнер и данные.',
 
-  // pages/Users.tsx
   'users.title': 'Пользователи',
   'users.subtitle': 'Все, у кого есть аккаунт PowerNode.',
   'users.createUser': 'Создать пользователя',
@@ -176,7 +171,6 @@ export const ru: Dict = {
   'users.noUsersYet': 'Пользователей пока нет.',
   'users.noUsersMatch': 'Ни один пользователь не соответствует поиску.',
 
-  // pages/Activity.tsx
   'activity.forbidden': 'Просматривать журнал активности могут только администраторы.',
   'activity.title': 'Активность',
   'activity.subtitle': 'Недавние действия в панели.',
@@ -190,7 +184,6 @@ export const ru: Dict = {
   'activity.noActivityMatch': 'Ничего не найдено по этому запросу.',
   'activity.loadMore': 'Загрузить ещё',
 
-  // pages/Account.tsx
   'account.title': 'Аккаунт',
   'account.subtitle': 'API-ключи для программного доступа.',
   'account.apiKeys': 'API-ключи',
@@ -238,7 +231,6 @@ export const ru: Dict = {
   'account.disabling': 'Отключение…',
   'account.disable2fa': 'Отключить 2FA',
 
-  // pages/Settings.tsx
   'settings.title': 'Настройки',
   'settings.subtitle': 'Версия панели и обновления.',
   'settings.version': 'Версия',
@@ -251,7 +243,6 @@ export const ru: Dict = {
   'settings.updateAvailableSuffix': '. Выполните это на сервере панели:',
   'settings.upToDate': 'У вас последняя версия (v{version}).',
 
-  // pages/ServerView.tsx
   'serverView.back': '← Назад',
   'serverView.suspendedTitle': 'Этот сервер приостановлен',
   'serverView.suspended': 'Этот сервер приостановлен.',
@@ -337,7 +328,6 @@ export const ru: Dict = {
   'serverView.telegramProxyDuplicateName': 'Ключ с таким именем уже есть.',
   'serverView.telegramProxyNoSecret': 'Секрет появится после первого запуска сервера — запусти его и вернись сюда.',
 
-  // guides
   'guide.overview.title': 'Как это работает',
   'guide.overview.p1':
     'Статус, живое использование ресурсов и четыре кнопки питания слева покрывают повседневную работу. Карточка «Server info» ниже — это не просто отображение, а сводка реальной конфигурации сервера: нажмите Edit, чтобы что-то в ней изменить.',
@@ -426,7 +416,6 @@ export const ru: Dict = {
   'guide.sharing.p4':
     'Удаление участника отзывает доступ немедленно — без периода ожидания, без подтверждения с его стороны.',
 
-  // components/StatusBadge.tsx
   'status.running': 'Онлайн',
   'status.offline': 'Офлайн',
   'status.starting': 'Запускается',
@@ -435,7 +424,6 @@ export const ru: Dict = {
   'status.install_failed': 'Ошибка установки',
   'status.suspended': 'Приостановлен',
 
-  // components/ServerList.tsx + ServerCard.tsx
   'serverList.statServers': 'Серверы',
   'serverList.statOnline': 'Онлайн',
   'serverList.statOffline': 'Офлайн',
@@ -455,7 +443,6 @@ export const ru: Dict = {
   'serverCard.restart': 'Перезапустить',
   'serverCard.manage': 'Управление',
 
-  // components/CreateServerForm.tsx
   'createServer.button': '+ Создать сервер',
   'createServer.title': 'Создание сервера',
   'createServer.name': 'Название',
@@ -481,7 +468,6 @@ export const ru: Dict = {
   'createServer.creating': 'Создание…',
   'createServer.create': 'Создать',
 
-  // components/FileManager.tsx
   'files.looksBinary': '«{name}» похож на бинарный файл — используйте Download вместо редактирования как текста.',
   'files.conflict':
     '«{name}» был изменён на диске с момента открытия — откройте заново, чтобы увидеть последнюю версию, прежде чем сохранять снова.',
@@ -501,7 +487,6 @@ export const ru: Dict = {
   'files.delete': 'Удалить',
   'files.emptyDirectory': 'Пустая папка.',
 
-  // components/DatabaseManager.tsx
   'db.confirmDelete': 'Удалить базу данных «{name}»? Она и её пользователь будут удалены безвозвратно.',
   'db.forbidden': 'У вас нет прав на просмотр баз данных этого сервера.',
   'db.noHostsYet': 'Хосты баз данных ещё не зарегистрированы — сначала администратор должен добавить хост на странице Nodes.',
@@ -516,7 +501,6 @@ export const ru: Dict = {
   'db.passwordLine': 'Пароль: ',
   'db.noDatabasesYet': 'Баз данных пока нет.',
 
-  // components/DomainManager.tsx
   'domains.confirmDelete': 'Удалить «{domain}»? Это удалит его реверс-прокси и TLS-сертификат.',
   'domains.forbidden': 'У вас нет прав на просмотр доменов этого сервера.',
   'domains.addCustomDomain': 'Добавить свой домен',
@@ -537,7 +521,6 @@ export const ru: Dict = {
   'domains.addedLine': 'Добавлен: ',
   'domains.noCustomDomainsYet': 'Своих доменов пока нет.',
 
-  // components/PortManager.tsx
   'ports.forbidden': 'У вас нет прав на просмотр портов этого сервера.',
   'ports.confirmRemovePrimary':
     'Удалить порт {port}? Это основной адрес сервера — его отображаемый адрес изменится. Контейнер будет пересоздан для применения изменений и ненадолго перезапустится.',
@@ -555,7 +538,6 @@ export const ru: Dict = {
   'ports.removing': 'Удаление…',
   'ports.noPortsAssignedYet': 'Портов пока не назначено.',
 
-  // components/BackupManager.tsx
   'backups.confirmRestore': 'Восстановить «{name}»? Это перезапишет файлы, которые сейчас на сервере.',
   'backups.confirmDelete': 'Удалить бэкап «{name}»? Это необратимо.',
   'backups.forbidden': 'У вас нет прав на просмотр бэкапов этого сервера.',
@@ -574,7 +556,6 @@ export const ru: Dict = {
   'backups.createdLine': 'Создан: ',
   'backups.noBackupsYet': 'Бэкапов пока нет.',
 
-  // components/ScheduleManager.tsx
   'schedules.commandLabel': 'Команда: {payload}',
   'schedules.backupLabelNamed': 'Бэкап: {payload}',
   'schedules.backupLabelAuto': 'Бэкап (автоназвание)',
@@ -613,7 +594,6 @@ export const ru: Dict = {
   'schedules.neverRun': 'Ещё не запускалось',
   'schedules.noSchedulesYet': 'Расписаний пока нет.',
 
-  // components/SubuserManager.tsx
   'subusers.confirmRemove': 'Убрать доступ {email} к этому серверу?',
   'subusers.forbidden': 'Управлять доступом может только владелец сервера или администратор.',
   'subusers.addCollaborator': 'Добавить участника',
@@ -624,7 +604,6 @@ export const ru: Dict = {
   'subusers.remove': 'Убрать',
   'subusers.noCollaboratorsYet': 'Участников пока нет.',
 
-  // types/index.ts — subuser/API-key permission labels
   'perm.controlStart': 'Запуск',
   'perm.controlStop': 'Остановка',
   'perm.controlRestart': 'Перезапуск',
@@ -645,7 +624,6 @@ export const ru: Dict = {
   'perm.allocationsRead': 'Просмотр портов',
   'perm.allocationsWrite': 'Управление портами',
 
-  // components/TwoFactorGate.tsx
   'twofaGate.required': 'Требуется 2FA',
   'twofaGate.hint': 'Перед продолжением у администраторских аккаунтов в этой панели должна быть включена двухфакторная аутентификация.',
   'twofaGate.setUp': 'Настроить 2FA',
@@ -710,6 +688,16 @@ export const ru: Dict = {
   'streamers.songRequestsWidgetUrlLabel': 'URL для Browser Source в OBS',
   'streamers.songRequestsWidgetUrlHint': 'Добавь эту ссылку как Browser Source в OBS — она проигрывает очередь вживую.',
   'streamers.songRequestsSkip': 'Пропустить',
+
+  'streamers.botTile': 'Чат-бот',
+  'streamers.botConnectHint': 'Подключи отдельный аккаунт-бота, чтобы он мог писать в твой чат — сначала создай второй Twitch-аккаунт для него, потом подключи его тут.',
+  'streamers.botConnect': 'Подключить аккаунт-бота',
+  'streamers.botConnectedAs': 'Бот подключен как {login}.',
+  'streamers.botNeedsMainConnection': 'Подключи и свой собственный Twitch-аккаунт (выше) — боту нужно знать, в какой канал писать.',
+  'streamers.botAddCommand': 'Добавить команду',
+  'streamers.botResponsePlaceholder': 'текст ответа',
+  'streamers.botDisconnect': 'Отключить бота',
+
   'streamers.spotifyConnectedAs': 'Подключено: {name}',
   'streamers.spotifyReadyHint':
     'Заказы треков со страницы доната теперь встают в очередь автоматически — просто держи Spotify открытым и что-нибудь играющим.',
