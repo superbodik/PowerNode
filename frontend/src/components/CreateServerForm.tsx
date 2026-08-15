@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { t } from '../i18n';
+import { EggVariableField, eggVariableHint } from './EggVariableField';
 import type { Allocation, Egg, Node } from '../types';
 
 interface Props {
@@ -335,18 +336,15 @@ export function CreateServerForm({ onCreated }: Props) {
               ?.variables.map((v) => (
                 <div className="sfield" key={v.env_variable}>
                   <label htmlFor={`env-${v.env_variable}`}>{v.name}</label>
-                  <input
+                  <EggVariableField
                     id={`env-${v.env_variable}`}
+                    variable={v}
                     value={environment[v.env_variable] ?? ''}
-                    onChange={(e) =>
-                      setEnvironment((env) => ({ ...env, [v.env_variable]: e.target.value }))
-                    }
-                    disabled={!v.is_editable}
-                    required={v.rules.split('|').includes('required')}
+                    onChange={(value) => setEnvironment((env) => ({ ...env, [v.env_variable]: value }))}
                   />
-                  {v.rules && (
+                  {eggVariableHint(v.rules) && (
                     <span className="srv-desc" style={{ fontSize: 10 }}>
-                      {v.rules}
+                      {eggVariableHint(v.rules)}
                     </span>
                   )}
                 </div>

@@ -5,6 +5,7 @@ import { t } from '../i18n';
 import { BackupManager } from '../components/BackupManager';
 import { DatabaseManager } from '../components/DatabaseManager';
 import { DomainManager } from '../components/DomainManager';
+import { EggVariableField, eggVariableHint } from '../components/EggVariableField';
 import { FileManager } from '../components/FileManager';
 import { GuidePanel } from '../components/GuidePanel';
 import { PortManager } from '../components/PortManager';
@@ -528,21 +529,20 @@ export function ServerView({ uuid, onBack }: Props) {
                       {eggVariables.map((v) => (
                         <div className="sfield" key={v.env_variable}>
                           <label htmlFor={`edit-env-${v.env_variable}`}>{v.name}</label>
-                          <input
+                          <EggVariableField
                             id={`edit-env-${v.env_variable}`}
+                            variable={v}
                             value={infoForm.environment[v.env_variable] ?? ''}
-                            onChange={(e) =>
+                            onChange={(value) =>
                               setInfoForm((f) => ({
                                 ...f,
-                                environment: { ...f.environment, [v.env_variable]: e.target.value },
+                                environment: { ...f.environment, [v.env_variable]: value },
                               }))
                             }
-                            disabled={!v.is_editable}
-                            required={v.rules.split('|').includes('required')}
                           />
-                          {v.rules && (
+                          {eggVariableHint(v.rules) && (
                             <span className="srv-desc" style={{ fontSize: 10 }}>
-                              {v.rules}
+                              {eggVariableHint(v.rules)}
                             </span>
                           )}
                         </div>

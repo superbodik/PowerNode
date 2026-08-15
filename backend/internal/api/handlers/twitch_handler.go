@@ -708,21 +708,13 @@ func (h *TwitchHandler) chatWidgetURL(login string) string {
 	return h.PublicURL + "/api/v1/widgets/chat/" + url.PathEscape(login)
 }
 
-// chatWidgetPageHTML renders chat itself rather than embedding Twitch's own
-// iframe -- their embed always ships a header/input bar that's cross-origin
-// content we can't restyle (see the earlier header-crop hack this replaces).
-// Connects straight to Twitch's public anonymous chat IRC-over-WebSocket
-// (wss://irc-ws.chat.twitch.tv) -- no OAuth, no scope, exactly the same
-// access anyone reading chat anonymously already has -- and renders just
-// icon + name + text. How many messages stay visible falls out naturally
-// from the Browser Source's own height (older ones scroll off), not a
-// fixed count.
 func chatWidgetPageHTML(login string) string {
 	return `<!doctype html>
 <html><head><meta charset="utf-8"><title>PowerNode Twitch chat</title>
 <style>
   html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, Segoe UI, sans-serif; }
-  #log { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; overflow: hidden; padding: 6px; box-sizing: border-box; }
+  #log { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; overflow: hidden; padding: 6px; box-sizing: border-box; opacity: 1; transition: opacity 2s; }
+  #log.faded { opacity: 0; }
   .msg { display: flex; align-items: flex-start; gap: 6px; padding: 3px 4px; font-size: 14px; line-height: 1.35; word-break: break-word; }
   .avatar {
     flex: 0 0 20px; width: 20px; height: 20px; border-radius: 50%;
@@ -739,7 +731,15 @@ func chatWidgetPageHTML(login string) string {
   <script>
     var channel = ` + jsStringLiteral(strings.ToLower(login)) + `;
     var log = document.getElementById('log');
-    var MAX_KEPT = 200; // trim DOM growth over a long stream; visible count is bounded by height anyway
+    var MAX_KEPT = 200;
+    var INACTIVITY_MS = 120000;
+    var fadeTimer = null;
+
+    function scheduleFade() {
+      if (fadeTimer) clearTimeout(fadeTimer);
+      log.classList.remove('faded');
+      fadeTimer = setTimeout(function () { log.classList.add('faded'); }, INACTIVITY_MS);
+    }
 
     function escapeHtml(s) {
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -765,6 +765,7 @@ func chatWidgetPageHTML(login string) string {
       log.appendChild(el);
       while (log.children.length > MAX_KEPT) log.removeChild(log.firstChild);
       log.scrollTop = log.scrollHeight;
+      scheduleFade();
     }
 
     function connect() {

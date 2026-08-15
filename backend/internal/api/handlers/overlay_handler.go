@@ -11,16 +11,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/yourorg/panel/internal/auth"
+	"github.com/yourorg/panel/internal/ws"
 )
 
-// OverlayHandler powers the moderator overlay constructor: a streamer (or
-// anyone holding the moderator link -- token-based access, no login,
-// same trust model as the Twitch alert widget) arranges widgets on a
-// canvas, and a separate public render page turns that into the actual
-// OBS Browser Source.
 type OverlayHandler struct {
 	DB        *pgxpool.Pool
 	PublicURL string
+	Hub       *ws.Hub
 }
 
 type overlayWidget struct {
@@ -41,10 +38,6 @@ type overlayLayoutResponse struct {
 	Widgets      []overlayWidget `json:"widgets"`
 }
 
-// resolveOwner identifies whose layout is being worked on -- either the
-// authenticated caller (normal panel login), or anyone presenting a valid
-// moderator_token (?token=... query param, no login required). Returns 0
-// with ok=false if neither checks out.
 func (h *OverlayHandler) resolveOwner(r *http.Request) (userID int64, ok bool) {
 	if claims, authed := auth.FromContext(r.Context()); authed {
 		return claims.UserID, true
@@ -70,9 +63,6 @@ func (h *OverlayHandler) renderURL(token string) string {
 	return h.PublicURL + "/api/v1/overlay/render/" + token
 }
 
-// GetLayout returns the caller's layout, creating an empty one on first
-// use -- there's nothing meaningful to show for "no layout yet" beyond an
-// empty canvas, so this just makes one exist rather than erroring.
 func (h *OverlayHandler) GetLayout(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.resolveOwner(r)
 	if !ok {
@@ -142,9 +132,6 @@ type saveWidgetsRequest struct {
 	Widgets []overlayWidget `json:"widgets"`
 }
 
-// SaveWidgets replaces the entire widget set in one call -- matches how a
-// canvas editor naturally saves state ("here's the current layout"),
-// rather than trying to diff individual widget moves against the server.
 func (h *OverlayHandler) SaveWidgets(w http.ResponseWriter, r *http.Request) {
 	userID, ok := h.resolveOwner(r)
 	if !ok {
@@ -163,9 +150,10 @@ func (h *OverlayHandler) SaveWidgets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var layoutID int64
+	var renderToken string
 	if err := h.DB.QueryRow(r.Context(),
-		`SELECT id FROM overlay_layouts WHERE owner_user_id = $1`, userID,
-	).Scan(&layoutID); err != nil {
+		`SELECT id, render_token FROM overlay_layouts WHERE owner_user_id = $1`, userID,
+	).Scan(&layoutID, &renderToken); err != nil {
 		http.Error(w, "layout not found -- load it first", http.StatusBadRequest)
 		return
 	}
@@ -204,13 +192,13 @@ func (h *OverlayHandler) SaveWidgets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.Hub != nil {
+		h.Hub.BroadcastWidget(renderToken, map[string]any{"type": "layout_changed"})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// RenderPage is the actual OBS Browser Source -- public, read-only, keyed
-// by render_token (deliberately separate from moderator_token so sharing
-// this URL, which might end up visible on-stream, can never grant edit
-// access). Renders each widget's last-known position/size and live data.
 func (h *OverlayHandler) RenderPage(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
 
@@ -243,10 +231,10 @@ func (h *OverlayHandler) RenderPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, overlayRenderPageHTML(username, widgets))
+	fmt.Fprint(w, overlayRenderPageHTML(username, token, widgets))
 }
 
-func overlayRenderPageHTML(username string, widgets []overlayWidget) string {
+func overlayRenderPageHTML(username, renderToken string, widgets []overlayWidget) string {
 	var boxes string
 	for _, wg := range widgets {
 		var inner string
@@ -300,9 +288,6 @@ func overlayRenderPageHTML(username string, widgets []overlayWidget) string {
 <body>
   <div class="stage">` + boxes + `</div>
   <script>
-    // Live-bind viewer_count / donation_total placeholders against the
-    // panel's own public analytics summary for this channel, polled
-    // periodically -- everything else on this page is static once loaded.
     function poll() {
       fetch('/api/v1/streamers/public-analytics/' + ` + jsStringLiteral(username) + `)
         .then(function (r) { return r.ok ? r.json() : null; })
@@ -319,6 +304,19 @@ func overlayRenderPageHTML(username string, widgets []overlayWidget) string {
     }
     poll();
     setInterval(poll, 15000);
+
+    function connectLayoutSocket() {
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var sock = new WebSocket(proto + '//' + location.host + '/ws/widgets/' + ` + jsStringLiteral(renderToken) + `);
+      sock.onmessage = function (ev) {
+        try {
+          var msg = JSON.parse(ev.data);
+          if (msg.type === 'layout_changed') location.reload();
+        } catch (e) {}
+      };
+      sock.onclose = function () { setTimeout(connectLayoutSocket, 3000); };
+    }
+    connectLayoutSocket();
   </script>
 </body></html>`
 }

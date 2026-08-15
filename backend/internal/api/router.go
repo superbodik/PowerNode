@@ -125,7 +125,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	)
 	stripeHandler.Spotify = spotifyHandler
 	analyticsHandler := &handlers.AnalyticsHandler{DB: deps.DB, Twitch: deps.TwitchClient}
-	overlayHandler := &handlers.OverlayHandler{DB: deps.DB, PublicURL: deps.PublicURL}
+	overlayHandler := &handlers.OverlayHandler{DB: deps.DB, PublicURL: deps.PublicURL, Hub: deps.Hub}
 	songRequestHandler := &handlers.SongRequestHandler{
 		DB:             deps.DB,
 		Client:         deps.TwitchClient,
