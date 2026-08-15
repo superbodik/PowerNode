@@ -219,6 +219,9 @@ func (h *TwitchBotHandler) DeleteCommand(w http.ResponseWriter, r *http.Request)
 
 func (h *TwitchBotHandler) HandleChatMessage(ctx context.Context, userID int64, chatterUserID, text string) {
 	text = strings.TrimSpace(text)
+
+	_, _ = h.DB.Exec(ctx, `UPDATE stream_sessions SET chat_messages = chat_messages + 1 WHERE user_id = $1 AND ended_at IS NULL`, userID)
+
 	if !strings.HasPrefix(text, "!") {
 		return
 	}

@@ -29,6 +29,7 @@ import type {
   ServerDatabase,
   ServerDomain,
   SSHKey,
+  StreamSession,
   Subuser,
   TwoFASetup,
   TwoFAStatus,
@@ -485,7 +486,12 @@ export const api = {
       viewer_count?: number;
       donations_today: { currency: string; total_cents: number; count: number }[];
       donations_all_time: { currency: string; total_cents: number; count: number }[];
+      chat_messages_today: number;
     }>('/streamers/analytics'),
+
+  listStreamSessions: () => request<StreamSession[]>('/streamers/sessions'),
+
+  getStreamSession: (id: number) => request<StreamSession>(`/streamers/sessions/${id}`),
 
   getTwitchBotStatus: () =>
     request<{ connected: boolean; bot_login?: string; needs_main_connection: boolean }>('/integrations/twitch/bot/status'),

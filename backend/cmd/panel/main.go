@@ -15,6 +15,7 @@ import (
 	stripe "github.com/stripe/stripe-go/v81"
 
 	"github.com/yourorg/panel/internal/api"
+	"github.com/yourorg/panel/internal/api/handlers"
 	"github.com/yourorg/panel/internal/auth"
 	"github.com/yourorg/panel/internal/config"
 	"github.com/yourorg/panel/internal/crypto"
@@ -119,6 +120,7 @@ func main() {
 	if twitchClient.Enabled() {
 		log.Printf("twitch integration enabled (redirect: %s)", twitchRedirectURI)
 	}
+	go handlers.RunViewerSampler(pool, twitchClient)
 
 	if cfg.StripeSecretKey != "" {
 		stripe.Key = cfg.StripeSecretKey

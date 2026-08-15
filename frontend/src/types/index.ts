@@ -423,6 +423,30 @@ export interface BotCommand {
   response: string;
 }
 
+export interface ViewerSample {
+  sampled_at: string;
+  viewers: number;
+}
+
+export interface SessionDonation {
+  donor_name: string;
+  message: string;
+  amount_cents: number;
+  currency: string;
+  created_at: string;
+}
+
+export interface StreamSession {
+  id: number;
+  started_at: string;
+  ended_at: string | null;
+  peak_viewers: number;
+  chat_messages: number;
+  donation_total: { currency: string; total_cents: number; count: number }[];
+  samples?: ViewerSample[];
+  donations?: SessionDonation[];
+}
+
 export interface QueuedSongRequest {
   id: number;
   redeemer_name: string;

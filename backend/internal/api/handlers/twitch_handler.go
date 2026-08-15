@@ -63,6 +63,7 @@ type TwitchHandler struct {
 	PublicURL      string
 	SongRequests   *SongRequestHandler
 	Bot            *TwitchBotHandler
+	Analytics      *AnalyticsHandler
 }
 
 type twitchStartResponse struct {
@@ -197,6 +198,10 @@ func (h *TwitchHandler) Callback(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fail()
 		return
+	}
+
+	if h.Analytics != nil {
+		h.Analytics.EnsureSessionTracking(r.Context(), userID)
 	}
 
 	http.Redirect(w, r, "/streamers?twitch=connected", http.StatusFound)
@@ -599,6 +604,20 @@ func (h *TwitchHandler) handleEventSubNotification(r *http.Request, body []byte)
 	if payload.Subscription.Type == twitchBotEventType {
 		if h.Bot != nil {
 			h.Bot.HandleChatMessage(r.Context(), userID, payload.Event.ChatterUserID, payload.Event.Message.Text)
+		}
+		return
+	}
+
+	if payload.Subscription.Type == streamOnlineEventType {
+		if h.Analytics != nil {
+			h.Analytics.HandleStreamOnline(r.Context(), userID)
+		}
+		return
+	}
+
+	if payload.Subscription.Type == streamOfflineEventType {
+		if h.Analytics != nil {
+			h.Analytics.HandleStreamOffline(r.Context(), userID)
 		}
 		return
 	}

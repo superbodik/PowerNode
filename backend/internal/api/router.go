@@ -124,7 +124,12 @@ func NewRouter(deps Dependencies) http.Handler {
 		deps.DB, deps.Hub, deps.PublicURL, deps.StripeWebhookSecret, deps.StripeEnabled, deps.DonationPlatformFeeBps,
 	)
 	stripeHandler.Spotify = spotifyHandler
-	analyticsHandler := &handlers.AnalyticsHandler{DB: deps.DB, Twitch: deps.TwitchClient}
+	analyticsHandler := &handlers.AnalyticsHandler{
+		DB:             deps.DB,
+		Twitch:         deps.TwitchClient,
+		EventSubSecret: deps.TwitchEventSubSecret,
+		PublicURL:      deps.PublicURL,
+	}
 	overlayHandler := &handlers.OverlayHandler{DB: deps.DB, PublicURL: deps.PublicURL, Hub: deps.Hub}
 	songRequestHandler := &handlers.SongRequestHandler{
 		DB:             deps.DB,
@@ -143,6 +148,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		PublicURL:      deps.PublicURL,
 	}
 	twitchHandler.Bot = twitchBotHandler
+	twitchHandler.Analytics = analyticsHandler
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/login", authHandler.Login)
@@ -297,6 +303,8 @@ func NewRouter(deps Dependencies) http.Handler {
 			r.Delete("/integrations/stripe", stripeHandler.Disconnect)
 
 			r.Get("/streamers/analytics", analyticsHandler.Get)
+			r.Get("/streamers/sessions", analyticsHandler.ListSessions)
+			r.Get("/streamers/sessions/{id}", analyticsHandler.GetSession)
 
 			r.Get("/integrations/spotify/status", spotifyHandler.Status)
 			r.Post("/integrations/spotify/start", spotifyHandler.Start)
