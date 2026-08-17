@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -557,10 +558,27 @@ func (h *ServerHandler) Update(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// rebuildServerContainer recreates a server's container from its current DB
-// state, preserving whatever ports it already has published — the same
-// preserve-files-and-ports rebuild ServerAllocationHandler uses when a port
-// is added or removed.
+func (h *ServerHandler) recreateMissingContainer(ctx context.Context, serverID, nodeID int64, serverUUID uuid.UUID) error {
+	var dockerImage, startupCommand string
+	var environmentJSON []byte
+	var memoryMB, swapMB int64
+	var ioWeight int
+	var cpuPercent *int
+	if err := h.DB.QueryRow(ctx, `
+		SELECT docker_image, startup_command, environment, memory_mb, swap_mb, io_weight, cpu_percent
+		FROM servers WHERE id = $1`, serverID,
+	).Scan(&dockerImage, &startupCommand, &environmentJSON, &memoryMB, &swapMB, &ioWeight, &cpuPercent); err != nil {
+		return fmt.Errorf("load server: %w", err)
+	}
+
+	environment := map[string]string{}
+	if err := json.Unmarshal(environmentJSON, &environment); err != nil {
+		return fmt.Errorf("read server environment: %w", err)
+	}
+
+	return h.rebuildServerContainer(ctx, serverID, nodeID, serverUUID, dockerImage, startupCommand, memoryMB, swapMB, environment, ioWeight, cpuPercent)
+}
+
 func (h *ServerHandler) rebuildServerContainer(
 	ctx context.Context, serverID, nodeID int64, serverUUID uuid.UUID,
 	dockerImage, startupCommand string, memoryMB, swapMB int64,
@@ -728,6 +746,13 @@ func (h *ServerHandler) Power(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := client.Power(r.Context(), id, req.Action)
+	if err != nil && strings.Contains(err.Error(), "No such container") {
+		if rebuildErr := h.recreateMissingContainer(r.Context(), serverID, nodeID, id); rebuildErr != nil {
+			http.Error(w, "container was missing and could not be recreated: "+rebuildErr.Error(), http.StatusBadGateway)
+			return
+		}
+		resp, err = client.Power(r.Context(), id, req.Action)
+	}
 	if err != nil {
 		http.Error(w, "daemon rejected power action: "+err.Error(), http.StatusBadGateway)
 		return

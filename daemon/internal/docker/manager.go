@@ -92,13 +92,6 @@ func (m *Manager) CreateContainer(ctx context.Context, spec CreateSpec) (string,
 	}
 	openFirewallPorts(spec.PortBindings)
 
-	// A startup command runs as a shell script regardless of what the base
-	// image's own ENTRYPOINT is — some images (nginx) wrap an arbitrary CMD
-	// in a smart entrypoint script that execs it as-is, but that's a
-	// convention, not a guarantee. Images with a rigid ENTRYPOINT (a single
-	// binary, no shell) would otherwise receive our script as literal
-	// arguments to that binary instead of running it. Explicitly overriding
-	// Entrypoint makes this predictable for every image.
 	var entrypoint, cmd []string
 	if spec.StartupCommand != "" {
 		entrypoint = []string{"/bin/sh", "-c"}
@@ -134,13 +127,6 @@ func (m *Manager) CreateContainer(ctx context.Context, spec CreateSpec) (string,
 	return created.ID, nil
 }
 
-// RecreateContainer replaces a server's container with one built from spec,
-// keeping its /home/container bind mount (and therefore its files) intact.
-// Docker can't change published ports on an existing container, so this is how
-// an allocation added after creation reaches the server.
-//
-// The old container is renamed aside rather than deleted outright, so a failed
-// create can be rolled back to exactly what was running before.
 func (m *Manager) RecreateContainer(ctx context.Context, spec CreateSpec) error {
 	name := ContainerNameFor(spec.ServerUUID)
 	oldName := name + "-rebuild"
@@ -150,7 +136,6 @@ func (m *Manager) RecreateContainer(ctx context.Context, spec CreateSpec) error 
 		wasRunning = state == "running"
 	}
 
-	// Clean up after an earlier rebuild that died halfway through.
 	_ = m.cli.ContainerRemove(ctx, oldName, container.RemoveOptions{Force: true, RemoveVolumes: true})
 
 	hadContainer := true
@@ -211,12 +196,6 @@ func (m *Manager) ensureImage(ctx context.Context, image string) error {
 	return err
 }
 
-// StartContainer, StopContainer and KillContainer are idempotent: reaching a
-// state the container is already in counts as success rather than an error.
-// A user mashing the power buttons in the panel fires several of these for
-// the same container in quick succession, and Docker itself rejects e.g. a
-// second kill on a container that's already dead — without this, that
-// rejection surfaced all the way up as a 502 in the panel.
 func (m *Manager) StartContainer(ctx context.Context, containerID string) error {
 	if state, err := m.InspectState(ctx, containerID); err == nil && state == "running" {
 		return nil
@@ -252,12 +231,14 @@ func (m *Manager) KillContainer(ctx context.Context, containerID string) error {
 }
 
 func (m *Manager) RemoveContainer(ctx context.Context, containerID string) error {
-	// Best-effort: close whatever host ports this container had open before
-	// it's gone and Docker can no longer tell us what they were.
 	if info, err := m.cli.ContainerInspect(ctx, containerID); err == nil && info.HostConfig != nil {
 		closeFirewallPorts(info.HostConfig.PortBindings)
 	}
-	return m.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true, RemoveVolumes: true})
+	err := m.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true, RemoveVolumes: true})
+	if err != nil && client.IsErrNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func ContainerNameFor(serverUUID uuid.UUID) string {
@@ -327,23 +308,12 @@ func toPortMap(bindings map[string]string) (nat.PortMap, nat.PortSet, error) {
 	return portMap, portSet, nil
 }
 
-// openFirewallPorts opens each host port a container is being given so
-// traffic can actually reach it -- Docker publishing a port and the OS
-// firewall allowing it are two independent things, and nothing else in
-// this codebase manages the latter. Best-effort and non-fatal: a node
-// without ufw (or with it disabled) shouldn't fail server creation over
-// this, and it's better to at least try than to leave every allocated
-// port silently unreachable the way it was before this existed.
 func openFirewallPorts(bindings map[string]string) {
 	for containerPort, hostPort := range bindings {
 		firewallAllow(portProto(containerPort), hostPort)
 	}
 }
 
-// closeFirewallPorts is the mirror of openFirewallPorts, given Docker's
-// own port-binding shape (as returned by ContainerInspect) rather than
-// CreateSpec's -- called right before a container is removed, since that's
-// the last moment we can still ask Docker what ports it had.
 func closeFirewallPorts(bindings nat.PortMap) {
 	for port, hostBindings := range bindings {
 		for _, hb := range hostBindings {
