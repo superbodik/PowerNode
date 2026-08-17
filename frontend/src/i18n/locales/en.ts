@@ -688,7 +688,7 @@ export const en = {
   'streamers.songRequestsSkip': 'Skip',
 
   'streamers.botTile': 'Chat bot',
-  'streamers.botConnectHint': 'Connect a separate bot account so it can post in your chat -- create a second Twitch account for it first, then connect that one here.',
+  'streamers.botConnectHint': 'Connect the account the bot should post as. A separate Twitch account is recommended, but you can also authorize the same account you connected above -- the bot will just post as you.',
   'streamers.botConnect': 'Connect bot account',
   'streamers.botConnectedAs': 'Bot connected as {login}.',
   'streamers.botNeedsMainConnection': 'Connect your own Twitch account too (above) -- the bot needs to know which channel to post in.',
